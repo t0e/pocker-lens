@@ -6,16 +6,15 @@
 
 ## ⚠️ Current Implementation Status
 
-**Phase 4: Fast Entry + Natural-Language Transaction Input (Active & Completed)**
+**Phase 5: Receipt Processing Pipeline & Storage Vault (Active & Completed)**
 
-The project is under active development. Phase 4 introduces:
-- **Local Deterministic Natural-Language Parser**: Zero paid API dependency architecture (`RuleBasedParser`) parsing natural language into structured transaction drafts.
-- **Bilingual English & Vietnamese Support**: Dictionary and regex-driven detection for numbers/multipliers (`85k`, `80 nghìn`, `32tr`, `2 triệu`, `2m`), types, accounts, categories, and simple dates (`today`, `yesterday`, `hôm nay`, `hôm qua`).
-- **Human-in-the-Loop Confirmation**: Natural language input parses into a live preview draft for review/edit before saving; never silently writes to the database.
-- **Smart Account & Category Ingestion**: Context-aware account resolution scoped strictly to the authenticated user's active accounts and categories.
-- **Mobile-First Quick Add**: Modal supporting both natural quick add and comprehensive manual entry, with keyboard shortcuts (`N`, `Cmd+K` / `Ctrl+K`) and transaction repeat shortcuts.
+The project is under active development. Phase 5 introduces:
+- **Asynchronous Receipt Processing Pipeline**: BullMQ queue worker and Redis infrastructure processing receipt uploads asynchronously with exponential backoff retries.
+- **Pluggable Storage Provider & File Security**: Path-traversal proof `LocalStorageProvider` (`/data/receipts`), authentic image magic-bytes header verification (JPEG, PNG, WebP), and a 10MB size limit.
+- **Strict Ownership & Stream Delivery**: Authenticated and authorized receipt image streaming endpoints (`GET /receipts/:id/file`) ensuring complete multi-tenant isolation.
+- **Receipt Vault & Upload UI**: Mobile-first receipt dashboard with live polling status updates (`UPLOADED` -> `QUEUED` -> `PROCESSING` -> `READY`/`FAILED`), camera capture/drag-and-drop modal, and high-fidelity image inspection modals.
 
-*Receipt scanning OCR and background processing pipeline belong to Phase 5.*
+*OCR line item and transaction extraction belongs to Phase 6.*
 
 ---
 
@@ -35,7 +34,8 @@ The project is under active development. Phase 4 introduces:
 - [x] **Phase 2: Authentication + Financial Accounts** (Auth, session cookies, accounts CRUD, multi-currency, ownership enforcement)
 - [x] **Phase 3: Transactions & Cash Flow** (Income/expense logging, atomic same-currency transfers, categories, monthly summaries)
 - [x] **Phase 4: Fast Entry + Natural-Language Input** (English + Vietnamese rule-based parser, quick-add modal, draft preview, confirm flow)
-- [ ] **Phase 5: Receipt Scanning, OCR Pipeline & Multi-Currency Analytics**
+- [x] **Phase 5: Receipt Processing Pipeline, Secure Storage & Vault** (Multipart uploads, magic bytes validation, BullMQ worker, UI vault)
+- [ ] **Phase 6: Multi-Currency Analytics, Budgets & OCR Line Item Extraction**
 
 ---
 
