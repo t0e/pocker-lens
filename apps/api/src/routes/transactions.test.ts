@@ -26,7 +26,7 @@ describe('Transactions Endpoints (/transactions)', () => {
   const bankAccount = {
     id: 'acc_bank',
     userId: userA.id,
-    name: 'Main Bank',
+    name: 'Vietcombank',
     type: 'BANK',
     currency: 'VND',
     openingBalance: new Prisma.Decimal('10000000'),
@@ -40,7 +40,7 @@ describe('Transactions Endpoints (/transactions)', () => {
   const cashAccount = {
     id: 'acc_cash',
     userId: userA.id,
-    name: 'Cash Wallet',
+    name: 'Cash',
     type: 'CASH',
     currency: 'VND',
     openingBalance: new Prisma.Decimal('1000000'),
@@ -65,10 +65,124 @@ describe('Transactions Endpoints (/transactions)', () => {
     updatedAt: new Date(),
   };
 
+  const foodCategory = {
+    id: 'cat_food',
+    userId: null,
+    name: 'Food & Drink',
+    type: 'EXPENSE',
+    icon: 'utensils',
+    isSystem: true,
+    isArchived: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  const salaryCategory = {
+    id: 'cat_salary',
+    userId: null,
+    name: 'Salary',
+    type: 'INCOME',
+    icon: 'banknote',
+    isSystem: true,
+    isArchived: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
   beforeEach(() => {
     vi.restoreAllMocks();
     app = buildApp();
     vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any);
+  });
+
+  describe('POST /transactions/parse (Phase 4 Natural Language Parsing)', () => {
+    beforeEach(() => {
+      vi.spyOn(prisma.account, 'findMany').mockResolvedValue([bankAccount, cashAccount] as any);
+      vi.spyOn(prisma.category, 'findMany').mockResolvedValue([foodCategory, salaryCategory] as any);
+      vi.spyOn(prisma.transaction, 'findMany').mockResolvedValue([]);
+    });
+
+    it('parses English expense "Lunch 85k cash" into structured draft without saving to DB', async () => {
+      const createTxSpy = vi.spyOn(prisma.transaction, 'create');
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/transactions/parse',
+        headers: { authorization: 'Bearer token' },
+        payload: { text: 'Lunch 85k cash' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.parsed.type).toBe('expense');
+      expect(body.parsed.amount).toBe('85000');
+      expect(body.parsed.currency).toBe('VND');
+      expect(body.parsed.accountId).toBe(cashAccount.id);
+      expect(body.parsed.categoryName).toBe('Food & Drink');
+      expect(body.parsed.description).toContain('Lunch');
+
+      // CRITICAL: Must not write to database during parse!
+      expect(createTxSpy).not.toHaveBeenCalled();
+    });
+
+    it('parses Vietnamese expense "ăn trưa 80k tiền mặt"', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/transactions/parse',
+        headers: { authorization: 'Bearer token' },
+        payload: { text: 'ăn trưa 80k tiền mặt' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.parsed.type).toBe('expense');
+      expect(body.parsed.amount).toBe('80000');
+      expect(body.parsed.accountId).toBe(cashAccount.id);
+      expect(body.parsed.categoryName).toBe('Food & Drink');
+    });
+
+    it('parses Vietnamese transfer "chuyển 2tr từ Vietcombank sang tiền mặt"', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/transactions/parse',
+        headers: { authorization: 'Bearer token' },
+        payload: { text: 'chuyển 2tr từ Vietcombank sang tiền mặt' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.parsed.type).toBe('transfer');
+      expect(body.parsed.amount).toBe('2000000');
+      expect(body.parsed.accountId).toBe(bankAccount.id);
+      expect(body.parsed.transferAccountId).toBe(cashAccount.id);
+    });
+
+    it('parses English income "Salary 32m to Vietcombank"', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/transactions/parse',
+        headers: { authorization: 'Bearer token' },
+        payload: { text: 'Salary 32m to Vietcombank' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.parsed.type).toBe('income');
+      expect(body.parsed.amount).toBe('32000000');
+      expect(body.parsed.categoryName).toBe('Salary');
+      expect(body.parsed.accountId).toBe(bankAccount.id);
+    });
+
+    it('rejects empty input text with 400', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/transactions/parse',
+        headers: { authorization: 'Bearer token' },
+        payload: { text: '' },
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
   });
 
   describe('Accounting Lifecycle: Expense', () => {

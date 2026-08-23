@@ -13,6 +13,9 @@ import {
   PaginatedTransactionsResponse,
   MonthlyFinancialSummaryResponse,
   CurrencyMonthlySummary,
+  RuleBasedParser,
+  ParserUserContext,
+  ParseTransactionResult,
 } from '@pocketlens/shared';
 import { prisma } from '../db/client.js';
 import { formatAccountResponse } from './accounts.js';
@@ -40,8 +43,84 @@ export function formatTransactionResponse(tx: any): TransactionResponse {
   };
 }
 
+const parser = new RuleBasedParser();
+
 export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);
+
+  // POST /transactions/parse (Natural Language Parser - Does NOT create transaction)
+  fastify.post('/transactions/parse', async (request, reply) => {
+    const body = request.body as { text?: string };
+    const text = body?.text || '';
+    const userId = request.user.id;
+
+    if (!text || typeof text !== 'string') {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: 'Input text string is required for parsing',
+      });
+    }
+
+    // Load User Accounts Context
+    const accounts = await prisma.account.findMany({
+      where: { userId, isArchived: false },
+      orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
+    });
+
+    // Load User Categories Context
+    const categories = await prisma.category.findMany({
+      where: {
+        AND: [
+          { OR: [{ isSystem: true }, { userId }] },
+          { isArchived: false },
+        ],
+      },
+    });
+
+    // Load recent 10 transactions for context
+    const recentTx = await prisma.transaction.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: {
+        description: true,
+        merchant: true,
+        accountId: true,
+        categoryId: true,
+        type: true,
+      },
+    });
+
+    const parserContext: ParserUserContext = {
+      accounts: accounts.map((a) => ({
+        id: a.id,
+        name: a.name,
+        type: a.type.toLowerCase(),
+        currency: a.currency,
+        isDefault: a.isDefault,
+        isArchived: a.isArchived,
+      })),
+      categories: categories.map((c) => ({
+        id: c.id,
+        name: c.name,
+        type: c.type.toLowerCase() as 'expense' | 'income',
+        icon: c.icon,
+        isSystem: c.isSystem,
+      })),
+      recentTransactions: recentTx.map((tx) => ({
+        description: tx.description,
+        merchant: tx.merchant,
+        accountId: tx.accountId,
+        categoryId: tx.categoryId,
+        type: tx.type.toLowerCase() as TransactionType,
+      })),
+      preferredCurrency: accounts.find((a) => a.isDefault)?.currency || accounts[0]?.currency || 'VND',
+    };
+
+    const result = parser.parse(text, parserContext);
+    return reply.send(result);
+  });
 
   // GET /transactions/summary (Monthly Income, Expense, Net per Currency)
   fastify.get('/transactions/summary', async (request, reply) => {
@@ -281,7 +360,7 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Enforce same-currency transfers for Phase 3
+      // Enforce same-currency transfers for Phase 3/4
       if (sourceAccount.currency !== destinationAccount.currency) {
         return reply.status(400).send({
           statusCode: 400,
