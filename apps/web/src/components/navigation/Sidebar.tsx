@@ -10,15 +10,17 @@ import {
   PieChart,
   Camera,
   Settings,
-  Sparkles,
+  LogOut,
+  User as UserIcon,
 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/Badge';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/transactions', label: 'Transactions', icon: ReceiptText },
   { href: '/accounts', label: 'Accounts', icon: Landmark },
+  { href: '/transactions', label: 'Transactions', icon: ReceiptText },
   { href: '/budgets', label: 'Budgets', icon: PieChart },
   { href: '/receipts', label: 'Receipts', icon: Camera },
   { href: '/settings', label: 'Settings', icon: Settings },
@@ -26,6 +28,7 @@ const NAV_ITEMS = [
 
 export const Sidebar: React.FC = () => {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
 
   return (
     <aside className="hidden lg:flex flex-col w-64 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 select-none shrink-0 h-screen sticky top-0">
@@ -42,7 +45,7 @@ export const Sidebar: React.FC = () => {
             <span className="text-xs text-zinc-400 font-medium">Finance Tracker</span>
           </div>
         </Link>
-        <Badge variant="phase">Phase 1</Badge>
+        <Badge variant="phase">Phase 2</Badge>
       </div>
 
       {/* Navigation Links */}
@@ -68,18 +71,31 @@ export const Sidebar: React.FC = () => {
         })}
       </nav>
 
-      {/* Footer / System Status */}
-      <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
-        <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900/60 p-3 border border-zinc-100 dark:border-zinc-800/80">
-          <div className="flex items-center space-x-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-            <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
-            <span>Phase 1: Foundation</span>
+      {/* User Profile / Logout Footer */}
+      {user && (
+        <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+          <div className="flex items-center justify-between p-2 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center space-x-2.5 min-w-0">
+              <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0">
+                {user.displayName.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                  {user.displayName}
+                </div>
+                <div className="text-[10px] text-zinc-400 truncate">{user.email}</div>
+              </div>
+            </div>
+            <button
+              onClick={() => logout()}
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
+              title="Sign Out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
-          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
-            Application shell, Docker, API, and Worker ready.
-          </p>
         </div>
-      </div>
+      )}
     </aside>
   );
 };
