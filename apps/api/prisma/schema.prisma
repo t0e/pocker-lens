@@ -7,8 +7,7 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Phase 1: Foundation baseline table for system health and schema verification
-// Note: Business tables (transactions, accounts, budgets, receipts) will be added in subsequent phases.
+// Phase 1: Foundation baseline table
 model SystemMetadata {
   id        String   @id @default(cuid())
   key       String   @unique
@@ -17,4 +16,64 @@ model SystemMetadata {
   updatedAt DateTime @updatedAt
 
   @@map("_system_metadata")
+}
+
+// Phase 2: Users
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  displayName  String    @map("display_name")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  accounts     Account[]
+  sessions     Session[]
+
+  @@map("users")
+}
+
+// Phase 2: Persistent Server-Side Sessions
+model Session {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("sessions")
+}
+
+enum AccountType {
+  CASH        @map("cash")
+  BANK        @map("bank")
+  CREDIT_CARD @map("credit_card")
+  SAVINGS     @map("savings")
+  E_WALLET    @map("e_wallet")
+  OTHER       @map("other")
+}
+
+// Phase 2: Financial Accounts
+model Account {
+  id             String      @id @default(cuid())
+  userId         String      @map("user_id")
+  name           String
+  type           AccountType
+  currency       String      @db.VarChar(3)
+  openingBalance Decimal     @default(0) @db.Decimal(19, 4) @map("opening_balance")
+  currentBalance Decimal     @default(0) @db.Decimal(19, 4) @map("current_balance")
+  isArchived     Boolean     @default(false) @map("is_archived")
+  isDefault      Boolean     @default(false) @map("is_default")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isArchived])
+  @@map("accounts")
 }

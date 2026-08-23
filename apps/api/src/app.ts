@@ -2,7 +2,12 @@ import fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import sensible from '@fastify/sensible';
+import cookie from '@fastify/cookie';
+import authPlugin from './plugins/auth.js';
 import { healthRoutes } from './routes/health.js';
+import { authRoutes } from './routes/auth.js';
+import { accountRoutes } from './routes/accounts.js';
+import { config } from './config/env.js';
 
 export function buildApp(): FastifyInstance {
   const app = fastify({
@@ -12,8 +17,15 @@ export function buildApp(): FastifyInstance {
     disableRequestLogging: false,
   });
 
+  // CORS configured to allow cookie credentials from frontend origins
   app.register(cors, {
-    origin: true,
+    origin: [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:4000',
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
   app.register(helmet, {
@@ -22,8 +34,19 @@ export function buildApp(): FastifyInstance {
 
   app.register(sensible);
 
-  // Health check routes
+  // Cookie parser & signer
+  app.register(cookie, {
+    secret: config.COOKIE_SECRET,
+    hook: 'onRequest',
+  });
+
+  // Auth Decorator & Hooks
+  app.register(authPlugin);
+
+  // Routes
   app.register(healthRoutes);
+  app.register(authRoutes);
+  app.register(accountRoutes);
 
   // Centralized error handler
   app.setErrorHandler((error, request, reply) => {
