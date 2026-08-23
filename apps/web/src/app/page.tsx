@@ -21,6 +21,8 @@ import {
   ArrowLeftRight,
   TrendingUp,
   ReceiptText,
+  PieChart,
+  Calendar,
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -34,6 +36,8 @@ import {
   CategoryResponse,
   MonthlyFinancialSummaryResponse,
   PaginatedTransactionsResponse,
+  MonthlyBudgetsResponse,
+  UpcomingOccurrenceResponse,
 } from '@pocketlens/shared';
 import { TransactionModal } from '@/components/transactions/TransactionModal';
 import { apiClient } from '@/lib/api-client';
@@ -45,6 +49,8 @@ export default function DashboardPage() {
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<TransactionResponse[]>([]);
   const [monthlySummary, setMonthlySummary] = useState<MonthlyFinancialSummaryResponse | null>(null);
+  const [monthlyBudgets, setMonthlyBudgets] = useState<MonthlyBudgetsResponse | null>(null);
+  const [upcomingPayments, setUpcomingPayments] = useState<UpcomingOccurrenceResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showBalance, setShowBalance] = useState(true);
 
@@ -54,17 +60,22 @@ export default function DashboardPage() {
   const fetchDashboardData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [accData, catData, txData, summaryData] = await Promise.all([
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const [accData, catData, txData, summaryData, budgetData, upcomingData] = await Promise.all([
         apiClient<AccountResponse[]>('/accounts'),
         apiClient<CategoryResponse[]>('/categories'),
         apiClient<PaginatedTransactionsResponse>('/transactions?limit=5'),
         apiClient<MonthlyFinancialSummaryResponse>('/transactions/summary'),
+        apiClient<MonthlyBudgetsResponse>(`/budgets?month=${currentMonth}`).catch(() => null),
+        apiClient<{ upcoming: UpcomingOccurrenceResponse[] }>('/recurring/upcoming?days=14').catch(() => ({ upcoming: [] })),
       ]);
 
       setAccounts(accData);
       setCategories(catData);
       setRecentTransactions(txData.transactions);
       setMonthlySummary(summaryData);
+      setMonthlyBudgets(budgetData);
+      setUpcomingPayments(upcomingData.upcoming || []);
     } catch {
       // Fallback
     } finally {
@@ -75,23 +86,6 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
-
-  const getAccountIcon = (type: AccountType) => {
-    switch (type) {
-      case 'bank':
-        return <Landmark className="h-4 w-4" />;
-      case 'credit_card':
-        return <CreditCard className="h-4 w-4" />;
-      case 'savings':
-        return <PiggyBank className="h-4 w-4" />;
-      case 'e_wallet':
-        return <Smartphone className="h-4 w-4" />;
-      case 'cash':
-        return <Wallet className="h-4 w-4" />;
-      default:
-        return <CircleDot className="h-4 w-4" />;
-    }
-  };
 
   // Group balances per ISO currency
   const currencyTotals = accounts.reduce((acc, account) => {
@@ -116,11 +110,11 @@ export default function DashboardPage() {
             </h2>
             <Badge variant="success" className="space-x-1 hidden sm:inline-flex">
               <ShieldCheck className="h-3 w-3" />
-              <span>Phase 3 Verified</span>
+              <span>Phase 7 Active</span>
             </Badge>
           </div>
           <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
-            Real-time balance tracking, income/expenses, and account transfers.
+            Real-time balance tracking, category budgets, subscriptions, and receipt scanning.
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -133,10 +127,16 @@ export default function DashboardPage() {
             <Plus className="h-3.5 w-3.5" />
             <span>Add Transaction</span>
           </Button>
-          <Link href="/accounts">
+          <Link href="/receipts">
             <Button variant="outline" size="sm" className="space-x-1.5 text-xs">
-              <Wallet className="h-3.5 w-3.5" />
-              <span>Accounts</span>
+              <ReceiptText className="h-3.5 w-3.5" />
+              <span>Scan Receipt</span>
+            </Button>
+          </Link>
+          <Link href="/budgets">
+            <Button variant="outline" size="sm" className="space-x-1.5 text-xs">
+              <PieChart className="h-3.5 w-3.5" />
+              <span>Budgets</span>
             </Button>
           </Link>
         </div>
@@ -188,62 +188,137 @@ export default function DashboardPage() {
         </CardHeader>
       </Card>
 
-      {/* Monthly Financial Cash Flow Summary (Per Currency, Excluding Transfers) */}
-      {monthlySummary && monthlySummary.summaries.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-500 flex items-center space-x-1.5">
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
-              <span>Current Month Cash Flow ({monthlySummary.month})</span>
-            </h3>
+      {/* Monthly Budgets & Upcoming Payments Widgets */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Budget Progress Widget */}
+        <Card className="p-4 sm:p-5 flex flex-col justify-between">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <PieChart className="h-4 w-4 text-emerald-500" />
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                  Monthly Budget Status
+                </h3>
+              </div>
+              <Link
+                href="/budgets"
+                className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center space-x-0.5"
+              >
+                <span>Manage</span>
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+
+            {monthlyBudgets && Object.keys(monthlyBudgets.summaries).length > 0 ? (
+              <div className="space-y-3 pt-1">
+                {Object.entries(monthlyBudgets.summaries).map(([currency, sum]) => (
+                  <div key={currency} className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-800 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                        {currency} Monthly Budget
+                      </span>
+                      <span className={`font-extrabold font-mono ${
+                        sum.overallPercentage >= 100 ? 'text-rose-600' : 'text-emerald-600'
+                      }`}>
+                        {sum.overallPercentage}%
+                      </span>
+                    </div>
+
+                    <div className="h-2 w-full rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          sum.overallPercentage >= 100
+                            ? 'bg-rose-500'
+                            : sum.overallPercentage >= 80
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${Math.min(sum.overallPercentage, 100)}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                      <span>{formatMoney(sum.totalSpent, currency)} spent</span>
+                      <span>
+                        {sum.totalRemaining >= 0
+                          ? `${formatMoney(sum.totalRemaining, currency)} left`
+                          : `Over by ${formatMoney(Math.abs(sum.totalRemaining), currency)}`}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-6 text-center space-y-2">
+                <p className="text-xs text-zinc-400">No category budgets set for this month</p>
+                <Link href="/budgets">
+                  <Button variant="outline" size="sm" className="text-xs space-x-1">
+                    <Plus className="h-3 w-3" />
+                    <span>Set Monthly Budget</span>
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
+        </Card>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {monthlySummary.summaries.map((s) => (
-              <Card key={s.currency} className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <Badge variant="default" className="font-mono text-xs font-bold">
-                    {s.currency} Summary
-                  </Badge>
-                  <span className="text-[11px] text-zinc-400">Excludes transfers</span>
-                </div>
+        {/* Upcoming Payments Widget */}
+        <Card className="p-4 sm:p-5 flex flex-col justify-between">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-4 w-4 text-indigo-500" />
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                  Upcoming Payments (Next 14 Days)
+                </h3>
+              </div>
+              <Link
+                href="/budgets"
+                className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center space-x-0.5"
+              >
+                <span>View all</span>
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
 
-                <div className="grid grid-cols-3 gap-2 pt-1 text-center">
-                  <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40">
-                    <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 block">
-                      Income
-                    </span>
-                    <span className="text-xs sm:text-sm font-extrabold text-emerald-700 dark:text-emerald-400 mt-0.5 block truncate">
-                      +{formatMoney(s.income, s.currency)}
-                    </span>
-                  </div>
-
-                  <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/40">
-                    <span className="text-[10px] font-semibold text-rose-700 dark:text-rose-300 block">
-                      Expenses
-                    </span>
-                    <span className="text-xs sm:text-sm font-extrabold text-rose-700 dark:text-rose-400 mt-0.5 block truncate">
-                      -{formatMoney(s.expense, s.currency)}
-                    </span>
-                  </div>
-
-                  <div className="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/60">
-                    <span className="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400 block">
-                      Net Flow
-                    </span>
-                    <span className="text-xs sm:text-sm font-extrabold text-zinc-900 dark:text-zinc-100 mt-0.5 block truncate">
-                      {parseFloat(s.net) >= 0 ? '+' : ''}
-                      {formatMoney(s.net, s.currency)}
-                    </span>
-                  </div>
-                </div>
-              </Card>
-            ))}
+            {upcomingPayments.length > 0 ? (
+              <div className="divide-y divide-zinc-100 dark:divide-zinc-800/80 pt-1">
+                {upcomingPayments.slice(0, 3).map((item, idx) => {
+                  const d = new Date(item.scheduledFor);
+                  return (
+                    <div key={idx} className="py-2 flex items-center justify-between text-xs">
+                      <div className="flex items-center space-x-2.5 min-w-0">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 shrink-0 font-mono">
+                          {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                        <span className="font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                          {item.description}
+                        </span>
+                      </div>
+                      <span className="font-bold font-mono text-zinc-900 dark:text-zinc-100 shrink-0">
+                        {item.type === 'EXPENSE' ? '-' : '+'}
+                        {formatMoney(item.amount, item.currency)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-6 text-center space-y-2">
+                <p className="text-xs text-zinc-400">No upcoming payments in the next 14 days</p>
+                <Link href="/budgets">
+                  <Button variant="outline" size="sm" className="text-xs space-x-1">
+                    <Plus className="h-3 w-3" />
+                    <span>Add Recurring / Subscription</span>
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        </Card>
+      </div>
 
-      {/* Grid: Recent Transactions & Account Snapshot */}
+      {/* Grid: Recent Transactions & Implementation Stage */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Transactions List */}
         <Card className="lg:col-span-2">
@@ -355,21 +430,21 @@ export default function DashboardPage() {
           <CardContent className="space-y-3 text-xs">
             <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 space-y-1">
               <div className="font-bold text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
-                <span>Phase 3: Transactions</span>
+                <span>Phase 7: Budgets & Subscriptions</span>
                 <Badge variant="success">Active & Verified</Badge>
               </div>
               <p className="text-emerald-700 dark:text-emerald-400 text-[11px] leading-relaxed">
-                Income, expenses, and same-currency atomic transfers with zero balance drift.
+                Category spending limits, subscription tracking, and idempotent recurring execution.
               </p>
             </div>
 
             <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 space-y-1 opacity-80">
               <div className="font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between">
-                <span>Phase 4: Receipt Scanning & OCR</span>
+                <span>Phase 8: Multi-Currency Analytics</span>
                 <Badge variant="phase">Next Phase</Badge>
               </div>
               <p className="text-zinc-500 text-[11px] leading-relaxed">
-                English and Vietnamese receipt extraction via background BullMQ worker pipeline.
+                Comprehensive analytics charts, exchange rate trends, and multi-currency reporting.
               </p>
             </div>
           </CardContent>

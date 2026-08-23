@@ -16,7 +16,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/transactions': 'Transactions & Activity',
   '/accounts': 'Accounts & Wallets',
   '/receipts': 'Receipt Scanner & Vault',
-  '/budgets': 'Budgets (Phase 6)',
+  '/budgets': 'Budgets & Recurring',
   '/settings': 'Settings & Profile',
 };
 
@@ -50,7 +50,7 @@ export const Header: React.FC = () => {
           {title}
         </h1>
         <div className="hidden sm:inline-flex">
-          <Badge variant="success">Phase 6 Active</Badge>
+          <Badge variant="success">Phase 7 Active</Badge>
         </div>
       </div>
 
