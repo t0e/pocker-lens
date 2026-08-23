@@ -11,6 +11,7 @@ import {
   Layers,
   Edit2,
   Trash2,
+  RotateCcw,
   Loader2,
   ReceiptText,
   AlertCircle,
@@ -32,7 +33,6 @@ import {
   Award,
   TrendingUp,
   Gift,
-  RotateCcw,
   PlusCircle,
   Tag,
 } from 'lucide-react';
@@ -68,6 +68,7 @@ export default function TransactionsPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<TransactionResponse | null>(null);
+  const [repeatTransaction, setRepeatTransaction] = useState<TransactionResponse | null>(null);
 
   // Fetch accounts & categories once
   useEffect(() => {
@@ -121,13 +122,41 @@ export default function TransactionsPage() {
     fetchTransactions();
   }, [fetchTransactions]);
 
+  // Keyboard shortcut listener ('N' or 'Cmd+K' / 'Ctrl+K')
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = (document.activeElement?.tagName || '').toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+        return;
+      }
+
+      if (e.key === 'n' || e.key === 'N' || ((e.metaKey || e.ctrlKey) && e.key === 'k')) {
+        e.preventDefault();
+        setEditingTransaction(null);
+        setRepeatTransaction(null);
+        setIsModalOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleOpenCreate = () => {
     setEditingTransaction(null);
+    setRepeatTransaction(null);
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (tx: TransactionResponse) => {
+    setRepeatTransaction(null);
     setEditingTransaction(tx);
+    setIsModalOpen(true);
+  };
+
+  const handleRepeat = (tx: TransactionResponse) => {
+    setEditingTransaction(null);
+    setRepeatTransaction(tx);
     setIsModalOpen(true);
   };
 
@@ -217,9 +246,12 @@ export default function TransactionsPage() {
       {/* Header and Quick Add Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Transactions
-          </h2>
+          <div className="flex items-center space-x-2">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+              Transactions
+            </h2>
+            <Badge variant="phase" className="text-[10px] hidden sm:inline-flex">Press &apos;N&apos; for Quick Add</Badge>
+          </div>
           <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
             Log and manage your expenses, income, and account transfers
           </p>
@@ -230,8 +262,8 @@ export default function TransactionsPage() {
           onClick={handleOpenCreate}
           className="space-x-1.5 shadow-sm shadow-emerald-500/10"
         >
-          <Plus className="h-4 w-4" />
-          <span>Add Transaction</span>
+          <Sparkles className="h-4 w-4" />
+          <span>Quick Add</span>
         </Button>
       </div>
 
@@ -327,12 +359,12 @@ export default function TransactionsPage() {
               <p className="text-xs text-zinc-500">
                 {typeFilter !== 'all' || accountFilter !== 'all' || categoryFilter !== 'all'
                   ? 'No transactions match the selected filters.'
-                  : 'Start logging your daily expenses, salary income, or account transfers.'}
+                  : 'Start logging your daily expenses, salary income, or account transfers with natural language or manual entry.'}
               </p>
             </div>
             <Button variant="primary" size="md" onClick={handleOpenCreate} className="space-x-1.5">
-              <Plus className="h-4 w-4" />
-              <span>Add Transaction</span>
+              <Sparkles className="h-4 w-4" />
+              <span>Add First Transaction</span>
             </Button>
           </CardContent>
         </Card>
@@ -439,6 +471,13 @@ export default function TransactionsPage() {
                         {/* Actions */}
                         <div className="flex items-center space-x-1 opacity-80 group-hover:opacity-100 transition-opacity">
                           <button
+                            onClick={() => handleRepeat(tx)}
+                            className="p-1.5 rounded-lg text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                            title="Repeat Transaction"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </button>
+                          <button
                             onClick={() => handleOpenEdit(tx)}
                             className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                             title="Edit Transaction"
@@ -500,6 +539,7 @@ export default function TransactionsPage() {
         onClose={() => setIsModalOpen(false)}
         onSuccess={fetchTransactions}
         editingTransaction={editingTransaction}
+        repeatTransaction={repeatTransaction}
         accounts={accounts}
         categories={categories}
       />

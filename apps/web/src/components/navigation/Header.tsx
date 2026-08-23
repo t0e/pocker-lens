@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Plus, LogOut } from 'lucide-react';
+import { Sparkles, LogOut } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -16,7 +16,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/transactions': 'Transactions & Activity',
   '/accounts': 'Accounts & Wallets',
   '/budgets': 'Budgets (Phase 5)',
-  '/receipts': 'Receipt Scanner (Phase 4)',
+  '/receipts': 'Receipt Scanner (Phase 5)',
   '/settings': 'Settings & Profile',
 };
 
@@ -50,7 +50,7 @@ export const Header: React.FC = () => {
           {title}
         </h1>
         <div className="hidden sm:inline-flex">
-          <Badge variant="success">Phase 3 Active</Badge>
+          <Badge variant="success">Phase 4 Active</Badge>
         </div>
       </div>
 
@@ -60,10 +60,10 @@ export const Header: React.FC = () => {
             variant="primary"
             size="sm"
             onClick={() => setIsModalOpen(true)}
-            className="space-x-1 text-xs shadow-sm shadow-emerald-500/10"
+            className="space-x-1.5 text-xs shadow-sm shadow-emerald-500/10"
           >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Add Entry</span>
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>Quick Add</span>
           </Button>
         )}
 
@@ -92,7 +92,6 @@ export const Header: React.FC = () => {
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           onSuccess={() => {
-            // Trigger refresh if on page that listens or reload current view
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('transaction-updated'));
             }
