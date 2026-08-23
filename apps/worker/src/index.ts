@@ -1,14 +1,18 @@
 import pino from 'pino';
+import { Worker } from 'bullmq';
 import { config } from './config/env.js';
-import { createRedisConnection, createReceiptQueue } from './queue/index.js';
+import { createRedisConnection } from './queue/index.js';
+import { QUEUE_NAMES, ReceiptJobData, ReceiptJobResult } from '@pocketlens/shared';
 import { createStorageProvider } from '@pocketlens/shared/server';
+import { processReceiptJob } from './processor/receipt.js';
+import { prisma } from './db/client.js';
 
 const logger = pino({
   level: config.NODE_ENV === 'test' ? 'silent' : 'info',
 });
 
+let worker: Worker<ReceiptJobData, ReceiptJobResult> | null = null;
 let redisConnection: ReturnType<typeof createRedisConnection> | null = null;
-let receiptQueue: ReturnType<typeof createReceiptQueue> | null = null;
 
 async function startWorker() {
   logger.info({ env: config.NODE_ENV }, '🚀 Initializing PocketLens Background Worker...');
@@ -31,11 +35,25 @@ async function startWorker() {
     const pong = await redisConnection.ping();
     logger.info({ pong }, '✅ Redis connection established');
 
-    // Initialize BullMQ Queue structure (ready for Phase 2 receipt jobs)
-    receiptQueue = createReceiptQueue(redisConnection);
-    logger.info({ queue: receiptQueue.name }, '📬 Receipt processing queue structure registered');
+    // Start BullMQ Worker on 'receipt-processing'
+    worker = new Worker<ReceiptJobData, ReceiptJobResult>(
+      QUEUE_NAMES.RECEIPT_PROCESSING,
+      processReceiptJob,
+      {
+        connection: redisConnection,
+        concurrency: 2,
+      }
+    );
 
-    logger.info('⚡ PocketLens Worker started and idle (awaiting Phase 2 job processors)');
+    worker.on('completed', (job) => {
+      logger.info({ jobId: job.id, receiptId: job.data.receiptId }, 'Job successfully completed');
+    });
+
+    worker.on('failed', (job, err) => {
+      logger.error({ jobId: job?.id, receiptId: job?.data.receiptId, err: err.message }, 'Job failed');
+    });
+
+    logger.info('⚡ PocketLens BullMQ Worker active and listening for receipt jobs');
   } catch (err) {
     logger.error({ err }, '❌ Fatal worker startup failure');
     process.exit(1);
@@ -50,15 +68,18 @@ async function shutdown(signal: string) {
   logger.info(`Received ${signal}. Shutting down worker gracefully...`);
 
   try {
-    if (receiptQueue) {
-      await receiptQueue.close();
-      logger.info('BullMQ queue closed');
+    if (worker) {
+      await worker.close();
+      logger.info('BullMQ worker closed');
     }
 
     if (redisConnection) {
       await redisConnection.quit();
       logger.info('Redis connection closed');
     }
+
+    await prisma.$disconnect();
+    logger.info('Prisma disconnected');
 
     logger.info('Graceful shutdown complete. Goodbye.');
     process.exit(0);
