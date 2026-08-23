@@ -20,15 +20,17 @@ model SystemMetadata {
 
 // Phase 2: Users
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String    @map("password_hash")
-  displayName  String    @map("display_name")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id           String        @id @default(cuid())
+  email        String        @unique
+  passwordHash String        @map("password_hash")
+  displayName  String        @map("display_name")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
 
   accounts     Account[]
   sessions     Session[]
+  categories   Category[]
+  transactions Transaction[]
 
   @@map("users")
 }
@@ -59,21 +61,85 @@ enum AccountType {
 
 // Phase 2: Financial Accounts
 model Account {
-  id             String      @id @default(cuid())
-  userId         String      @map("user_id")
-  name           String
-  type           AccountType
-  currency       String      @db.VarChar(3)
-  openingBalance Decimal     @default(0) @db.Decimal(19, 4) @map("opening_balance")
-  currentBalance Decimal     @default(0) @db.Decimal(19, 4) @map("current_balance")
-  isArchived     Boolean     @default(false) @map("is_archived")
-  isDefault      Boolean     @default(false) @map("is_default")
-  createdAt      DateTime    @default(now()) @map("created_at")
-  updatedAt      DateTime    @updatedAt @map("updated_at")
+  id                   String        @id @default(cuid())
+  userId               String        @map("user_id")
+  name                 String
+  type                 AccountType
+  currency             String        @db.VarChar(3)
+  openingBalance       Decimal       @default(0) @db.Decimal(19, 4) @map("opening_balance")
+  currentBalance       Decimal       @default(0) @db.Decimal(19, 4) @map("current_balance")
+  isArchived           Boolean       @default(false) @map("is_archived")
+  isDefault            Boolean       @default(false) @map("is_default")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
 
-  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions         Transaction[] @relation("AccountTransactions")
+  transferTransactions Transaction[] @relation("TransferTransactions")
 
   @@index([userId])
   @@index([userId, isArchived])
   @@map("accounts")
+}
+
+enum CategoryType {
+  EXPENSE @map("expense")
+  INCOME  @map("income")
+}
+
+// Phase 3: Categories (System defaults + user custom categories)
+model Category {
+  id           String        @id @default(cuid())
+  userId       String?       @map("user_id")
+  name         String
+  type         CategoryType
+  icon         String?
+  isSystem     Boolean       @default(false) @map("is_system")
+  isArchived   Boolean       @default(false) @map("is_archived")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([userId])
+  @@index([type])
+  @@map("categories")
+}
+
+enum TransactionType {
+  EXPENSE  @map("expense")
+  INCOME   @map("income")
+  TRANSFER @map("transfer")
+}
+
+// Phase 3: Financial Transactions
+model Transaction {
+  id                String          @id @default(cuid())
+  userId            String          @map("user_id")
+  type              TransactionType
+  accountId         String          @map("account_id")
+  transferAccountId String?         @map("transfer_account_id")
+  categoryId        String?         @map("category_id")
+  amount            Decimal         @db.Decimal(19, 4)
+  currency          String          @db.VarChar(3)
+  transactionDate   DateTime        @map("transaction_date")
+  description       String
+  merchant          String?
+  notes             String?
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account           Account         @relation("AccountTransactions", fields: [accountId], references: [id], onDelete: Cascade)
+  transferAccount   Account?        @relation("TransferTransactions", fields: [transferAccountId], references: [id], onDelete: SetNull)
+  category          Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([accountId])
+  @@index([transferAccountId])
+  @@index([categoryId])
+  @@index([transactionDate])
+  @@index([userId, transactionDate])
+  @@map("transactions")
 }
