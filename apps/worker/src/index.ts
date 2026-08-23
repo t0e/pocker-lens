@@ -5,6 +5,7 @@ import { createRedisConnection } from './queue/index.js';
 import { QUEUE_NAMES, ReceiptJobData, ReceiptJobResult } from '@pocketlens/shared';
 import { createStorageProvider } from '@pocketlens/shared/server';
 import { processReceiptJob } from './processor/receipt.js';
+import { runRecurringScheduler } from './scheduler/recurring.js';
 import { prisma } from './db/client.js';
 
 const logger = pino({
@@ -13,6 +14,7 @@ const logger = pino({
 
 let worker: Worker<ReceiptJobData, ReceiptJobResult> | null = null;
 let redisConnection: ReturnType<typeof createRedisConnection> | null = null;
+let recurringTimer: NodeJS.Timeout | null = null;
 
 async function startWorker() {
   logger.info({ env: config.NODE_ENV }, '🚀 Initializing PocketLens Background Worker...');
@@ -54,6 +56,25 @@ async function startWorker() {
     });
 
     logger.info('⚡ PocketLens BullMQ Worker active and listening for receipt jobs');
+
+    // Run recurring scheduler immediately on startup, then periodically every 60s
+    try {
+      await runRecurringScheduler();
+    } catch (schedErr: any) {
+      logger.warn({ err: schedErr.message }, 'Initial recurring scheduler run completed with errors');
+    }
+
+    recurringTimer = setInterval(async () => {
+      try {
+        await runRecurringScheduler();
+      } catch (err: any) {
+        logger.error({ err: err.message }, 'Recurring scheduler tick error');
+      }
+    }, 60000);
+
+    if (recurringTimer && typeof recurringTimer.unref === 'function') {
+      recurringTimer.unref();
+    }
   } catch (err) {
     logger.error({ err }, '❌ Fatal worker startup failure');
     process.exit(1);
@@ -68,6 +89,11 @@ async function shutdown(signal: string) {
   logger.info(`Received ${signal}. Shutting down worker gracefully...`);
 
   try {
+    if (recurringTimer) {
+      clearInterval(recurringTimer);
+      recurringTimer = null;
+    }
+
     if (worker) {
       await worker.close();
       logger.info('BullMQ worker closed');
