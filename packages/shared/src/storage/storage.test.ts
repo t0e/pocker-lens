@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { LocalStorageProvider } from './index.js';
+import { LocalStorageProvider } from './local.js';
 
 describe('LocalStorageProvider', () => {
   let tempDir: string;

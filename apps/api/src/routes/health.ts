@@ -1,7 +1,8 @@
 import { FastifyPluginAsync } from 'fastify';
 import { checkDatabaseHealth } from '../db/client.js';
 import { checkRedisHealth } from '../redis/client.js';
-import { createStorageProvider, HealthStatus } from '@pocketlens/shared';
+import { createStorageProvider } from '@pocketlens/shared/server';
+import { HealthStatus } from '@pocketlens/shared';
 import { config } from '../config/env.js';
 
 export const healthRoutes: FastifyPluginAsync = async (fastify) => {

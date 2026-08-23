@@ -1,7 +1,7 @@
 import pino from 'pino';
 import { config } from './config/env.js';
 import { createRedisConnection, createReceiptQueue } from './queue/index.js';
-import { createStorageProvider } from '@pocketlens/shared';
+import { createStorageProvider } from '@pocketlens/shared/server';
 
 const logger = pino({
   level: config.NODE_ENV === 'test' ? 'silent' : 'info',

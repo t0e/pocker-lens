@@ -6,14 +6,14 @@ import os from 'node:os';
 dotenv.config();
 dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 
-const isTest = process.env.NODE_ENV === 'test';
-
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   API_PORT: z.coerce.number().default(4000),
   HOST: z.string().default('0.0.0.0'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   REDIS_URL: z.string().min(1, 'REDIS_URL is required'),
+  COOKIE_SECRET: z.string().min(16).default('pocketlens_dev_secret_cookie_key_32_chars_long'),
+  SESSION_EXPIRY_DAYS: z.coerce.number().default(30),
   STORAGE_PROVIDER: z.enum(['local', 's3']).default('local'),
   RECEIPT_STORAGE_PATH: z.string().default('/data/receipts'),
 });
@@ -30,6 +30,9 @@ export function loadEnv(): Env {
     }
     if (!rawData.REDIS_URL) {
       rawData.REDIS_URL = 'redis://localhost:6379';
+    }
+    if (!rawData.COOKIE_SECRET) {
+      rawData.COOKIE_SECRET = 'pocketlens_test_cookie_secret_32_characters';
     }
   }
 

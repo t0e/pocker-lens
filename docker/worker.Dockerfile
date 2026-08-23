@@ -31,7 +31,7 @@ COPY packages/shared/package.json ./packages/shared/
 COPY apps/worker/package.json ./apps/worker/
 
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder /app/apps/worker/dist ./apps/worker/dist
+COPY --from=builder /app/packages/shared ./packages/shared
+COPY --from=builder /app/apps/worker ./apps/worker
 
 CMD ["node", "./apps/worker/dist/index.js"]
