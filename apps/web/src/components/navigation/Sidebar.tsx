@@ -11,7 +11,6 @@ import {
   Camera,
   Settings,
   LogOut,
-  User as UserIcon,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
@@ -19,8 +18,8 @@ import { Badge } from '../ui/Badge';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/accounts', label: 'Accounts', icon: Landmark },
   { href: '/transactions', label: 'Transactions', icon: ReceiptText },
+  { href: '/accounts', label: 'Accounts', icon: Landmark },
   { href: '/budgets', label: 'Budgets', icon: PieChart },
   { href: '/receipts', label: 'Receipts', icon: Camera },
   { href: '/settings', label: 'Settings', icon: Settings },
@@ -45,7 +44,7 @@ export const Sidebar: React.FC = () => {
             <span className="text-xs text-zinc-400 font-medium">Finance Tracker</span>
           </div>
         </Link>
-        <Badge variant="phase">Phase 2</Badge>
+        <Badge variant="phase">Phase 3</Badge>
       </div>
 
       {/* Navigation Links */}
