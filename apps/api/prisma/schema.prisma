@@ -31,6 +31,7 @@ model User {
   sessions     Session[]
   categories   Category[]
   transactions Transaction[]
+  receipts     Receipt[]
 
   @@map("users")
 }
@@ -134,6 +135,7 @@ model Transaction {
   account           Account         @relation("AccountTransactions", fields: [accountId], references: [id], onDelete: Cascade)
   transferAccount   Account?        @relation("TransferTransactions", fields: [transferAccountId], references: [id], onDelete: SetNull)
   category          Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  receipts          Receipt[]
 
   @@index([userId])
   @@index([accountId])
@@ -142,4 +144,38 @@ model Transaction {
   @@index([transactionDate])
   @@index([userId, transactionDate])
   @@map("transactions")
+}
+
+enum ReceiptStatus {
+  UPLOADED   @map("uploaded")
+  QUEUED     @map("queued")
+  PROCESSING @map("processing")
+  READY      @map("ready")
+  FAILED     @map("failed")
+}
+
+// Phase 5: Receipt Storage & Background Processing Lifecycle
+model Receipt {
+  id                    String        @id @default(cuid())
+  userId                String        @map("user_id")
+  originalFilename      String        @map("original_filename")
+  storageKey            String        @unique @map("storage_key")
+  mimeType              String        @map("mime_type")
+  fileSize              Int           @map("file_size")
+  status                ReceiptStatus @default(UPLOADED)
+  errorCode             String?       @map("error_code")
+  errorMessage          String?       @map("error_message")
+  transactionId         String?       @map("transaction_id")
+  processingStartedAt   DateTime?     @map("processing_started_at")
+  processingCompletedAt DateTime?     @map("processing_completed_at")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transaction           Transaction?  @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([transactionId])
+  @@map("receipts")
 }

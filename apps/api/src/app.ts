@@ -3,13 +3,16 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import sensible from '@fastify/sensible';
 import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
 import authPlugin from './plugins/auth.js';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
 import { accountRoutes } from './routes/accounts.js';
 import { categoryRoutes } from './routes/categories.js';
 import { transactionRoutes } from './routes/transactions.js';
+import { receiptRoutes } from './routes/receipts.js';
 import { config } from './config/env.js';
+import { MAX_RECEIPT_FILE_SIZE } from '@pocketlens/shared';
 
 export function buildApp(): FastifyInstance {
   const app = fastify({
@@ -36,6 +39,14 @@ export function buildApp(): FastifyInstance {
 
   app.register(sensible);
 
+  // Multipart support for receipt image uploads
+  app.register(multipart, {
+    limits: {
+      fileSize: MAX_RECEIPT_FILE_SIZE,
+      files: 1,
+    },
+  });
+
   // Cookie parser & signer
   app.register(cookie, {
     secret: config.COOKIE_SECRET,
@@ -51,6 +62,7 @@ export function buildApp(): FastifyInstance {
   app.register(accountRoutes);
   app.register(categoryRoutes);
   app.register(transactionRoutes);
+  app.register(receiptRoutes);
 
   // Centralized error handler
   app.setErrorHandler((error, request, reply) => {
