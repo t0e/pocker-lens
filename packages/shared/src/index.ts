@@ -9,3 +9,5 @@ export * from './receipt/index.js';
 export * from './queue/index.js';
 export * from './storage/index.js';
 export * from './ocr/index.js';
+export * from './budget/index.js';
+export * from './recurring/index.js';
