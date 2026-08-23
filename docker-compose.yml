@@ -1,0 +1,125 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pocketlens-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pocketlens}
+      POSTGRES_USER: ${POSTGRES_USER:-pocketlens}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pocketlens_dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - pocketlens_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: pocketlens-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - pocketlens_network
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    container_name: pocketlens-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      API_PORT: 4000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pocketlens}:${POSTGRES_PASSWORD:-pocketlens_dev_password}@postgres:5432/${POSTGRES_DB:-pocketlens}?schema=public
+      REDIS_URL: redis://redis:6379
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+      RECEIPT_STORAGE_PATH: ${RECEIPT_STORAGE_PATH:-/data/receipts}
+    ports:
+      - "${API_PORT:-4000}:4000"
+    volumes:
+      - receipt_data:/data/receipts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - pocketlens_network
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    container_name: pocketlens-worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pocketlens}:${POSTGRES_PASSWORD:-pocketlens_dev_password}@postgres:5432/${POSTGRES_DB:-pocketlens}?schema=public
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+      RECEIPT_STORAGE_PATH: ${RECEIPT_STORAGE_PATH:-/data/receipts}
+    volumes:
+      - receipt_data:/data/receipts
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - pocketlens_network
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    container_name: pocketlens-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - pocketlens_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  receipt_data:
+
+networks:
+  pocketlens_network:
+    driver: bridge
