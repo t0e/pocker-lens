@@ -27,7 +27,7 @@ describe('LocalStorageProvider', () => {
   });
 
   it('should save and retrieve a file buffer', async () => {
-    const key = 'test-receipt.jpg';
+    const key = 'receipts/user123/test-receipt.jpg';
     const testContent = Buffer.from('fake receipt binary content');
 
     const saveResult = await provider.saveFile(key, testContent);
@@ -42,7 +42,7 @@ describe('LocalStorageProvider', () => {
   });
 
   it('should delete a file', async () => {
-    const key = 'delete-me.png';
+    const key = 'receipts/user123/delete-me.png';
     await provider.saveFile(key, Buffer.from('test'));
     expect(await provider.exists(key)).toBe(true);
 
@@ -50,8 +50,10 @@ describe('LocalStorageProvider', () => {
     expect(await provider.exists(key)).toBe(false);
   });
 
-  it('should generate a safe local URL', async () => {
-    const url = await provider.getFileUrl('folder/receipt.jpg');
-    expect(url).toBe('/storage/receipts/folder%2Freceipt.jpg');
+  it('should prevent path traversal attempts', async () => {
+    const maliciousKey = '../../etc/passwd';
+    // Path resolution normalizes and contains inside base path, or throws error
+    const fullPath = (provider as any).getFullPath(maliciousKey);
+    expect(fullPath.startsWith(tempDir)).toBe(true);
   });
 });

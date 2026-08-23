@@ -8,12 +8,19 @@ export class LocalStorageProvider implements StorageProvider {
   private basePath: string;
 
   constructor(basePath: string = '/data/receipts') {
-    this.basePath = basePath;
+    this.basePath = path.resolve(basePath);
   }
 
   private getFullPath(key: string): string {
+    // Prevent path traversal
     const safeKey = path.normalize(key).replace(/^(\.\.(\/|\\|$))+/, '');
-    return path.join(this.basePath, safeKey);
+    const resolvedPath = path.resolve(this.basePath, safeKey);
+
+    if (!resolvedPath.startsWith(this.basePath)) {
+      throw new Error(`Invalid storage key: path traversal detected (${key})`);
+    }
+
+    return resolvedPath;
   }
 
   async ensureReady(): Promise<boolean> {
@@ -57,7 +64,8 @@ export class LocalStorageProvider implements StorageProvider {
 
   async exists(key: string): Promise<boolean> {
     try {
-      await fs.access(this.getFullPath(key));
+      const fullPath = this.getFullPath(key);
+      await fs.access(fullPath);
       return true;
     } catch {
       return false;
