@@ -7,6 +7,8 @@ import authPlugin from './plugins/auth.js';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
 import { accountRoutes } from './routes/accounts.js';
+import { categoryRoutes } from './routes/categories.js';
+import { transactionRoutes } from './routes/transactions.js';
 import { config } from './config/env.js';
 
 export function buildApp(): FastifyInstance {
@@ -47,6 +49,8 @@ export function buildApp(): FastifyInstance {
   app.register(healthRoutes);
   app.register(authRoutes);
   app.register(accountRoutes);
+  app.register(categoryRoutes);
+  app.register(transactionRoutes);
 
   // Centralized error handler
   app.setErrorHandler((error, request, reply) => {
