@@ -1,0 +1,19 @@
+{
+  "name": "pocketlens-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "type-check": "npm run type-check --workspaces",
+    "lint": "npm run lint --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "dev": "echo \"Use 'docker compose up' for local development\""
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
