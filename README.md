@@ -6,15 +6,13 @@
 
 ## ⚠️ Current Implementation Status
 
-**Phase 5: Receipt Processing Pipeline & Storage Vault (Active & Completed)**
+**Phase 6: Multilingual Receipt OCR + Transaction Extraction (Active & Completed)**
 
-The project is under active development. Phase 5 introduces:
-- **Asynchronous Receipt Processing Pipeline**: BullMQ queue worker and Redis infrastructure processing receipt uploads asynchronously with exponential backoff retries.
-- **Pluggable Storage Provider & File Security**: Path-traversal proof `LocalStorageProvider` (`/data/receipts`), authentic image magic-bytes header verification (JPEG, PNG, WebP), and a 10MB size limit.
-- **Strict Ownership & Stream Delivery**: Authenticated and authorized receipt image streaming endpoints (`GET /receipts/:id/file`) ensuring complete multi-tenant isolation.
-- **Receipt Vault & Upload UI**: Mobile-first receipt dashboard with live polling status updates (`UPLOADED` -> `QUEUED` -> `PROCESSING` -> `READY`/`FAILED`), camera capture/drag-and-drop modal, and high-fidelity image inspection modals.
-
-*OCR line item and transaction extraction belongs to Phase 6.*
+The project is under active development. Phase 6 introduces:
+- **Local Multilingual OCR Pipeline**: `LocalOCRProvider` engine with English and Vietnamese language detection and zero paid API dependencies.
+- **Deterministic Receipt Field Extractor**: Locales-aware parsing engine extracting Merchant, Total Amount, Date, Currency, and Line Items. Handles Vietnamese dot-separated thousands (`80.000 VNĐ` / `1.250.000 VND`), English commas (`80,000`), Total vs Subtotal vs Discount vs Cash vs Change.
+- **Category & Account Suggestions**: Context-aware categorization using bilingual dictionaries and user account resolution.
+- **Interactive Side-by-Side Review & Confirmation**: Editable draft form side-by-side with receipt image, field confidence indicators (`High`, `Medium`, `Low`), raw OCR text inspection, duplicate transaction prevention, and atomic balance integration with Phase 3 transaction service.
 
 ---
 
@@ -35,7 +33,8 @@ The project is under active development. Phase 5 introduces:
 - [x] **Phase 3: Transactions & Cash Flow** (Income/expense logging, atomic same-currency transfers, categories, monthly summaries)
 - [x] **Phase 4: Fast Entry + Natural-Language Input** (English + Vietnamese rule-based parser, quick-add modal, draft preview, confirm flow)
 - [x] **Phase 5: Receipt Processing Pipeline, Secure Storage & Vault** (Multipart uploads, magic bytes validation, BullMQ worker, UI vault)
-- [ ] **Phase 6: Multi-Currency Analytics, Budgets & OCR Line Item Extraction**
+- [x] **Phase 6: Multilingual Receipt OCR & Transaction Extraction** (Local OCR, English/Vietnamese parser, draft review, confirm flow)
+- [ ] **Phase 7: Multi-Currency Analytics, Budgets & Polish**
 
 ---
 

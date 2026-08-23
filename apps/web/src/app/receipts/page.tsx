@@ -180,12 +180,12 @@ export default function ReceiptsPage() {
         <div>
           <div className="flex items-center space-x-2">
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-              Receipt Scanner & Storage
+              Receipt Scanner & OCR
             </h2>
-            <Badge variant="phase" className="text-[10px]">Phase 5 Pipeline</Badge>
+            <Badge variant="phase" className="text-[10px]">Phase 6 Multilingual OCR</Badge>
           </div>
           <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
-            Store and verify receipt photos with asynchronous background job processing
+            Extract details from English & Vietnamese receipts and confirm transactions with a tap
           </p>
         </div>
         <Button
@@ -236,7 +236,7 @@ export default function ReceiptsPage() {
       {isLoading ? (
         <div className="py-20 flex flex-col items-center justify-center text-zinc-500">
           <Loader2 className="h-8 w-8 animate-spin text-emerald-500 mb-3" />
-          <span className="text-sm">Loading receipt storage...</span>
+          <span className="text-sm">Loading receipts & extractions...</span>
         </div>
       ) : totalCount === 0 ? (
         /* Empty State */
@@ -252,7 +252,7 @@ export default function ReceiptsPage() {
               <p className="text-xs text-zinc-500">
                 {statusFilter !== 'all'
                   ? 'No receipts match the selected status filter.'
-                  : 'Capture or upload receipt photos to store them in your private encrypted vault.'}
+                  : 'Capture or upload receipt photos to extract structured drafts with English & Vietnamese OCR.'}
               </p>
             </div>
             <Button
@@ -275,81 +275,104 @@ export default function ReceiptsPage() {
               </div>
 
               <Card className="divide-y divide-zinc-100 dark:divide-zinc-800/80 overflow-hidden shadow-sm">
-                {items.map((receipt) => (
-                  <div
-                    key={receipt.id}
-                    className="p-3.5 sm:p-4 flex items-center justify-between hover:bg-zinc-50/70 dark:hover:bg-zinc-900/60 transition-colors group cursor-pointer"
-                    onClick={() => handleOpenDetail(receipt)}
-                  >
-                    {/* Left: Thumbnail placeholder + Metadata */}
-                    <div className="flex items-center space-x-3.5 min-w-0 pr-2">
-                      <div className="h-12 w-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-500 flex items-center justify-center shrink-0 border border-zinc-200/60 dark:border-zinc-700/60">
-                        <Receipt className="h-6 w-6 text-emerald-500" />
-                      </div>
+                {items.map((receipt) => {
+                  const merchantName = receipt.extraction?.merchant;
+                  const totalAmt = receipt.extraction?.totalAmount;
+                  const currencyCode = receipt.extraction?.currency || 'VND';
 
-                      <div className="min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
-                            {receipt.originalFilename}
-                          </span>
+                  return (
+                    <div
+                      key={receipt.id}
+                      className="p-3.5 sm:p-4 flex items-center justify-between hover:bg-zinc-50/70 dark:hover:bg-zinc-900/60 transition-colors group cursor-pointer"
+                      onClick={() => handleOpenDetail(receipt)}
+                    >
+                      {/* Left: Thumbnail placeholder + Metadata */}
+                      <div className="flex items-center space-x-3.5 min-w-0 pr-2">
+                        <div className="h-12 w-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-500 flex items-center justify-center shrink-0 border border-zinc-200/60 dark:border-zinc-700/60">
+                          <Receipt className="h-6 w-6 text-emerald-500" />
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] text-zinc-400">
-                          <span>{formatFileSize(receipt.fileSize)}</span>
-                          <span>•</span>
-                          <span>
-                            {new Date(receipt.createdAt).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                          {receipt.errorMessage && (
-                            <>
-                              <span>•</span>
-                              <span className="text-rose-500 truncate max-w-[160px]">
-                                {receipt.errorMessage}
+                        <div className="min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
+                              {merchantName || receipt.originalFilename}
+                            </span>
+                            {receipt.transactionId && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-semibold shrink-0">
+                                Confirmed
                               </span>
-                            </>
+                            )}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] text-zinc-400">
+                            {merchantName && (
+                              <>
+                                <span className="truncate max-w-[140px] text-zinc-500 dark:text-zinc-400">{receipt.originalFilename}</span>
+                                <span>•</span>
+                              </>
+                            )}
+                            <span>{formatFileSize(receipt.fileSize)}</span>
+                            <span>•</span>
+                            <span>
+                              {new Date(receipt.createdAt).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                            {receipt.errorMessage && (
+                              <>
+                                <span>•</span>
+                                <span className="text-rose-500 truncate max-w-[160px]">
+                                  {receipt.errorMessage}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Status Badge & Amount & Actions */}
+                      <div className="flex items-center space-x-3 shrink-0">
+                        {totalAmt !== null && totalAmt !== undefined && (
+                          <div className="hidden sm:block text-right">
+                            <div className="text-sm font-bold text-zinc-900 dark:text-zinc-100 font-mono">
+                              {totalAmt.toLocaleString()} {currencyCode}
+                            </div>
+                            {receipt.extraction?.suggestedCategoryName && (
+                              <div className="text-[10px] text-zinc-400">
+                                {receipt.extraction.suggestedCategoryName}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div>{getStatusBadge(receipt.status)}</div>
+
+                        <div
+                          className="flex items-center space-x-1 opacity-80 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {receipt.status === 'failed' && (
+                            <button
+                              onClick={() => handleRetryReceipt(receipt.id)}
+                              className="p-1.5 rounded-lg text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                              title="Retry Processing"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </button>
                           )}
+                          <button
+                            onClick={() => handleOpenDetail(receipt)}
+                            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                            title="View Receipt & Extraction"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
                     </div>
-
-                    {/* Right: Status Badge & Actions */}
-                    <div className="flex items-center space-x-3 shrink-0">
-                      <div>{getStatusBadge(receipt.status)}</div>
-
-                      <div
-                        className="flex items-center space-x-1 opacity-80 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {receipt.status === 'failed' && (
-                          <button
-                            onClick={() => handleRetryReceipt(receipt.id)}
-                            className="p-1.5 rounded-lg text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                            title="Retry Processing"
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleOpenDetail(receipt)}
-                          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                          title="View Receipt"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteReceipt(receipt.id)}
-                          className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                          title="Delete Receipt"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </Card>
             </div>
           ))}
@@ -357,9 +380,9 @@ export default function ReceiptsPage() {
           {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-2 px-1 text-xs text-zinc-500">
-              <div>
-                Showing page {page} of {totalPages} ({totalCount} receipts)
-              </div>
+              <span>
+                Showing {receipts.length} of {totalCount} receipts (Page {page} of {totalPages})
+              </span>
               <div className="flex items-center space-x-2">
                 <Button
                   variant="outline"
@@ -394,7 +417,7 @@ export default function ReceiptsPage() {
         onSuccess={fetchReceipts}
       />
 
-      {/* Detail View Modal */}
+      {/* Detail View & Confirmation Modal */}
       <ReceiptDetailModal
         receipt={selectedReceipt}
         isOpen={isDetailModalOpen}
@@ -404,6 +427,7 @@ export default function ReceiptsPage() {
         }}
         onDelete={handleDeleteReceipt}
         onRetry={handleRetryReceipt}
+        onConfirmed={fetchReceipts}
       />
     </div>
   );

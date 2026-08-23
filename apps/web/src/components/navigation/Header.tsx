@@ -50,7 +50,7 @@ export const Header: React.FC = () => {
           {title}
         </h1>
         <div className="hidden sm:inline-flex">
-          <Badge variant="success">Phase 5 Active</Badge>
+          <Badge variant="success">Phase 6 Active</Badge>
         </div>
       </div>
 
