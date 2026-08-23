@@ -77,6 +77,7 @@ model Account {
   user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions         Transaction[] @relation("AccountTransactions")
   transferTransactions Transaction[] @relation("TransferTransactions")
+  extractions          ReceiptExtraction[]
 
   @@index([userId])
   @@index([userId, isArchived])
@@ -102,6 +103,7 @@ model Category {
 
   user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
+  extractions  ReceiptExtraction[]
 
   @@index([userId])
   @@index([type])
@@ -156,26 +158,70 @@ enum ReceiptStatus {
 
 // Phase 5: Receipt Storage & Background Processing Lifecycle
 model Receipt {
-  id                    String        @id @default(cuid())
-  userId                String        @map("user_id")
-  originalFilename      String        @map("original_filename")
-  storageKey            String        @unique @map("storage_key")
-  mimeType              String        @map("mime_type")
-  fileSize              Int           @map("file_size")
-  status                ReceiptStatus @default(UPLOADED)
-  errorCode             String?       @map("error_code")
-  errorMessage          String?       @map("error_message")
-  transactionId         String?       @map("transaction_id")
-  processingStartedAt   DateTime?     @map("processing_started_at")
-  processingCompletedAt DateTime?     @map("processing_completed_at")
-  createdAt             DateTime      @default(now()) @map("created_at")
-  updatedAt             DateTime      @updatedAt @map("updated_at")
+  id                    String             @id @default(cuid())
+  userId                String             @map("user_id")
+  originalFilename      String             @map("original_filename")
+  storageKey            String             @unique @map("storage_key")
+  mimeType              String             @map("mime_type")
+  fileSize              Int                @map("file_size")
+  status                ReceiptStatus      @default(UPLOADED)
+  errorCode             String?            @map("error_code")
+  errorMessage          String?            @map("error_message")
+  transactionId         String?            @map("transaction_id")
+  processingStartedAt   DateTime?          @map("processing_started_at")
+  processingCompletedAt DateTime?          @map("processing_completed_at")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
 
-  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transaction           Transaction?  @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transaction           Transaction?       @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  extraction            ReceiptExtraction?
 
   @@index([userId])
   @@index([userId, status])
   @@index([transactionId])
   @@map("receipts")
+}
+
+// Phase 6: Receipt Multilingual OCR Extraction & Line Items
+model ReceiptExtraction {
+  id               String        @id @default(cuid())
+  receiptId        String        @unique @map("receipt_id")
+  merchant         String?
+  transactionDate  DateTime?     @map("transaction_date")
+  totalAmount      Decimal?      @db.Decimal(19, 4) @map("total_amount")
+  currency         String?       @db.VarChar(3)
+  categoryId       String?       @map("category_id")
+  accountId        String?       @map("account_id")
+  rawText          String        @db.Text @map("raw_text")
+  detectedLanguage String?       @map("detected_language")
+  confidence       Decimal?      @db.Decimal(5, 2)
+  fieldConfidences Json?         @map("field_confidences")
+  status           String        @default("PENDING_REVIEW")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  receipt          Receipt       @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  category         Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  account          Account?      @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  items            ReceiptItem[]
+
+  @@index([receiptId])
+  @@map("receipt_extractions")
+}
+
+model ReceiptItem {
+  id           String            @id @default(cuid())
+  extractionId String            @map("extraction_id")
+  description  String
+  quantity     Decimal?          @db.Decimal(10, 2)
+  unitPrice    Decimal?          @db.Decimal(19, 4) @map("unit_price")
+  totalPrice   Decimal?          @db.Decimal(19, 4) @map("total_price")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  extraction   ReceiptExtraction @relation(fields: [extractionId], references: [id], onDelete: Cascade)
+
+  @@index([extractionId])
+  @@map("receipt_items")
 }

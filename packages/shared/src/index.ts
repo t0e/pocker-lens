@@ -8,3 +8,4 @@ export * from './parser/index.js';
 export * from './receipt/index.js';
 export * from './queue/index.js';
 export * from './storage/index.js';
+export * from './ocr/index.js';

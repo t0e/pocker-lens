@@ -26,7 +26,67 @@ export interface ReceiptResponse {
   processingCompletedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  extraction?: ReceiptExtractionResponse | null;
 }
+
+export type FieldConfidence = 'high' | 'medium' | 'low' | 'none';
+
+export interface FieldConfidences {
+  merchant: FieldConfidence;
+  transactionDate: FieldConfidence;
+  totalAmount: FieldConfidence;
+  currency: FieldConfidence;
+  category: FieldConfidence;
+  account: FieldConfidence;
+}
+
+export interface ReceiptItemResponse {
+  id: string;
+  extractionId: string;
+  description: string;
+  quantity: number | null;
+  unitPrice: number | null;
+  totalPrice: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReceiptExtractionResponse {
+  id: string;
+  receiptId: string;
+  merchant: string | null;
+  transactionDate: string | null;
+  totalAmount: number | null;
+  currency: string | null;
+  categoryId: string | null;
+  accountId: string | null;
+  rawText: string;
+  detectedLanguage: string | null;
+  confidence: number | null;
+  fieldConfidences: FieldConfidences;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  items: ReceiptItemResponse[];
+  suggestedCategoryName?: string | null;
+  suggestedAccountName?: string | null;
+}
+
+export const ConfirmReceiptDraftSchema = z.object({
+  type: z.enum(['EXPENSE', 'INCOME', 'TRANSFER']).default('EXPENSE'),
+  accountId: z.string().min(1, 'Account is required'),
+  categoryId: z.string().optional().nullable(),
+  amount: z.coerce.number().positive('Amount must be greater than zero'),
+  currency: z.string().min(3).max(3),
+  transactionDate: z.string().min(1, 'Transaction date is required'),
+  description: z.string().min(1, 'Description is required'),
+  merchant: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+});
+
+export type ConfirmReceiptDraftInput = z.infer<typeof ConfirmReceiptDraftSchema>;
+
+export * from './parser.js';
 
 export interface PaginatedReceiptsResponse {
   receipts: ReceiptResponse[];
