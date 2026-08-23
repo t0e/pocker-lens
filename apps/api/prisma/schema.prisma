@@ -1,0 +1,20 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Phase 1: Foundation baseline table for system health and schema verification
+// Note: Business tables (transactions, accounts, budgets, receipts) will be added in subsequent phases.
+model SystemMetadata {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("_system_metadata")
+}
