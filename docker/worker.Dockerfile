@@ -13,8 +13,10 @@ COPY apps/web/package.json ./apps/web/
 RUN npm ci
 
 COPY packages/shared ./packages/shared
+COPY apps/api/prisma ./apps/api/prisma
 COPY apps/worker ./apps/worker
 
+RUN npx prisma generate --schema=./apps/api/prisma/schema.prisma
 RUN npm run build --workspace=@pocketlens/shared
 RUN npm run build --workspace=@pocketlens/worker
 
@@ -22,7 +24,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache openssl libc6-compat
 
 RUN mkdir -p /data/receipts
 
