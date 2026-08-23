@@ -6,24 +6,23 @@
 
 ## ⚠️ Current Implementation Status
 
-**Phase 3: Transactions, Income, Expenses + Transfers (Active & Completed)**
+**Phase 4: Fast Entry + Natural-Language Transaction Input (Active & Completed)**
 
-The project is under active development. Phase 3 introduces:
-- **Core Transaction Architecture**: First-class support for `expense`, `income`, and `transfer` transactions.
-- **Single-Row Transfer Design (Option A)**: Source account (`accountId`) debited and destination account (`transferAccountId`) credited atomically without inflating income/expense metrics. Same-currency transfer validation enforced.
-- **Zero Balance Drift**: Account `currentBalance` maintained via atomic PostgreSQL database transactions (`prisma.$transaction`). Automatic balance reversal upon transaction update or deletion.
-- **Categories System**: 19 seeded system default categories + customizable user categories with type compatibility (`expense` vs `income`).
-- **Monthly Cash Flow Summary**: High-performance backend aggregation for monthly income, expenses, and net flow per currency (strictly excluding transfers).
-- **Responsive Transaction UI**: Mobile-first transaction feed grouped by date, type/account/category filters, and fast manual entry modal.
+The project is under active development. Phase 4 introduces:
+- **Local Deterministic Natural-Language Parser**: Zero paid API dependency architecture (`RuleBasedParser`) parsing natural language into structured transaction drafts.
+- **Bilingual English & Vietnamese Support**: Dictionary and regex-driven detection for numbers/multipliers (`85k`, `80 nghìn`, `32tr`, `2 triệu`, `2m`), types, accounts, categories, and simple dates (`today`, `yesterday`, `hôm nay`, `hôm qua`).
+- **Human-in-the-Loop Confirmation**: Natural language input parses into a live preview draft for review/edit before saving; never silently writes to the database.
+- **Smart Account & Category Ingestion**: Context-aware account resolution scoped strictly to the authenticated user's active accounts and categories.
+- **Mobile-First Quick Add**: Modal supporting both natural quick add and comprehensive manual entry, with keyboard shortcuts (`N`, `Cmd+K` / `Ctrl+K`) and transaction repeat shortcuts.
 
-*Receipt scanning OCR and budgets are scheduled for subsequent phases.*
+*Receipt scanning OCR and background processing pipeline belong to Phase 5.*
 
 ---
 
 ## 🎯 Project Goals
 
-- **Lightning-Fast Transaction Capture**: Log expenses in seconds using receipt scanning, quick entry modal, and keyboard shortcuts.
-- **Multilingual OCR & Processing**: Built with first-class support for English and Vietnamese receipts and currency formats.
+- **Lightning-Fast Transaction Capture**: Log expenses in seconds using receipt scanning, quick natural language entry, and keyboard shortcuts.
+- **Multilingual Input & Processing**: Built with first-class support for English and Vietnamese inputs and currency formats.
 - **Mobile-First Experience**: Designed primarily for mobile web and PWA usage, while providing a clean responsive desktop dashboard.
 - **Reliable Background Pipeline**: Asynchronous background worker architecture for receipt processing and image storage.
 - **Privacy & Ownership**: Docker-first local development with strict user data isolation and decimal-accurate balance tracking.
@@ -35,8 +34,8 @@ The project is under active development. Phase 3 introduces:
 - [x] **Phase 1: Project Foundation** (Monorepo, Docker Compose, API/Worker scaffolds, PostgreSQL, Redis, healthchecks)
 - [x] **Phase 2: Authentication + Financial Accounts** (Auth, session cookies, accounts CRUD, multi-currency, ownership enforcement)
 - [x] **Phase 3: Transactions & Cash Flow** (Income/expense logging, atomic same-currency transfers, categories, monthly summaries)
-- [ ] **Phase 4: Receipt Scanning & OCR Pipeline** (English & Vietnamese receipt extraction, BullMQ processing)
-- [ ] **Phase 5: Budgets, Subscriptions & Multi-Currency Analytics**
+- [x] **Phase 4: Fast Entry + Natural-Language Input** (English + Vietnamese rule-based parser, quick-add modal, draft preview, confirm flow)
+- [ ] **Phase 5: Receipt Scanning, OCR Pipeline & Multi-Currency Analytics**
 
 ---
 
@@ -55,6 +54,7 @@ Backend API (Fastify / TypeScript — Port 4000)
    ├── Auth Service (Bcrypt Password Hashing, Signed HttpOnly Session Cookies)
    ├── Accounts Service (CRUD, Ownership Isolation, Decimal Precision)
    ├── Transactions Service (Atomic Expense/Income/Transfer, Reversal on Delete/Edit)
+   ├── Natural-Language Parser (RuleBasedParser with English & Vietnamese Dictionaries)
    ├── Categories Service (System Default Seeds + Custom User Categories)
    ├── Monthly Summary Service (Per-Currency Cash Flow Calculation)
    ├── PostgreSQL 16 (Users, Sessions, Accounts, Categories, Transactions — Port 5432)
@@ -69,6 +69,7 @@ Background Worker (Node.js / BullMQ)
 
 - **Frontend**: Next.js 14 (App Router), React 18, Tailwind CSS, Lucide Icons
 - **Backend API**: Node.js, Fastify, TypeScript, Prisma ORM, Bcrypt, Zod, Pino
+- **Natural Language Parsing**: Local deterministic rule-based engine (`@pocketlens/shared/parser`) with modular dictionaries (`en.ts`, `vi.ts`)
 - **Background Worker**: Node.js, TypeScript, BullMQ, ioredis
 - **Database**: PostgreSQL 16 (`DECIMAL(19,4)` money columns)
 - **Cache & Queue**: Redis 7
@@ -90,13 +91,13 @@ pocket-lens/
 │   │
 │   ├── api/                    # Node.js + Fastify backend API
 │   │   ├── prisma/             # Prisma schema and migrations (Users, Sessions, Accounts, Categories, Transactions)
-│   │   └── src/                # Auth, accounts, categories, transactions routes, DB & Redis clients
+│   │   └── src/                # Auth, accounts, categories, transactions, parser routes, DB & Redis clients
 │   │
 │   └── worker/                 # Node.js + TypeScript background worker
 │       └── src/                # BullMQ queue registration and lifecycle
 │
 ├── packages/
-│   └── shared/                 # Shared TypeScript types, validation schemas, currency constants, and storage interfaces
+│   └── shared/                 # Shared TypeScript types, validation schemas, currency constants, and natural language parser
 │
 ├── docker/                     # Service Dockerfiles (api, worker, web)
 ├── docker-compose.yml          # Canonical development orchestrator
@@ -142,7 +143,7 @@ pocket-lens/
 Run tests, type-checks, and linter across all workspaces:
 
 ```bash
-# Run all unit, integration, and API tests
+# Run all unit, integration, parser, and API tests
 npm test
 
 # Run TypeScript type-checking
