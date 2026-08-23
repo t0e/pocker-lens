@@ -4,10 +4,13 @@ import {
   ReceiptJobData,
   ReceiptJobResult,
   validateImageMagicBytes,
+  extractReceiptData,
+  OCRProvider,
 } from '@pocketlens/shared';
 import { createStorageProvider } from '@pocketlens/shared/server';
 import { prisma } from '../db/client.js';
 import { config } from '../config/env.js';
+import { LocalOCRProvider } from '../ocr/local.js';
 
 const logger = pino({
   level: config.NODE_ENV === 'test' ? 'silent' : 'info',
@@ -18,15 +21,32 @@ const storage = createStorageProvider({
   localBasePath: config.RECEIPT_STORAGE_PATH,
 });
 
+let ocrProvider: OCRProvider = new LocalOCRProvider();
+
+export function setOCRProvider(provider: OCRProvider) {
+  ocrProvider = provider;
+}
+
 export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResult>): Promise<ReceiptJobResult> {
   const { receiptId } = job.data;
   const startTime = Date.now();
 
   logger.info({ receiptId, jobId: job.id }, 'receipt.processing started');
 
-  // 1. Fetch receipt from database
+  // 1. Fetch receipt and user details from database
   const receipt = await prisma.receipt.findUnique({
     where: { id: receiptId },
+    include: {
+      user: {
+        include: {
+          categories: { where: { isArchived: false } },
+          accounts: { where: { isArchived: false } },
+        },
+      },
+      extraction: {
+        include: { items: true },
+      },
+    },
   });
 
   if (!receipt) {
@@ -34,9 +54,9 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
     return { receiptId, success: false, processedAt: new Date().toISOString() };
   }
 
-  // Idempotency check: if already READY, skip and return success
-  if (receipt.status === 'READY') {
-    logger.info({ receiptId }, 'Receipt already processed and marked READY. Idempotent skip.');
+  // Idempotency check: if already READY and has extraction, skip
+  if (receipt.status === 'READY' && receipt.extraction) {
+    logger.info({ receiptId }, 'Receipt already processed with extraction and marked READY. Idempotent skip.');
     return { receiptId, success: true, processedAt: new Date().toISOString() };
   }
 
@@ -68,26 +88,86 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
       throw new Error('Stored receipt file failed signature verification');
     }
 
-    // 4. Mark READY (Phase 5: successfully stored, validated, and processed by background worker)
-    const completedAt = new Date();
-    await prisma.receipt.update({
-      where: { id: receiptId },
-      data: {
-        status: 'READY',
-        processingCompletedAt: completedAt,
-      },
+    // 4. Perform OCR text extraction
+    logger.info({ receiptId }, 'receipt.ocr extracting text...');
+    const ocrResult = await ocrProvider.extractText(fileBuffer, receipt.mimeType);
+
+    // 5. Perform deterministic structured extraction (English + Vietnamese)
+    const userCategories = receipt.user.categories.map((c) => ({ id: c.id, name: c.name }));
+    const defaultAccount = receipt.user.accounts.find((a) => a.isDefault) || receipt.user.accounts[0];
+
+    const extracted = extractReceiptData(ocrResult.rawText, {
+      userCategories,
+      defaultCurrency: defaultAccount?.currency || 'VND',
+    });
+
+    // 6. Persist extraction and line items in database atomically
+    await prisma.$transaction(async (tx) => {
+      // Delete old extraction items if re-processing
+      if (receipt.extraction) {
+        await tx.receiptItem.deleteMany({
+          where: { extractionId: receipt.extraction.id },
+        });
+        await tx.receiptExtraction.delete({
+          where: { id: receipt.extraction.id },
+        });
+      }
+
+      const extractionRecord = await tx.receiptExtraction.create({
+        data: {
+          receiptId: receipt.id,
+          merchant: extracted.merchant,
+          transactionDate: extracted.transactionDate,
+          totalAmount: extracted.totalAmount !== null ? extracted.totalAmount : undefined,
+          currency: extracted.currency,
+          categoryId: extracted.suggestedCategoryId || null,
+          accountId: defaultAccount?.id || null,
+          rawText: extracted.rawText,
+          detectedLanguage: extracted.detectedLanguage,
+          confidence: extracted.confidence,
+          fieldConfidences: extracted.fieldConfidences as any,
+          status: 'PENDING_REVIEW',
+          items: {
+            create: extracted.items.map((item) => ({
+              description: item.description,
+              quantity: item.quantity !== null ? item.quantity : undefined,
+              unitPrice: item.unitPrice !== null ? item.unitPrice : undefined,
+              totalPrice: item.totalPrice !== null ? item.totalPrice : undefined,
+            })),
+          },
+        },
+      });
+
+      // 7. Mark receipt READY for user review
+      await tx.receipt.update({
+        where: { id: receiptId },
+        data: {
+          status: 'READY',
+          processingCompletedAt: new Date(),
+        },
+      });
+
+      return extractionRecord;
     });
 
     const durationMs = Date.now() - startTime;
     logger.info(
-      { receiptId, userId: receipt.userId, size: fileBuffer.length, durationMs },
-      'receipt.ready (Phase 5 verification complete)'
+      {
+        receiptId,
+        userId: receipt.userId,
+        merchant: extracted.merchant,
+        total: extracted.totalAmount,
+        currency: extracted.currency,
+        itemsCount: extracted.items.length,
+        durationMs,
+      },
+      'receipt.ready (Phase 6 OCR & extraction complete)'
     );
 
     return {
       receiptId,
       success: true,
-      processedAt: completedAt.toISOString(),
+      processedAt: new Date().toISOString(),
     };
   } catch (err: any) {
     const durationMs = Date.now() - startTime;
@@ -98,7 +178,7 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
       data: {
         status: 'FAILED',
         errorCode: 'PROCESSING_FAILED',
-        errorMessage: 'Receipt processing failed. Please verify the file and retry.',
+        errorMessage: 'Receipt OCR and extraction failed. Please verify the file and retry.',
         processingCompletedAt: new Date(),
       },
     });
