@@ -110,11 +110,11 @@ export default function DashboardPage() {
             </h2>
             <Badge variant="success" className="space-x-1 hidden sm:inline-flex">
               <ShieldCheck className="h-3 w-3" />
-              <span>Phase 7 Active</span>
+              <span>Phase 8 Active</span>
             </Badge>
           </div>
           <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
-            Real-time balance tracking, category budgets, subscriptions, and receipt scanning.
+            Real-time balance tracking, category budgets, subscriptions, analytics, and receipt scanning.
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -127,10 +127,10 @@ export default function DashboardPage() {
             <Plus className="h-3.5 w-3.5" />
             <span>Add Transaction</span>
           </Button>
-          <Link href="/receipts">
+          <Link href="/analytics">
             <Button variant="outline" size="sm" className="space-x-1.5 text-xs">
-              <ReceiptText className="h-3.5 w-3.5" />
-              <span>Scan Receipt</span>
+              <TrendingUp className="h-3.5 w-3.5" />
+              <span>Analytics</span>
             </Button>
           </Link>
           <Link href="/budgets">

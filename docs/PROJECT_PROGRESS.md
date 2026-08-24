@@ -181,7 +181,42 @@ User confirms → Creates Transaction via Phase 3 service (Status: CONFIRMED)
 
 ---
 
-## 10. Completed Phases 1–7 Summary
+## 10. Analytics, Trends & Spending Insights Engine (Phase 8)
+
+- **SQL Aggregation & Indexes**:
+  - Derived directly from `Transaction` table via `groupBy({ by: ['type', 'currency'] })` and indexed by `[userId, type, transactionDate]`, `[userId, currency, transactionDate]`, `[userId, categoryId, transactionDate]`, and `[userId, merchant]`.
+- **Transfers Rule**: Transfers (`type: 'TRANSFER'`) are strictly excluded from spending, income, categories, merchant breakdowns, and biggest expense lists. Transfers appear only under account cashflow movements (`transfersIn` and `transfersOut`).
+- **Deterministic Rule Engine (No AI / LLM Dependencies)**:
+  - Generates actionable, purely factual insights:
+    - Significant category increases (>15% MoM, >50k VND / $5).
+    - Significant category reductions (>15% MoM).
+    - New category expenditures (zero baseline in previous period).
+    - Budget pace alerts (ahead of pace by >15% at day N of month).
+    - Budget limit exceeded alerts.
+    - Dominant single expense share (>40% of period expenses).
+    - High savings rate milestones (>50% savings rate).
+    - Subscription spending share (>15% of monthly expenses).
+- **Calendar Spending Pace Math**:
+  - `expectedPaceAmount = budgetAmount * (daysElapsed / daysInMonth)`.
+  - Calculates real calendar days (leap years, 28/29/30/31 days) and compares actual expense pace vs time elapsed.
+- **Analytics Endpoints**:
+  - `GET /analytics/summary`: Period income, expenses, net, savings rate, MoM comparison.
+  - `GET /analytics/trends`: Monthly cash flow trends across 3–24 months.
+  - `GET /analytics/categories`: Category breakdown with percentages and top categories.
+  - `GET /analytics/merchants`: Normalized merchant spending and transaction counts.
+  - `GET /analytics/expenses/biggest`: Largest individual non-transfer expenses.
+  - `GET /analytics/accounts`: Account balance, income, expenses, transfers in/out.
+  - `GET /analytics/budgets`: Budget performance and calendar spending pace.
+  - `GET /analytics/subscriptions`: Normalized subscription costs and 7/30 days projections.
+  - `GET /analytics/insights`: Deterministic rule-based spending insights.
+- **Transaction Search & Filter Extensions**:
+  - Case-insensitive search on description, merchant, and notes.
+  - Sorting: `date_desc`, `date_asc`, `amount_desc`, `amount_asc`.
+  - Filtering by type, currency, account, category, and amount range.
+
+---
+
+## 11. Completed Phases 1–8 Summary
 
 | Phase | Description | Key Deliverables |
 |---|---|---|
@@ -192,25 +227,27 @@ User confirms → Creates Transaction via Phase 3 service (Status: CONFIRMED)
 | **Phase 5** | Multilingual Receipt OCR Engine | Local Tesseract OCR (EN/VI), dictionary token matching, deterministic field extraction |
 | **Phase 6** | Receipt Review & Confirmation Flow | Interactive side-by-side review modal, item editing, confirmation into transaction service |
 | **Phase 7** | Budgets, Recurring & Subscriptions | Monthly category budgets, progress alerts, recurring date math, subscriptions, idempotent scheduler |
+| **Phase 8** | Analytics, Trends & Spending Insights | Cashflow trends, category & merchant breakdown, spending pace, subscriptions summary, deterministic insights, search & sorting |
 
 ---
 
-## 11. Current Verification Status (Phase 7 Complete)
+## 12. Current Verification Status (Phase 8 Complete)
 
-- **Test Suite**: **150 / 150 tests passing** across 19 test files.
-  - `@pocketlens/shared`: 62 tests
-  - `@pocketlens/api`: 80 tests
-  - `@pocketlens/worker`: 8 tests
+- **Test Suite**: **164 / 164 tests passing** across 21 test files.
+  - `@pocketlens/shared`: 67 tests (9 files)
+  - `@pocketlens/api`: 89 tests (9 files)
+  - `@pocketlens/worker`: 8 tests (3 files)
 - **TypeScript**: `npm run type-check` passes with **0 errors** across all 4 workspaces.
 - **Lint**: `npm run lint` passes with **0 warnings / 0 errors**.
-- **Build**: `npm run build` succeeds completely (Prisma generate, Next.js static page optimization).
-- **Remote Git Status**: Pushed to `origin/main` (latest commit: `eb57793`).
+- **Build**: `npm run build` succeeds completely (Next.js static optimization with `/analytics` route).
+- **Docker Compose**: All 5 containers (`postgres`, `redis`, `api`, `worker`, `web`) healthy and operational.
+- **Remote Git Status**: Pushed to `origin/main`.
 - **Known Operational Limitations**:
   - *Worker Migration Race on Fresh Database*: On a completely fresh database, the worker may execute its initial recurring-scheduler check before Prisma migrations complete. The failure is handled gracefully and processing resumes on the next 60-second scheduler tick. Consider introducing a dedicated migration/init service during Phase 10 production hardening.
 
 ---
 
-## 12. Environment Variables Reference
+## 13. Environment Variables Reference
 
 Create a `.env` in the repository root:
 
@@ -239,7 +276,7 @@ RECEIPT_STORAGE_PATH=/tmp/pocketlens-receipts
 
 ---
 
-## 13. How to Run & Develop
+## 14. How to Run & Develop
 
 ### Prerequisites
 - Node.js 20+
@@ -280,14 +317,14 @@ Access UI at `http://localhost:3000` and API at `http://localhost:4000`.
 
 ---
 
-## 14. What Phase 8 Should Implement
+## 15. What Phase 9 Should Implement
 
-Phase 8 will focus on **Multi-Currency Analytics & Financial Reporting**:
-- Visual spending breakdowns (category distributions, monthly spending trends).
-- Multi-currency net worth dashboard with user-configured reference currencies.
-- Cashflow analytics (Income vs. Expense over 3/6/12 months).
-- Export capabilities (CSV/JSON export for transactions and tax records).
-- Strict isolation: Continue preserving exact currency amounts without lossy auto-conversion unless explicitly requested with historical exchange rate tables.
+Phase 9 will focus on **Data Export, Backup, Import & Audit Trail**:
+- Complete JSON & CSV export for transactions, accounts, categories, and budgets.
+- Date range and account-filtered exports.
+- CSV import with column mapping and duplicate detection.
+- Data export password/PIN protection or secure download tokens.
+- Complete user data deletion / account reset capability (privacy & GDPR compliance).
 
 ---
 

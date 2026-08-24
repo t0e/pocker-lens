@@ -208,6 +208,11 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
       categoryId?: string;
       startDate?: string;
       endDate?: string;
+      search?: string;
+      currency?: string;
+      minAmount?: string;
+      maxAmount?: string;
+      sortBy?: string;
     };
 
     const userId = request.user.id;
@@ -220,6 +225,7 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
       ...(query.type && ['expense', 'income', 'transfer'].includes(query.type)
         ? { type: query.type.toUpperCase() as PrismaTransactionType }
         : {}),
+      ...(query.currency ? { currency: query.currency.toUpperCase() } : {}),
       ...(query.accountId
         ? {
             OR: [{ accountId: query.accountId }, { transferAccountId: query.accountId }],
@@ -236,6 +242,41 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
         : {}),
     };
 
+    if (query.minAmount !== undefined || query.maxAmount !== undefined) {
+      const min = query.minAmount ? parseFloat(query.minAmount) : undefined;
+      const max = query.maxAmount ? parseFloat(query.maxAmount) : undefined;
+      where.amount = {
+        ...(min !== undefined && !isNaN(min) ? { gte: min } : {}),
+        ...(max !== undefined && !isNaN(max) ? { lte: max } : {}),
+      };
+    }
+
+    const search = query.search?.trim();
+    if (search) {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        {
+          OR: [
+            { description: { contains: search, mode: 'insensitive' } },
+            { merchant: { contains: search, mode: 'insensitive' } },
+            { notes: { contains: search, mode: 'insensitive' } },
+          ],
+        },
+      ];
+    }
+
+    let orderBy: Prisma.TransactionOrderByWithRelationInput[] = [
+      { transactionDate: 'desc' },
+      { createdAt: 'desc' },
+    ];
+    if (query.sortBy === 'date_asc') {
+      orderBy = [{ transactionDate: 'asc' }, { createdAt: 'asc' }];
+    } else if (query.sortBy === 'amount_desc') {
+      orderBy = [{ amount: 'desc' }, { transactionDate: 'desc' }];
+    } else if (query.sortBy === 'amount_asc') {
+      orderBy = [{ amount: 'asc' }, { transactionDate: 'desc' }];
+    }
+
     const [total, transactions] = await Promise.all([
       prisma.transaction.count({ where }),
       prisma.transaction.findMany({
@@ -245,7 +286,7 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
           transferAccount: true,
           category: true,
         },
-        orderBy: [{ transactionDate: 'desc' }, { createdAt: 'desc' }],
+        orderBy,
         skip,
         take: limit,
       }),

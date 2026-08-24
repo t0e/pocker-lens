@@ -154,6 +154,10 @@ model Transaction {
   @@index([recurringTransactionId])
   @@index([transactionDate])
   @@index([userId, transactionDate])
+  @@index([userId, type, transactionDate])
+  @@index([userId, currency, transactionDate])
+  @@index([userId, categoryId, transactionDate])
+  @@index([userId, merchant])
   @@map("transactions")
 }
 

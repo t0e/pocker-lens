@@ -64,6 +64,9 @@ export default function TransactionsPage() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [accountFilter, setAccountFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [currencyFilter, setCurrencyFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sortBy, setSortBy] = useState<string>('date_desc');
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -95,6 +98,7 @@ export default function TransactionsPage() {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: '20',
+        sortBy,
       });
 
       if (typeFilter !== 'all') {
@@ -106,6 +110,12 @@ export default function TransactionsPage() {
       if (categoryFilter !== 'all') {
         params.append('categoryId', categoryFilter);
       }
+      if (currencyFilter !== 'all') {
+        params.append('currency', currencyFilter);
+      }
+      if (searchQuery.trim()) {
+        params.append('search', searchQuery.trim());
+      }
 
       const data = await apiClient<PaginatedTransactionsResponse>(`/transactions?${params.toString()}`);
       setTransactions(data.transactions);
@@ -116,7 +126,7 @@ export default function TransactionsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, typeFilter, accountFilter, categoryFilter]);
+  }, [page, typeFilter, accountFilter, categoryFilter, currencyFilter, searchQuery, sortBy]);
 
   useEffect(() => {
     fetchTransactions();
@@ -275,34 +285,56 @@ export default function TransactionsPage() {
       )}
 
       {/* Filter and Control Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
-        {/* Type Pills */}
-        <div className="flex items-center space-x-1 overflow-x-auto pb-1 sm:pb-0">
-          {[
-            { label: 'All', value: 'all' },
-            { label: 'Expenses', value: 'expense' },
-            { label: 'Income', value: 'income' },
-            { label: 'Transfers', value: 'transfer' },
-          ].map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => {
-                setTypeFilter(tab.value);
+      <div className="flex flex-col space-y-3 p-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+        {/* Search Bar & Type Pills */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Search Input */}
+          <div className="relative flex-1 max-w-md">
+            <input
+              type="text"
+              placeholder="Search description, merchant, notes..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
                 setPage(1);
               }}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-all whitespace-nowrap ${
-                typeFilter === tab.value
-                  ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-sm'
-                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+              className="w-full text-xs pl-8 pr-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+            <span className="absolute left-2.5 top-2.5 text-zinc-400">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </span>
+          </div>
+
+          {/* Type Pills */}
+          <div className="flex items-center space-x-1 overflow-x-auto pb-1 sm:pb-0">
+            {[
+              { label: 'All', value: 'all' },
+              { label: 'Expenses', value: 'expense' },
+              { label: 'Income', value: 'income' },
+              { label: 'Transfers', value: 'transfer' },
+            ].map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => {
+                  setTypeFilter(tab.value);
+                  setPage(1);
+                }}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-all whitespace-nowrap ${
+                  typeFilter === tab.value
+                    ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-sm'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Dropdown Filters */}
-        <div className="flex items-center space-x-2">
+        {/* Dropdown Filters and Sort */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800/60">
           {/* Account Filter */}
           <select
             value={accountFilter}
@@ -335,6 +367,36 @@ export default function TransactionsPage() {
                 {c.name}
               </option>
             ))}
+          </select>
+
+          {/* Currency Filter */}
+          <select
+            value={currencyFilter}
+            onChange={(e) => {
+              setCurrencyFilter(e.target.value);
+              setPage(1);
+            }}
+            className="text-xs px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          >
+            <option value="all">All Currencies</option>
+            <option value="VND">VND</option>
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+          </select>
+
+          {/* Sort Selector */}
+          <select
+            value={sortBy}
+            onChange={(e) => {
+              setSortBy(e.target.value);
+              setPage(1);
+            }}
+            className="text-xs px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 ml-auto"
+          >
+            <option value="date_desc">Newest First</option>
+            <option value="date_asc">Oldest First</option>
+            <option value="amount_desc">Highest Amount</option>
+            <option value="amount_asc">Lowest Amount</option>
           </select>
         </div>
       </div>

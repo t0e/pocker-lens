@@ -9,6 +9,7 @@ import {
   Landmark,
   PieChart,
   Camera,
+  TrendingUp,
   Settings,
   LogOut,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ import { Badge } from '../ui/Badge';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/analytics', label: 'Analytics', icon: TrendingUp },
   { href: '/transactions', label: 'Transactions', icon: ReceiptText },
   { href: '/accounts', label: 'Accounts', icon: Landmark },
   { href: '/receipts', label: 'Receipts', icon: Camera },
@@ -44,7 +46,7 @@ export const Sidebar: React.FC = () => {
             <span className="text-xs text-zinc-400 font-medium">Finance Tracker</span>
           </div>
         </Link>
-        <Badge variant="phase">Phase 7</Badge>
+        <Badge variant="phase">Phase 8</Badge>
       </div>
 
       {/* Navigation Links */}

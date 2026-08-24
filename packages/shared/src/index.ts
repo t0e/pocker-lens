@@ -11,3 +11,4 @@ export * from './storage/index.js';
 export * from './ocr/index.js';
 export * from './budget/index.js';
 export * from './recurring/index.js';
+export * from './analytics/index.js';

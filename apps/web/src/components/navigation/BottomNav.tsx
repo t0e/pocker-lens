@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, ReceiptText, Plus, PieChart, MoreHorizontal } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Plus, PieChart, ReceiptText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const BottomNav: React.FC = () => {
@@ -11,10 +11,10 @@ export const BottomNav: React.FC = () => {
 
   const navItems = [
     { href: '/', label: 'Home', icon: LayoutDashboard },
-    { href: '/transactions', label: 'Transactions', icon: ReceiptText },
+    { href: '/analytics', label: 'Trends', icon: TrendingUp },
     { href: '/receipts', label: 'Add', icon: Plus, isAction: true },
     { href: '/budgets', label: 'Budgets', icon: PieChart },
-    { href: '/settings', label: 'More', icon: MoreHorizontal },
+    { href: '/transactions', label: 'Activity', icon: ReceiptText },
   ];
 
   return (
