@@ -302,6 +302,50 @@ CHANGE: 50.000
       const result = extractReceiptData(receipt);
       expect(result.totalAmount).toBe(50000);
     });
+
+    it('uses agreement between total and payment lines to select correct amount', () => {
+      // Simulates OCR where Tổng cộng might be uncertain but Momo confirms
+      const receipt = `
+SIEU THI FUJIMART
+Ngay: 22/08/2026
+
+Cherryducers        520.000
+Sua chua             35.000
+Banh                 21.120
+
+Tong cong           376.120
+Momo                376.120
+Gia tri mua         376.120
+      `;
+      const result = extractReceiptData(receipt);
+      // 376120 should be selected because it appears in 3 lines (agreement)
+      // vs 520000 which only appears once (unit price)
+      expect(result.totalAmount).toBe(376120);
+    });
+
+    it('does not use largest number as total when unit prices are present', () => {
+      const receipt = `
+Store
+Cherries (1kg)     520.000
+Milk                 35.000
+TOTAL              376.120
+      `;
+      const result = extractReceiptData(receipt);
+      // 520000 is a unit price, not the total
+      expect(result.totalAmount).toBe(376120);
+    });
+
+    it('handles OCR-uncertain total with payment confirmation', () => {
+      // OCR reads 378,120 for Tổng cộng but Momo says 376,120
+      const receipt = `
+SIEU THI FUJIMART
+Tong cong           378.120
+Momo                376.120
+      `;
+      const result = extractReceiptData(receipt);
+      // Payment line confirms 376120
+      expect(result.totalAmount).toBe(376120);
+    });
   });
 
   describe('Line Items', () => {

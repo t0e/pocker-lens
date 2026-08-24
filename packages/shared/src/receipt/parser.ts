@@ -64,7 +64,11 @@ const TOTAL_KEYWORDS_SCORED: Array<{ regex: RegExp; bonus: number }> = [
   { regex: /THANH\s*TOAN/i, bonus: 15 },
 ];
 
-const NON_TOTAL_KEYWORDS_REGEX = /(SUBTOTAL|SUB\s*TOTAL|TIỀN\s*HÀNG|TỔNG\s*TIỀN\s*HÀNG|TẠM\s*TÍNH|TAX|VAT|THUẾ|DISCOUNT|GIẢM\s*GIÁ|CHIẾT\s*KHẤU|TIỀN\s*KHÁCH\s*ĐƯA|TIỀN\s*MẶT|CASH\b|TIỀN\s*THỐI|TIỀN\s*TRẢ\s*LẠI|CHANGE\b)/i;
+const NON_TOTAL_KEYWORDS_REGEX = /(SUBTOTAL|SUB\s*TOTAL|TIỀN\s*HÀNG|TỔNG\s*TIỀN\s*HÀNG|TẠM\s*TÍNH|TAX|VAT|THUẾ|DISCOUNT|GIẢM\s*GIÁ|CHIẾT\s*KHẤU|TIỀN\s*KHÁCH\s*ĐƯA|TIỀN\s*KHÁCH\s*TRẢ|TIỀN\s*MẶT|CASH\b|TIỀN\s*THỐI|TIỀN\s*TRẢ\s*LẠI|CHANGE\b)/i;
+
+// Payment method lines — these often show the same amount as the total
+// Used ONLY for agreement scoring (confirming which total is correct), not as total candidates
+const PAYMENT_KEYWORDS_REGEX = /(MOMO|VNPAY|ZALOPAY|THANH\s*TOÁN\s*QR|CHUYỂN\s*KHOẢN|CARD\b|VISA\b|MASTERCARD|BANK\b|AGRI\b|VCB\b|VTB\b|TPB\b|MB\b|ACB\b|SHB\b|HDB\b|OCB\b|EXIMBANK|VIETIN\b|TECHCOMBANK|SACOMBANK|PUBLIC\s*BANK|LIOABANK|KEB\s*HANA|WOORI|HSBC|STANDARD\s*CHARTERED|CIMB|CITIBANK)/i;
 
 const HEADER_IGNORE_REGEX = /^(RECEIPT|INVOICE|HOÁ\s*ĐƠN|HÓA\s*ĐƠN|PHIẾU\s*THANH\s*TOÁN|PHIẾU\s*TÍNH\s*TIỀN|BIÊN\s*LAI|BIÊN\s*NHẬN|CỬA\s*HÀNG|STORE|SHOP|WELCOME|THANK\s*YOU|CẢM\s*ƠN|TEL|HOTLINE|ĐT|ĐIỆN\s*THOẠI|FAX|MST|MÃ\s*SỐ\s*THUẾ|TAX\s*ID|ĐỊA\s*CHỈ|Đ\/C|ADDRESS|DATE|NGÀY|TIME|GIỜ|STT|NO\.|QUẦY|THU\s*NGÂN|CASHIER)/i;
 
@@ -340,28 +344,31 @@ export function extractMerchant(lines: string[]): { merchant: string | null; con
  */
 function scoreTotalCandidate(line: string, nextLine: string | undefined, lineIndex: number, totalLines: number, isVND: boolean): { score: number; amount: number | null } {
   let score = 0;
+  let hasKeyword = false;
   let amount: number | null = null;
 
   // Check for total keywords
   for (const { regex, bonus } of TOTAL_KEYWORDS_SCORED) {
     if (regex.test(line)) {
       score += bonus;
+      hasKeyword = true;
       break;
     }
   }
 
   // If line also has a NON_TOTAL keyword (but not a grand total), penalize
-  if (NON_TOTAL_KEYWORDS_REGEX.test(line) && !/(TỔNG\s*CỘNG|GRAND\s*TOTAL|TOTAL\s*DUE|AMOUNT\s*DUE)/i.test(line)) {
+  if (hasKeyword && NON_TOTAL_KEYWORDS_REGEX.test(line) && !/(TỔNG\s*CỘNG|GRAND\s*TOTAL|TOTAL\s*DUE|AMOUNT\s*DUE)/i.test(line)) {
     score -= 50;
+    hasKeyword = false; // effectively not a total keyword line
   }
 
-  // Extract amounts from this line
+  // Extract amounts from this line (only count if keyword matched)
   const amounts = line.match(/([0-9.,]{2,})/g);
   if (amounts && amounts.length > 0) {
     const parsed = parseReceiptAmount(amounts[amounts.length - 1], isVND);
     if (parsed !== null && parsed > 0) {
       amount = parsed;
-      score += 10;
+      if (hasKeyword) score += 10;
     }
   }
 
@@ -378,12 +385,14 @@ function scoreTotalCandidate(line: string, nextLine: string | undefined, lineInd
   }
 
   // Position bonus: totals are usually near the bottom
-  const positionRatio = lineIndex / Math.max(totalLines - 1, 1);
-  if (positionRatio > 0.7) score += 15;
-  else if (positionRatio > 0.5) score += 8;
+  if (hasKeyword) {
+    const positionRatio = lineIndex / Math.max(totalLines - 1, 1);
+    if (positionRatio > 0.7) score += 15;
+    else if (positionRatio > 0.5) score += 8;
+  }
 
   // Amount sanity: totals are usually > 1000 VND or > 1 USD
-  if (amount !== null) {
+  if (hasKeyword && amount !== null) {
     if (isVND && amount >= 1000 && amount <= 100000000) score += 5;
     else if (!isVND && amount >= 1 && amount <= 100000) score += 5;
   }
@@ -462,49 +471,133 @@ export function extractReceiptData(rawText: string, context?: ExtractionContext)
   // 4. Date Detection
   const { date: transactionDate, confidence: dateConfidence } = extractDate(lines);
 
-  // 5. Total Detection — scored multi-candidate approach
+  // 5. Total Detection — scored multi-candidate approach with agreement scoring
   let totalAmount: number | null = null;
   let amountConfidence: FieldConfidence = 'none';
 
-  // Collect total candidates
-  const totalCandidates: Array<{ line: string; index: number; score: number; amount: number | null }> = [];
+  // Collect total candidates and payment amount candidates separately
+  const totalCandidates: Array<{ line: string; index: number; score: number; amount: number }> = [];
+  const paymentAmounts: Array<{ line: string; amount: number }> = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const nextLine = i + 1 < lines.length ? lines[i + 1] : undefined;
     const { score, amount } = scoreTotalCandidate(line, nextLine, i, lines.length, isVND);
-    if (score > 0 && amount !== null) {
+    if (score > 0 && amount !== null && amount > 0) {
       totalCandidates.push({ line, index: i, score, amount });
     }
-  }
 
-  // Sort by score descending, pick best
-  if (totalCandidates.length > 0) {
-    totalCandidates.sort((a, b) => b.score - a.score);
-    const best = totalCandidates[0];
-    totalAmount = best.amount;
-    amountConfidence = best.score >= 30 ? 'high' : best.score >= 15 ? 'medium' : 'low';
-  }
-
-  // Fallback: largest reasonable amount on non-excluded lines
-  if (totalAmount === null) {
-    let maxAmount = 0;
-    for (const line of lines) {
-      if (NON_TOTAL_KEYWORDS_REGEX.test(line)) continue;
-      if (HEADER_IGNORE_REGEX.test(line)) continue;
-      const matches = line.match(/([0-9.,]{3,})/g);
-      if (matches) {
-        for (const m of matches) {
-          const parsed = parseReceiptAmount(m, isVND);
-          if (parsed !== null && parsed > maxAmount && parsed < 1000000000) {
-            maxAmount = parsed;
+    // Collect payment line amounts (Momo, cash, bank transfer, etc.)
+    if (PAYMENT_KEYWORDS_REGEX.test(line) && !NON_TOTAL_KEYWORDS_REGEX.test(line)) {
+      const payAmounts = line.match(/([0-9.,]{2,})/g);
+      if (payAmounts) {
+        for (const pa of payAmounts) {
+          const parsed = parseReceiptAmount(pa, isVND);
+          if (parsed !== null && parsed > 0) {
+            paymentAmounts.push({ line, amount: parsed });
           }
         }
       }
     }
-    if (maxAmount > 0) {
-      totalAmount = maxAmount;
+  }
+
+  // Sort total candidates by score
+  if (totalCandidates.length > 0) {
+    totalCandidates.sort((a, b) => b.score - a.score);
+
+    // Agreement scoring: payment lines that match a total candidate amount
+    // confirm that total, giving it extra weight.
+    // This handles OCR uncertainty where:
+    //   Tổng cộng      378,120  (OCR uncertain on digit)
+    //   Momo            376,120  (payment line confirms correct amount)
+    //
+    // Strategy:
+    // 1. Payment amounts matching a total candidate boost it (+20)
+    // 2. If a total candidate is NOT confirmed by any payment amount, and
+    //    payment amounts disagree with it, the payment amount is likely more
+    //    accurate (payment systems know the exact amount).
+    const candidateScores = totalCandidates.map((tc) => ({ ...tc }));
+
+    for (const tc of candidateScores) {
+      for (const pa of paymentAmounts) {
+        if (pa.amount === tc.amount) {
+          tc.score += 20;
+        }
+      }
+      const sameAmount = totalCandidates.filter((other) => other.amount === tc.amount);
+      if (sameAmount.length > 1) {
+        tc.score += 10 * (sameAmount.length - 1);
+      }
+    }
+
+    // If no total candidate was confirmed by payment amounts,
+    // and payment amounts disagree with the best total candidate,
+    // the payment amount likely reflects the actual amount paid.
+    const bestUnboosted = candidateScores[0];
+    const hasPaymentConfirmation = paymentAmounts.some((pa) => pa.amount === bestUnboosted.amount);
+
+    if (!hasPaymentConfirmation && paymentAmounts.length >= 1) {
+      // Add payment amounts as alternative candidates
+      // They represent actual money transferred — often more accurate than OCR of total line
+      const paymentVotes = new Map<number, number>();
+      for (const pa of paymentAmounts) {
+        paymentVotes.set(pa.amount, (paymentVotes.get(pa.amount) || 0) + 1);
+      }
+      for (const [amount, voteCount] of paymentVotes) {
+        // Payment amounts get a high base score since they come from payment systems
+        candidateScores.push({
+          line: `payment-amount(${voteCount}x)`,
+          index: totalCandidates.length,
+          score: 35 + voteCount * 10,
+          amount,
+        });
+      }
+    }
+
+    candidateScores.sort((a, b) => b.score - a.score);
+    const bestCandidate = candidateScores[0];
+    totalAmount = bestCandidate.amount;
+
+    const paymentAgreements = paymentAmounts.filter((pa) => pa.amount === totalAmount).length;
+
+    if (paymentAgreements >= 2) {
+      amountConfidence = 'high';
+    } else if (paymentAgreements >= 1) {
+      amountConfidence = 'high';
+    } else if (bestCandidate.score >= 40) {
+      amountConfidence = 'high';
+    } else if (bestCandidate.score >= 25) {
+      amountConfidence = 'medium';
+    } else {
       amountConfidence = 'low';
+    }
+  }
+
+  // Fallback: only if no total candidate found at all, try to find a reasonable amount
+  // from lines that look like summary lines (not individual items)
+  // NEVER use "largest number wins" — that fails for receipts with unit prices
+  if (totalAmount === null) {
+    // Look for standalone amounts on lines without product descriptions
+    for (const line of lines) {
+      if (NON_TOTAL_KEYWORDS_REGEX.test(line)) continue;
+      if (HEADER_IGNORE_REGEX.test(line)) continue;
+      // Skip lines that look like item descriptions (text before number)
+      if (/^[A-ZÀ-Ỹ].*\d{2,}/i.test(line) && line.length > 15) continue;
+      const amounts = line.match(/([0-9.,]{3,})/g);
+      if (amounts) {
+        for (const m of amounts) {
+          const parsed = parseReceiptAmount(m, isVND);
+          if (parsed !== null && parsed > 0 && parsed < 1000000000) {
+            // Only accept if this is a short line (likely a summary line, not an item)
+            if (line.length < 40) {
+              totalAmount = parsed;
+              amountConfidence = 'low';
+              break;
+            }
+          }
+        }
+        if (totalAmount !== null) break;
+      }
     }
   }
 

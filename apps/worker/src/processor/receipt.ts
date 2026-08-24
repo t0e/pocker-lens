@@ -92,9 +92,10 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
     logger.info({ receiptId }, 'receipt.ocr extracting text (multi-pass)...');
     const ocrResult = await ocrProvider.extractText(fileBuffer, receipt.mimeType);
 
-    // Extract quality info if available (EnhancedOCRResult)
+    // Extract quality and debug info if available (EnhancedOCRResult)
     const enhancedResult = ocrResult as EnhancedOCRResult;
     const qualityInfo = enhancedResult.quality || null;
+    const debugInfo = enhancedResult.debug || null;
 
     // 5. Perform deterministic structured extraction (English + Vietnamese)
     const userCategories = receipt.user.categories.map((c) => ({ id: c.id, name: c.name }));
@@ -117,7 +118,7 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
         });
       }
 
-      // Merge image quality info into fieldConfidences JSON
+      // Merge image quality + debug info into fieldConfidences JSON (dev inspection)
       const fieldConfidencesWithQuality = {
         ...extracted.fieldConfidences,
         ...(qualityInfo ? {
@@ -128,6 +129,18 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
             sharpness: Math.round(qualityInfo.sharpness),
             resolution: `${qualityInfo.width}x${qualityInfo.height}`,
             issues: qualityInfo.details,
+          },
+        } : {}),
+        ...(debugInfo ? {
+          ocrPipeline: {
+            documentDetected: debugInfo.documentDetected,
+            documentConfidence: Math.round(debugInfo.documentConfidence * 100) / 100,
+            documentAreaPercent: Math.round(debugInfo.documentAreaFraction * 100),
+            perspectiveCorrected: debugInfo.perspectiveCorrected,
+            originalDimensions: debugInfo.originalDimensions,
+            croppedDimensions: debugInfo.croppedDimensions,
+            candidates: debugInfo.candidateLabels,
+            bestCandidate: enhancedResult.bestCandidate || 'unknown',
           },
         } : {}),
       };
@@ -181,6 +194,8 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
         ocrConfidence: ocrResult.confidence,
         extractionConfidence: extracted.confidence,
         qualityRating: qualityInfo?.rating || 'unknown',
+        documentDetected: debugInfo?.documentDetected ?? false,
+        perspectiveCorrected: debugInfo?.perspectiveCorrected ?? false,
         candidateCount: enhancedResult.candidateCount || 1,
         bestCandidate: enhancedResult.bestCandidate || 'unknown',
         durationMs,
