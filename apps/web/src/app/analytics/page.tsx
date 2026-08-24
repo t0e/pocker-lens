@@ -196,7 +196,7 @@ export default function AnalyticsPage() {
         <>
           {/* Converted Summary Banner (when user has multi-currency data) */}
           {summary?.convertedSummary && (
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-zinc-900 to-zinc-900 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+            <Card className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-br from-zinc-900 to-zinc-800 dark:from-zinc-900 dark:to-zinc-950 border-l-4 border-l-emerald-500">
               <div className="space-y-0.5">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
                   Cross-Currency Converted Period Total ({summary.convertedSummary.reportingCurrency})
@@ -213,7 +213,7 @@ export default function AnalyticsPage() {
               <div className="text-[11px] text-zinc-400">
                 Converted from: {summary.convertedSummary.convertedFromCurrencies.join(", ") || selectedCurrency}
               </div>
-            </div>
+            </Card>
           )}
 
           {/* Section 1: Financial Summary Cards */}
