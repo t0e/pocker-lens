@@ -289,6 +289,33 @@ describe('Receipts Endpoints (/receipts - Phase 6)', () => {
     });
   });
 
+  describe('GET /receipts/:id/file', () => {
+    it('rejects unauthenticated file retrieval with 401', async () => {
+      vi.spyOn(authService, 'validateSession').mockResolvedValue(null);
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/receipts/${sampleReceipt.id}/file`,
+      });
+
+      expect(res.statusCode).toBe(401);
+      const body = JSON.parse(res.body);
+      expect(body.error).toBe('Unauthorized');
+    });
+
+    it('returns 404 when receipt does not exist or belongs to another user', async () => {
+      vi.spyOn(prisma.receipt, 'findFirst').mockResolvedValue(null);
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/receipts/unknown_id/file',
+        headers: { authorization: 'Bearer token' },
+      });
+
+      expect(res.statusCode).toBe(404);
+    });
+  });
+
   describe('DELETE /receipts/:id', () => {
     it('successfully deletes a receipt and unlinks file', async () => {
       vi.spyOn(prisma.receipt, 'findFirst').mockResolvedValue(sampleReceipt as any);

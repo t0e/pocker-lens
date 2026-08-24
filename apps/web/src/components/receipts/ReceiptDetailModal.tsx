@@ -73,10 +73,64 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [confirmSuccess, setConfirmSuccess] = useState(false);
 
+  // Authenticated Image Loading State
+  const [imageBlobUrl, setImageBlobUrl] = useState<string | null>(null);
+  const [isImageLoading, setIsImageLoading] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState<string | null>(null);
+
   // Intelligence States
   const [suggestedCategory, setSuggestedCategory] = useState<CategorySuggestionResponse | null>(null);
   const [duplicateMatch, setDuplicateMatch] = useState<DuplicateMatch | null>(null);
   const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+
+  // Fetch authenticated image blob with credentials
+  useEffect(() => {
+    const receiptId = receipt?.id;
+    if (!receiptId || !isOpen) {
+      setImageBlobUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      return;
+    }
+
+    let isMounted = true;
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    const targetUrl = `${apiBase}/receipts/${receiptId}/file`;
+
+    setIsImageLoading(true);
+    setImageLoadError(null);
+
+    fetch(targetUrl, {
+      credentials: 'include',
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`Failed to load receipt image (${res.status})`);
+        }
+        return res.blob();
+      })
+      .then((blob) => {
+        if (isMounted) {
+          const url = URL.createObjectURL(blob);
+          setImageBlobUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return url;
+          });
+          setIsImageLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setImageLoadError(err.message || 'Failed to load receipt image');
+          setIsImageLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [receipt?.id, isOpen]);
 
   useEffect(() => {
     if (categoryId || (!merchant.trim() && !description.trim())) {
@@ -335,16 +389,55 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           {/* Left Column: Receipt Image & Raw Text */}
           <div className="lg:col-span-5 space-y-3">
-            <div className="relative rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-950 aspect-[3/4] flex items-center justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={imageUrl}
-                alt={receipt.originalFilename}
-                className="max-h-full max-w-full object-contain"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
+            <div className="relative rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/60 aspect-[3/4] flex items-center justify-center p-2">
+              {isImageLoading ? (
+                <div className="flex flex-col items-center justify-center space-y-2 text-zinc-400">
+                  <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+                  <span className="text-xs">Loading receipt photo...</span>
+                </div>
+              ) : imageLoadError ? (
+                <div className="flex flex-col items-center justify-center space-y-2 text-center p-4 text-zinc-400">
+                  <AlertTriangle className="h-6 w-6 text-rose-500 mb-1" />
+                  <span className="text-xs text-rose-600 dark:text-rose-400 font-medium">{imageLoadError}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setIsImageLoading(true);
+                      setImageLoadError(null);
+                      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+                      fetch(`${apiBase}/receipts/${receipt.id}/file`, { credentials: 'include' })
+                        .then((res) => {
+                          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                          return res.blob();
+                        })
+                        .then((blob) => {
+                          const url = URL.createObjectURL(blob);
+                          setImageBlobUrl((prev) => {
+                            if (prev) URL.revokeObjectURL(prev);
+                            return url;
+                          });
+                          setIsImageLoading(false);
+                        })
+                        .catch((err) => {
+                          setImageLoadError(err.message || 'Failed to load receipt image');
+                          setIsImageLoading(false);
+                        });
+                    }}
+                    className="text-[11px] mt-1"
+                  >
+                    Retry Image
+                  </Button>
+                </div>
+              ) : imageBlobUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={imageBlobUrl}
+                  alt={receipt.originalFilename}
+                  className="max-h-full max-w-full object-contain rounded-lg shadow-sm bg-white dark:bg-zinc-950"
+                />
+              ) : null}
             </div>
 
             <div className="flex items-center justify-between text-xs text-zinc-400 px-1">
