@@ -36,4 +36,22 @@ export const healthRoutes: FastifyPluginAsync = async (fastify) => {
 
     return reply.status(isHealthy ? 200 : 503).send(response);
   });
+
+  // GET /ready (Readiness probe specifically for orchestrators/monitoring)
+  fastify.get('/ready', async (request, reply) => {
+    const [pgStatus, redisStatus, storageReady] = await Promise.all([
+      checkDatabaseHealth(),
+      checkRedisHealth(),
+      storage.ensureReady(),
+    ]);
+
+    const isReady = pgStatus === 'connected' && redisStatus === 'connected' && storageReady;
+    return reply.status(isReady ? 200 : 503).send({
+      ready: isReady,
+      postgres: pgStatus,
+      redis: redisStatus,
+      storage: storageReady ? 'ready' : 'unavailable',
+      timestamp: new Date().toISOString(),
+    });
+  });
 };

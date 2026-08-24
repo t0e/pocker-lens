@@ -27,13 +27,10 @@ export function buildApp(): FastifyInstance {
     disableRequestLogging: false,
   });
 
-  // CORS configured to allow cookie credentials from frontend origins
+  // CORS configured to allow cookie credentials from configured origins
+  const allowedOrigins = config.ALLOWED_ORIGINS.split(',').map((s) => s.trim());
   app.register(cors, {
-    origin: [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'http://localhost:4000',
-    ],
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });

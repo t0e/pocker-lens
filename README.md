@@ -1,79 +1,205 @@
 # PocketLens
 
-> PocketLens is a multilingual personal finance tracker focused on fast transaction capture through receipts, natural-language input, and a mobile-first interface.
+> Multilingual personal finance platform combining instant transaction entry, English/Vietnamese receipt OCR, budget management, recurring subscriptions, multi-currency reporting, and spending analytics.
+
+[![CI Status](https://github.com/t0e/pocker-lens/actions/workflows/ci.yml/badge.svg)](https://github.com/t0e/pocker-lens/actions/workflows/ci.yml)
+[![Node.js](https://img.shields.io/badge/node-v20.x-green.svg)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)](https://www.docker.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16.x-336791.svg)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-7.x-DC382D.svg)](https://redis.io/)
 
 ---
 
-## ⚠️ Current Implementation Status
+## 💡 Why PocketLens?
 
-**Phase 6: Multilingual Receipt OCR + Transaction Extraction (Active & Completed)**
+Managing personal finances across multiple currencies and languages is usually slow, tedious, or lossy. Existing tools often force automatic currency conversions that overwrite original transaction values or rely on brittle manual data entry.
 
-The project is under active development. Phase 6 introduces:
-- **Local Multilingual OCR Pipeline**: `LocalOCRProvider` engine with English and Vietnamese language detection and zero paid API dependencies.
-- **Deterministic Receipt Field Extractor**: Locales-aware parsing engine extracting Merchant, Total Amount, Date, Currency, and Line Items. Handles Vietnamese dot-separated thousands (`80.000 VNĐ` / `1.250.000 VND`), English commas (`80,000`), Total vs Subtotal vs Discount vs Cash vs Change.
-- **Category & Account Suggestions**: Context-aware categorization using bilingual dictionaries and user account resolution.
-- **Interactive Side-by-Side Review & Confirmation**: Editable draft form side-by-side with receipt image, field confidence indicators (`High`, `Medium`, `Low`), raw OCR text inspection, duplicate transaction prevention, and atomic balance integration with Phase 3 transaction service.
+**PocketLens is built on six foundational invariants:**
 
----
-
-## 🎯 Project Goals
-
-- **Lightning-Fast Transaction Capture**: Log expenses in seconds using receipt scanning, quick natural language entry, and keyboard shortcuts.
-- **Multilingual Input & Processing**: Built with first-class support for English and Vietnamese inputs and currency formats.
-- **Mobile-First Experience**: Designed primarily for mobile web and PWA usage, while providing a clean responsive desktop dashboard.
-- **Reliable Background Pipeline**: Asynchronous background worker architecture for receipt processing and image storage.
-- **Privacy & Ownership**: Docker-first local development with strict user data isolation and decimal-accurate balance tracking.
+1. **Original Money Immutability**: Every transaction permanently retains its original currency and amount in the database. Converted views are computed dynamically for reporting and never overwrite the underlying financial record.
+2. **Exact Decimal Precision**: All balances, transaction amounts, and exchange rates are handled with exact decimal arithmetic (`DECIMAL(19, 4)` and `DECIMAL(18, 8)` in PostgreSQL) to eliminate floating-point rounding errors.
+3. **Strict Transfer Semantics**: Internal transfers between accounts adjust individual account balances without inflating total income, expenses, or net worth.
+4. **Receipt Human-in-the-Loop Confirmation**: Receipt uploads and OCR extractions never modify financial balances until explicitly reviewed and confirmed by the user.
+5. **Idempotent Recurring Execution**: Background recurring schedulers ensure that scheduled payments execute exactly once per cycle, even in concurrent or restarted environments.
+6. **Multi-Tenant User Isolation**: All accounting ledgers, receipt images, category learning suggestions, and duplicate alerts are strictly scoped to the authenticated user.
 
 ---
 
-## 🚀 Roadmap
+## 🏗 Architecture
 
-- [x] **Phase 1: Project Foundation** (Monorepo, Docker Compose, API/Worker scaffolds, PostgreSQL, Redis, healthchecks)
-- [x] **Phase 2: Authentication + Financial Accounts** (Auth, session cookies, accounts CRUD, multi-currency, ownership enforcement)
-- [x] **Phase 3: Transactions & Cash Flow** (Income/expense logging, atomic same-currency transfers, categories, monthly summaries)
-- [x] **Phase 4: Fast Entry + Natural-Language Input** (English + Vietnamese rule-based parser, quick-add modal, draft preview, confirm flow)
-- [x] **Phase 5: Receipt Processing Pipeline, Secure Storage & Vault** (Multipart uploads, magic bytes validation, BullMQ worker, UI vault)
-- [x] **Phase 6: Multilingual Receipt OCR & Transaction Extraction** (Local OCR, English/Vietnamese parser, draft review, confirm flow)
-- [ ] **Phase 7: Multi-Currency Analytics, Budgets & Polish**
+```mermaid
+graph TD
+    subgraph Client ["Client Layer"]
+        Web["Next.js 14 Web Frontend<br/>(App Router, Tailwind CSS, Lucide)"]
+    end
 
----
+    subgraph API ["API & Routing Layer"]
+        Fastify["Fastify TypeScript API<br/>(Auth, Accounts, Transactions, Analytics, FX)"]
+        Auth["Session Cookie Auth<br/>(Bcrypt, Signed Cookies)"]
+        FX["Exchange Rate Engine<br/>(Historical Rates & Caching)"]
+    end
 
-## 🏗 Architecture & Tech Stack
+    subgraph Processing ["Asynchronous Worker"]
+        Worker["BullMQ Worker<br/>(OCR & Recurring Scheduler)"]
+        OCR["Local Multilingual OCR<br/>(English & Vietnamese Parsing)"]
+        Scheduler["Recurring Scheduler<br/>(Idempotent Occurrence Tracker)"]
+    end
 
-### Architecture Overview
+    subgraph Persistence ["Storage & Persistence Layer"]
+        DB[(PostgreSQL 16<br/>Prisma ORM)]
+        Queue[(Redis 7<br/>BullMQ & Cache)]
+        Storage[(Receipt Storage<br/>Local Volume / S3)]
+    end
 
-```text
-Browser (Web Frontend — Port 3000)
-   │
-   ├── Next.js App Router (Auth Context, Dashboard, Accounts, Transactions Feed, Quick Add Modal)
-   │
-   ▼
-Backend API (Fastify / TypeScript — Port 4000)
-   │
-   ├── Auth Service (Bcrypt Password Hashing, Signed HttpOnly Session Cookies)
-   ├── Accounts Service (CRUD, Ownership Isolation, Decimal Precision)
-   ├── Transactions Service (Atomic Expense/Income/Transfer, Reversal on Delete/Edit)
-   ├── Natural-Language Parser (RuleBasedParser with English & Vietnamese Dictionaries)
-   ├── Categories Service (System Default Seeds + Custom User Categories)
-   ├── Monthly Summary Service (Per-Currency Cash Flow Calculation)
-   ├── PostgreSQL 16 (Users, Sessions, Accounts, Categories, Transactions — Port 5432)
-   ├── Redis 7 (Session Cache & Queue Infrastructure — Port 6379)
-   └── Named Volume (/data/receipts — Receipt Image Storage)
-          ▲
-          │
-Background Worker (Node.js / BullMQ)
+    Web -->|HTTP / Cookies| Fastify
+    Fastify --> Auth
+    Fastify --> FX
+    Fastify --> DB
+    Fastify --> Queue
+    Fastify --> Storage
+
+    Worker --> OCR
+    Worker --> Scheduler
+    Worker --> Queue
+    Worker --> DB
+    Worker --> Storage
 ```
 
-### Tech Stack
+---
 
-- **Frontend**: Next.js 14 (App Router), React 18, Tailwind CSS, Lucide Icons
-- **Backend API**: Node.js, Fastify, TypeScript, Prisma ORM, Bcrypt, Zod, Pino
-- **Natural Language Parsing**: Local deterministic rule-based engine (`@pocketlens/shared/parser`) with modular dictionaries (`en.ts`, `vi.ts`)
-- **Background Worker**: Node.js, TypeScript, BullMQ, ioredis
-- **Database**: PostgreSQL 16 (`DECIMAL(19,4)` money columns)
-- **Cache & Queue**: Redis 7
-- **Storage**: Pluggable storage provider (`LocalStorageProvider` targeting `/data/receipts`)
-- **Infrastructure**: Docker, Docker Compose, npm workspaces
+## ⚡ Key Financial Workflows
+
+### 1. Receipt Capture & OCR Pipeline
+```text
+Receipt Upload (JPG/PNG/WebP/PDF)
+       ↓
+Magic-Byte & MIME Validation (≤ 10MB)
+       ↓
+Persistent Storage (Local Volume / S3)
+       ↓
+BullMQ Job Enqueue
+       ↓
+Worker OCR Extraction (English + Vietnamese)
+       ↓
+Interactive Side-by-Side Review UI
+       ↓
+User Confirmation → Transaction Service → Account Balance Update
+```
+
+### 2. Unified Transaction Service
+```text
+Manual Entry / Quick Add / OCR Confirm / Recurring Scheduler
+       ↓
+Existing Transaction Service
+       ↓
+Atomic Account Balance Adjustment (PostgreSQL Transaction)
+       ↓
+Dynamic Budget Spending & Net Worth Updates
+```
+
+### 3. Multi-Currency Reporting & Historical FX
+* **Historical Flows**: Transactions from past dates are converted using the exchange rate recorded on that exact transaction date.
+* **Current Net Worth & Balances**: Account balances convert dynamically using the latest active exchange rates.
+* **Missing Rate Resilience**: Missing exchange rates return `null` and mark conversion unavailable rather than falling back to an inaccurate 1:1 rate.
+
+### 4. Deterministic Intelligence & Duplicate Protection
+* **Merchant Normalization**: Standardizes casing, spacing, and punctuation (e.g., `HIGHLANDS COFFEE` and `Highlands Coffee` map to `highlands coffee`).
+* **User-Isolated Category Learning**: Suggests categories based strictly on the user's historical confirmations for that merchant.
+* **Duplicate Detection**: Flags potential duplicates within $\pm 24\text{ hours}$ based on account, amount, currency, and merchant. Offers users `Keep Both`, `Use Existing` (links receipt), or `Cancel`.
+
+---
+
+## 🛠 Tech Stack
+
+| Domain | Technologies |
+| :--- | :--- |
+| **Frontend** | Next.js 14 (App Router), React 18, Tailwind CSS, Lucide Icons |
+| **Backend API** | Node.js 20, Fastify, TypeScript, Prisma ORM, Zod, Pino |
+| **Worker & Queue** | Node.js 20, BullMQ, Redis 7, Tesseract.js OCR |
+| **Database** | PostgreSQL 16 (Exact `DECIMAL` columns, composite indexes) |
+| **Storage** | Local volume mount (`/data/receipts`) / S3-compatible provider |
+| **Orchestration** | Docker, Docker Compose (Multi-stage Alpine images) |
+| **CI/CD** | GitHub Actions (Lint, type-check, integration tests, build) |
+
+---
+
+## 🚀 Quick Start (Local Development)
+
+### Prerequisites
+* [Docker](https://docs.docker.com/get-docker/) & Docker Compose
+* [Node.js](https://nodejs.org/) v20+ (for local host scripting/testing)
+
+### 1. Clone & Configure
+```bash
+git clone https://github.com/t0e/pocker-lens.git
+cd pocker-lens
+cp .env.example .env
+```
+
+### 2. Start Services
+```bash
+docker compose up --build
+```
+
+Docker Compose automatically orchestrates startup in the correct sequence:
+1. `postgres` (PostgreSQL 16) & `redis` (Redis 7) initialize and become healthy.
+2. `migrate` runs `prisma migrate deploy` and exits cleanly.
+3. `api` (Fastify API) & `worker` (BullMQ worker) start concurrently with the schema fully prepared.
+4. `web` (Next.js frontend) launches and connects to the API.
+
+### 3. Access Services
+* **Web Application**: [http://localhost:3000](http://localhost:3000)
+* **API Health Check**: [http://localhost:4000/health](http://localhost:4000/health)
+* **API Readiness Probe**: [http://localhost:4000/ready](http://localhost:4000/ready)
+
+### 4. Stop Services
+```bash
+docker compose down
+```
+*(Volumes `postgres_data`, `redis_data`, and `receipt_data` persist data across restarts).*
+
+---
+
+## 🧪 Testing & Verification
+
+PocketLens includes comprehensive automated test coverage across shared logic and API integration:
+
+```bash
+# Run shared package unit tests (76 tests)
+npm test --workspace=@pocketlens/shared
+
+# Run API integration tests against database & Redis (97 tests)
+npm test --workspace=@pocketlens/api
+
+# Run full monorepo type-checking
+npm run type-check
+
+# Run full monorepo linting
+npm run lint
+
+# Build all applications and packages for production
+npm run build
+```
+
+---
+
+## 🔒 Security & Privacy
+
+* **Authentication**: Bcrypt password hashing (`cost factor 10`), server-side persistent sessions in PostgreSQL, signed `HttpOnly`, `SameSite=Lax` cookies.
+* **CORS & Origin Security**: Configurable allowed origins (`ALLOWED_ORIGINS`) with credentialed requests.
+* **Upload Protections**: Strict file size limits (10 MB), magic-byte file signature validation, sanitized unique storage keys (`cuid()`), and user ownership verification before receipt access.
+* **Error Sanitization**: Production API responses sanitize internal 500 errors to prevent leakage of database schemas, system paths, or library internals.
+* **No Telemetry / No Paid Third-Party Dependencies**: OCR and parsing run locally without leaking financial documents to third-party AI APIs.
+
+---
+
+## ⚠️ Known Limitations
+
+* **No Automatic Bank Syncing**: PocketLens focuses on privacy-friendly manual entry, quick text parsing, and receipt scanning. Direct Open Banking / Plaid integrations are intentionally excluded.
+* **OCR Quality Dependency**: Receipt parsing accuracy depends on photo resolution, lighting, and receipt print condition. The UI provides a side-by-side verification editor to correct extracted fields.
+* **Cross-Currency Transfers**: Transfers between accounts of different currencies are currently recorded as distinct transactions rather than an integrated FX transfer order.
+* **Development vs Production Storage**: Development uses a persistent Docker named volume. Production deployments should configure an S3-compatible object store (e.g. AWS S3, Cloudflare R2, or MinIO).
 
 ---
 
@@ -82,81 +208,24 @@ Background Worker (Node.js / BullMQ)
 ```text
 pocket-lens/
 ├── apps/
-│   ├── web/                    # Next.js App Router responsive frontend shell
-│   │   ├── src/app/            # App Router pages (Dashboard, Transactions, Accounts, Login, Register, etc.)
-│   │   ├── src/components/     # Layout, navigation, modals, and UI primitives
-│   │   ├── src/context/        # AuthContext and session state
-│   │   └── src/lib/            # Typed API client and currency formatters
-│   │
-│   ├── api/                    # Node.js + Fastify backend API
-│   │   ├── prisma/             # Prisma schema and migrations (Users, Sessions, Accounts, Categories, Transactions)
-│   │   └── src/                # Auth, accounts, categories, transactions, parser routes, DB & Redis clients
-│   │
-│   └── worker/                 # Node.js + TypeScript background worker
-│       └── src/                # BullMQ queue registration and lifecycle
-│
+│   ├── web/                    # Next.js 14 App Router frontend
+│   │   ├── src/app/            # Pages: Dashboard, Accounts, Transactions, Budgets, Analytics, Receipts
+│   │   └── src/components/     # Layout, charts, modals, review editors
+│   ├── api/                    # Fastify Node.js backend
+│   │   ├── prisma/             # Database schema and migrations
+│   │   └── src/                # Services: Auth, Accounts, Transactions, Budgets, FX, Duplicates
+│   └── worker/                 # Background processor
+│       └── src/                # BullMQ worker, OCR extraction, Recurring scheduler
 ├── packages/
-│   └── shared/                 # Shared TypeScript types, validation schemas, currency constants, and natural language parser
-│
-├── docker/                     # Service Dockerfiles (api, worker, web)
-├── docker-compose.yml          # Canonical development orchestrator
-├── .env.example                # Canonical environment template
-├── .gitignore                  # Git safety configuration
-└── README.md
-```
-
----
-
-## 🛠 Local Development & Docker Instructions
-
-### Prerequisites
-
-- [Docker](https://docs.docker.com/get-docker/) & Docker Compose
-- [Node.js](https://nodejs.org/) v20+ (for local host tooling)
-
-### 1. Quick Start with Docker
-
-1. Clone the repository and copy the environment template:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Start all services using Docker Compose:
-   ```bash
-   docker compose up --build
-   ```
-
-3. Access the services:
-   - **Web Application**: [http://localhost:3000](http://localhost:3000)
-   - **API Health Check**: [http://localhost:4000/health](http://localhost:4000/health)
-
-4. Stop services (preserving database and receipt storage data):
-   ```bash
-   docker compose down
-   ```
-
----
-
-## 🧪 Testing & Verification
-
-Run tests, type-checks, and linter across all workspaces:
-
-```bash
-# Run all unit, integration, parser, and API tests
-npm test
-
-# Run TypeScript type-checking
-npm run type-check
-
-# Run ESLint across packages
-npm run lint
-
-# Build all packages and applications
-npm run build
+│   └── shared/                 # Core domain types, FX math, natural language parser, schemas
+├── docker/                     # Optimized multi-stage Dockerfiles (api, worker, web)
+├── .github/workflows/          # Production CI workflow (lint, test, build)
+├── docker-compose.yml          # Local container orchestrator with dedicated migration container
+└── .env.example                # Environment configuration template
 ```
 
 ---
 
 ## 📄 License
 
-Private & Proprietary. All rights reserved.
+MIT License. Copyright (c) 2026 PocketLens Contributors.

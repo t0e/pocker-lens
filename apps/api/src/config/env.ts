@@ -16,6 +16,7 @@ const envSchema = z.object({
   SESSION_EXPIRY_DAYS: z.coerce.number().default(30),
   STORAGE_PROVIDER: z.enum(['local', 's3']).default('local'),
   RECEIPT_STORAGE_PATH: z.string().default('/data/receipts'),
+  ALLOWED_ORIGINS: z.string().default('http://localhost:3000,http://127.0.0.1:3000,http://localhost:4000'),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -1,0 +1,144 @@
+name: PocketLens CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate --schema=./apps/api/prisma/schema.prisma
+
+      - name: Build Shared Package
+        run: npm run build --workspace=@pocketlens/shared
+
+      - name: Run Lint
+        run: npm run lint
+
+      - name: Run Type Check
+        run: npm run type-check
+
+  test-shared:
+    name: Test Shared Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Shared Package
+        run: npm run build --workspace=@pocketlens/shared
+
+      - name: Run Shared Unit Tests
+        run: npm test --workspace=@pocketlens/shared
+
+  test-api:
+    name: Test API Services
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: pocketlens_test
+          POSTGRES_USER: pocketlens
+          POSTGRES_PASSWORD: pocketlens_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate --schema=./apps/api/prisma/schema.prisma
+
+      - name: Build Shared Package
+        run: npm run build --workspace=@pocketlens/shared
+
+      - name: Run Database Migrations
+        env:
+          DATABASE_URL: postgresql://pocketlens:pocketlens_test_password@localhost:5432/pocketlens_test?schema=public
+        run: npx prisma migrate deploy --schema=./apps/api/prisma/schema.prisma
+
+      - name: Run API Integration Tests
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://pocketlens:pocketlens_test_password@localhost:5432/pocketlens_test?schema=public
+          REDIS_URL: redis://localhost:6379
+          COOKIE_SECRET: pocketlens_ci_test_cookie_secret_32_characters_long
+        run: npm test --workspace=@pocketlens/api
+
+  build:
+    name: Production Build Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate --schema=./apps/api/prisma/schema.prisma
+
+      - name: Build All Workspaces
+        run: npm run build

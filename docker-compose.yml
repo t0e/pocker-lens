@@ -37,12 +37,28 @@ services:
     networks:
       - pocketlens_network
 
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    container_name: pocketlens-migrate
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pocketlens}:${POSTGRES_PASSWORD:-pocketlens_dev_password}@postgres:5432/${POSTGRES_DB:-pocketlens}?schema=public
+    command: ["npx", "prisma", "migrate", "deploy", "--schema=./apps/api/prisma/schema.prisma"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pocketlens_network
+
   api:
     build:
       context: .
       dockerfile: docker/api.Dockerfile
     container_name: pocketlens-api
     restart: unless-stopped
+    command: ["node", "./apps/api/dist/server.js"]
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       API_PORT: 4000
@@ -60,6 +76,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:4000/health"]
       interval: 10s
@@ -88,6 +106,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks:
       - pocketlens_network
 
