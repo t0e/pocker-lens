@@ -204,7 +204,9 @@ User confirms → Creates Transaction via Phase 3 service (Status: CONFIRMED)
 - **TypeScript**: `npm run type-check` passes with **0 errors** across all 4 workspaces.
 - **Lint**: `npm run lint` passes with **0 warnings / 0 errors**.
 - **Build**: `npm run build` succeeds completely (Prisma generate, Next.js static page optimization).
-- **Remote Git Status**: Pushed to `origin/main` (latest commit: `4c5d88c`).
+- **Remote Git Status**: Pushed to `origin/main` (latest commit: `eb57793`).
+- **Known Operational Limitations**:
+  - *Worker Migration Race on Fresh Database*: On a completely fresh database, the worker may execute its initial recurring-scheduler check before Prisma migrations complete. The failure is handled gracefully and processing resumes on the next 60-second scheduler tick. Consider introducing a dedicated migration/init service during Phase 10 production hardening.
 
 ---
 
