@@ -23,6 +23,11 @@ const storage = createStorageProvider({
 
 let ocrProvider: OCRProvider = new LocalOCRProvider();
 
+function memMB(stage: string): string {
+  const m = process.memoryUsage();
+  return `${stage} rss=${(m.rss / 1048576).toFixed(0)}MB heap=${(m.heapUsed / 1048576).toFixed(0)}/${(m.heapTotal / 1048576).toFixed(0)}MB`;
+}
+
 export function setOCRProvider(provider: OCRProvider) {
   ocrProvider = provider;
 }
@@ -82,6 +87,7 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
     if (!fileBuffer || fileBuffer.length === 0) {
       throw new Error('Stored receipt image file is empty or corrupted');
     }
+    logger.info({ receiptId, sizeKB: Math.round(fileBuffer.length / 1024) }, memMB('after.file-read'));
 
     const magicCheck = validateImageMagicBytes(fileBuffer);
     if (!magicCheck.valid) {
@@ -91,6 +97,7 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
     // 4. Perform multi-pass OCR text extraction with preprocessing
     logger.info({ receiptId }, 'receipt.ocr extracting text (multi-pass)...');
     const ocrResult = await ocrProvider.extractText(fileBuffer, receipt.mimeType);
+    logger.info({ receiptId }, memMB('after.ocr'));
 
     // Extract quality and debug info if available (EnhancedOCRResult)
     const enhancedResult = ocrResult as EnhancedOCRResult;

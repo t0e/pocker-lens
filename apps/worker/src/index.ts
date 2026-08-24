@@ -12,12 +12,14 @@ const logger = pino({
   level: config.NODE_ENV === 'test' ? 'silent' : 'info',
 });
 
+const WORKER_CONCURRENCY = parseInt(process.env.RECEIPT_WORKER_CONCURRENCY || '1', 10);
+
 let worker: Worker<ReceiptJobData, ReceiptJobResult> | null = null;
 let redisConnection: ReturnType<typeof createRedisConnection> | null = null;
 let recurringTimer: NodeJS.Timeout | null = null;
 
 async function startWorker() {
-  logger.info({ env: config.NODE_ENV }, '🚀 Initializing PocketLens Background Worker...');
+  logger.info({ env: config.NODE_ENV, concurrency: WORKER_CONCURRENCY }, '🚀 Initializing PocketLens Background Worker...');
 
   try {
     // Check storage readiness
@@ -37,13 +39,13 @@ async function startWorker() {
     const pong = await redisConnection.ping();
     logger.info({ pong }, '✅ Redis connection established');
 
-    // Start BullMQ Worker on 'receipt-processing'
+    // Start BullMQ Worker — concurrency=1 by default for OCR memory safety
     worker = new Worker<ReceiptJobData, ReceiptJobResult>(
       QUEUE_NAMES.RECEIPT_PROCESSING,
       processReceiptJob,
       {
         connection: redisConnection,
-        concurrency: 2,
+        concurrency: WORKER_CONCURRENCY,
       }
     );
 

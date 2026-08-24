@@ -36,4 +36,4 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/shared ./packages/shared
 COPY --from=builder /app/apps/worker ./apps/worker
 
-CMD ["node", "./apps/worker/dist/index.js"]
+CMD ["node", "--max-old-space-size=1536", "./apps/worker/dist/index.js"]
