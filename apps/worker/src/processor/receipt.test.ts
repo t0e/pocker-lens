@@ -2,7 +2,28 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { processReceiptJob, setOCRProvider } from './receipt.js';
 import { prisma } from '../db/client.js';
 import { LocalStorageProvider } from '@pocketlens/shared/server';
-import { MockOCRProvider } from '@pocketlens/shared';
+import { MockOCRProvider, OCRResult } from '@pocketlens/shared';
+
+// Mock OCR provider that returns quality info (simulates EnhancedOCRResult)
+class MockEnhancedOCRProvider {
+  private mockText: string;
+  private confidence: number;
+
+  constructor(mockText: string, confidence = 90) {
+    this.mockText = mockText;
+    this.confidence = confidence;
+  }
+
+  async extractText(_imageBuffer: Buffer, _mimeType: string): Promise<OCRResult> {
+    return {
+      rawText: this.mockText,
+      confidence: this.confidence,
+      detectedLanguage: 'eng+vie',
+      durationMs: 50,
+      provider: 'tesseract.js-local',
+    } as OCRResult;
+  }
+}
 
 describe('Receipt Background Worker Processor (processReceiptJob Phase 6)', () => {
   const mockUser = {
@@ -43,7 +64,7 @@ TỔNG CỘNG         80.000 VNĐ
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    setOCRProvider(new MockOCRProvider(sampleOCRText, 95));
+    setOCRProvider(new MockEnhancedOCRProvider(sampleOCRText, 95) as any);
   });
 
   it('processes valid receipt with OCR and creates structured extraction and items', async () => {

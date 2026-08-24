@@ -10,7 +10,7 @@ import {
 import { createStorageProvider } from '@pocketlens/shared/server';
 import { prisma } from '../db/client.js';
 import { config } from '../config/env.js';
-import { LocalOCRProvider } from '../ocr/local.js';
+import { LocalOCRProvider, EnhancedOCRResult } from '../ocr/local.js';
 
 const logger = pino({
   level: config.NODE_ENV === 'test' ? 'silent' : 'info',
@@ -88,9 +88,13 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
       throw new Error('Stored receipt file failed signature verification');
     }
 
-    // 4. Perform OCR text extraction
-    logger.info({ receiptId }, 'receipt.ocr extracting text...');
+    // 4. Perform multi-pass OCR text extraction with preprocessing
+    logger.info({ receiptId }, 'receipt.ocr extracting text (multi-pass)...');
     const ocrResult = await ocrProvider.extractText(fileBuffer, receipt.mimeType);
+
+    // Extract quality info if available (EnhancedOCRResult)
+    const enhancedResult = ocrResult as EnhancedOCRResult;
+    const qualityInfo = enhancedResult.quality || null;
 
     // 5. Perform deterministic structured extraction (English + Vietnamese)
     const userCategories = receipt.user.categories.map((c) => ({ id: c.id, name: c.name }));
@@ -113,6 +117,21 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
         });
       }
 
+      // Merge image quality info into fieldConfidences JSON
+      const fieldConfidencesWithQuality = {
+        ...extracted.fieldConfidences,
+        ...(qualityInfo ? {
+          imageQuality: {
+            rating: qualityInfo.rating,
+            brightness: Math.round(qualityInfo.brightness),
+            contrast: Math.round(qualityInfo.contrast),
+            sharpness: Math.round(qualityInfo.sharpness),
+            resolution: `${qualityInfo.width}x${qualityInfo.height}`,
+            issues: qualityInfo.details,
+          },
+        } : {}),
+      };
+
       const extractionRecord = await tx.receiptExtraction.create({
         data: {
           receiptId: receipt.id,
@@ -125,7 +144,7 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
           rawText: extracted.rawText,
           detectedLanguage: extracted.detectedLanguage,
           confidence: extracted.confidence,
-          fieldConfidences: extracted.fieldConfidences as any,
+          fieldConfidences: fieldConfidencesWithQuality as any,
           status: 'PENDING_REVIEW',
           items: {
             create: extracted.items.map((item) => ({
@@ -159,9 +178,14 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
         total: extracted.totalAmount,
         currency: extracted.currency,
         itemsCount: extracted.items.length,
+        ocrConfidence: ocrResult.confidence,
+        extractionConfidence: extracted.confidence,
+        qualityRating: qualityInfo?.rating || 'unknown',
+        candidateCount: enhancedResult.candidateCount || 1,
+        bestCandidate: enhancedResult.bestCandidate || 'unknown',
         durationMs,
       },
-      'receipt.ready (Phase 6 OCR & extraction complete)'
+      'receipt.ready (enhanced OCR & extraction complete)'
     );
 
     return {
