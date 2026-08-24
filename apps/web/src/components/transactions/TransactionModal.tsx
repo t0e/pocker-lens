@@ -26,11 +26,16 @@ import {
   CreateTransactionInput,
   ParseTransactionResult,
   ParsedTransactionDraft,
+  CategorySuggestionResponse,
+  DuplicateMatch,
+  DuplicateCheckResult,
 } from '@pocketlens/shared';
 import { apiClient } from '@/lib/api-client';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { formatMoney } from '@/lib/utils';
+import { CategorySuggestionBadge } from '../intelligence/CategorySuggestionBadge';
+import { DuplicateWarningModal } from '../intelligence/DuplicateWarningModal';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -72,6 +77,41 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Intelligence States
+  const [suggestedCategory, setSuggestedCategory] = useState<CategorySuggestionResponse | null>(null);
+  const [duplicateMatch, setDuplicateMatch] = useState<DuplicateMatch | null>(null);
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+
+  // Fetch category suggestion on merchant/description typing
+  useEffect(() => {
+    if (type === 'transfer' || categoryId || (!merchant.trim() && !description.trim())) {
+      setSuggestedCategory(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiClient<CategorySuggestionResponse>('/categories/suggest', {
+          method: 'POST',
+          body: JSON.stringify({
+            merchant: merchant.trim() || undefined,
+            description: description.trim() || undefined,
+            amount: parseFloat(amount) || undefined,
+          }),
+        });
+        if (res && res.categoryId && res.confidence !== 'NONE') {
+          setSuggestedCategory(res);
+        } else {
+          setSuggestedCategory(null);
+        }
+      } catch {
+        setSuggestedCategory(null);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [merchant, description, amount, type, categoryId]);
 
   // Initialize or reset form state
   useEffect(() => {
@@ -166,7 +206,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   };
 
   // Submit confirmed transaction to existing Phase 3 endpoint
-  const handleConfirmAndSave = async () => {
+  const handleConfirmAndSave = async (forceSave = false) => {
     setError(null);
 
     const num = parseFloat(amount);
@@ -192,6 +232,32 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       if (selectedSourceAccount && selectedDestAccount && selectedSourceAccount.currency !== selectedDestAccount.currency) {
         setError(`Cross-currency transfers are not supported. Both accounts must use ${selectedSourceAccount.currency}.`);
         return;
+      }
+    }
+
+    // Check for duplicates before creation (if not editing and modal not already dismissed)
+    if (!editingTransaction && !forceSave) {
+      try {
+        const dupRes = await apiClient<DuplicateCheckResult>('/transactions/check-duplicates', {
+          method: 'POST',
+          body: JSON.stringify({
+            accountId,
+            amount: num,
+            currency: selectedSourceAccount?.currency || 'VND',
+            transactionDate: new Date(date).toISOString(),
+            description: description.trim() || (type === 'transfer' ? 'Transfer' : type === 'income' ? 'Income' : 'Expense'),
+            merchant: merchant.trim() || null,
+            type,
+          }),
+        });
+
+        if (dupRes && dupRes.hasDuplicate && dupRes.matches.length > 0) {
+          setDuplicateMatch(dupRes.matches[0]);
+          setIsDuplicateModalOpen(true);
+          return;
+        }
+      } catch {
+        // If check fails gracefully continue
       }
     }
 
@@ -428,7 +494,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     variant="primary"
                     size="sm"
                     disabled={isSubmitting || !amount || !accountId}
-                    onClick={handleConfirmAndSave}
+                    onClick={() => handleConfirmAndSave(false)}
                     className="flex-1 text-xs font-bold"
                   >
                     {isSubmitting ? 'Saving...' : 'Confirm & Save'}
@@ -441,7 +507,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
         {/* 2. MANUAL ENTRY / DRAFT EDIT MODE */}
         {entryMode === 'manual' && (
-          <form onSubmit={(e) => { e.preventDefault(); handleConfirmAndSave(); }} className="space-y-4">
+          <form onSubmit={(e) => { e.preventDefault(); handleConfirmAndSave(false); }} className="space-y-4">
             {/* Type Selector Tabs */}
             <div className="grid grid-cols-3 gap-1.5 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
               <button
@@ -594,6 +660,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                       </option>
                     ))}
                   </select>
+                  {suggestedCategory && !categoryId && (
+                    <div className="mt-1.5">
+                      <CategorySuggestionBadge
+                        suggestion={suggestedCategory}
+                        onApply={(catId) => setCategoryId(catId)}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -688,6 +762,31 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               </Button>
             </div>
           </form>
+        )}
+
+        {/* Phase 9: Duplicate Warning Modal */}
+        {duplicateMatch && (
+          <DuplicateWarningModal
+            isOpen={isDuplicateModalOpen}
+            match={duplicateMatch}
+            newTransactionData={{
+              description: description.trim() || (type === 'transfer' ? 'Transfer' : type === 'income' ? 'Income' : 'Expense'),
+              amount: parseFloat(amount) || 0,
+              currency: selectedSourceAccount?.currency || 'VND',
+              transactionDate: date,
+            }}
+            onKeepBoth={() => {
+              setIsDuplicateModalOpen(false);
+              handleConfirmAndSave(true);
+            }}
+            onUseExisting={(_existingId) => {
+              setIsDuplicateModalOpen(false);
+              onClose();
+            }}
+            onCancel={() => {
+              setIsDuplicateModalOpen(false);
+            }}
+          />
         )}
       </div>
     </div>

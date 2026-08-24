@@ -23,8 +23,9 @@ model User {
   id           String        @id @default(cuid())
   email        String        @unique
   passwordHash String        @map("password_hash")
-  displayName  String        @map("display_name")
-  createdAt    DateTime      @default(now()) @map("created_at")
+  displayName       String        @map("display_name")
+  reportingCurrency String        @default("VND") @db.VarChar(3) @map("reporting_currency")
+  createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
 
   accounts              Account[]
@@ -317,4 +318,20 @@ model RecurringOccurrence {
   @@index([recurringTransactionId])
   @@index([transactionId])
   @@map("recurring_occurrences")
+}
+
+// Phase 9: Multi-Currency Exchange Rates
+model ExchangeRate {
+  id            String   @id @default(cuid())
+  baseCurrency  String   @db.VarChar(3) @map("base_currency")
+  quoteCurrency String   @db.VarChar(3) @map("quote_currency")
+  rate          Decimal  @db.Decimal(18, 8)
+  rateDate      DateTime @db.Date @map("rate_date")
+  provider      String   @default("default")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([baseCurrency, quoteCurrency, rateDate, provider])
+  @@index([baseCurrency, quoteCurrency, rateDate])
+  @@index([rateDate])
+  @@map("exchange_rates")
 }

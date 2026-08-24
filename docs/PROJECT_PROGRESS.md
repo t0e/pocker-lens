@@ -317,14 +317,26 @@ Access UI at `http://localhost:3000` and API at `http://localhost:4000`.
 
 ---
 
-## 15. What Phase 9 Should Implement
+### Phase 9: Multi-Currency, FX & Smart Financial Intelligence (COMPLETED)
+- **Preserve Original Money Invariant**: Transactions permanently retain original `amount` and `currency` in the database. All conversions are derived reporting views only.
+- **Exchange Rate Infrastructure**: Database table `exchange_rates` with `Decimal(18, 8)` precision, unique constraint on `[baseCurrency, quoteCurrency, rateDate, provider]`, and provider abstraction (`IFXProvider`, fixture and historical rates).
+- **Multi-Currency Reporting**: User preferred reporting currency (`reportingCurrency` on `User`), switcher dropdown in UI header, and converted period totals (`convertedSummary`).
+- **Cross-Currency Net Worth**: Converts all active account balances into user's reporting currency (`totalNetWorth` with breakdown by original currencies).
+- **Conservative Merchant Normalization**: `normalizeMerchant` cleans punctuation, excessive whitespace, and casing without merging distinct brands.
+- **Smarter Categorization Service**: Deterministic frequency scoring based on user-confirmed transaction history (`user_id + normalized_merchant`), description keywords, and dictionary fallback with confidence classification (`HIGH`, `MEDIUM`, `LOW`, `NONE`).
+- **Duplicate Transaction Protection**: Conservative candidate search window (same user, same currency, exact/near amount, ±1 day). Categorizes confidence (`EXACT`, `LIKELY`, `POSSIBLE`) and provides user choices: `Keep Both`, `Use Existing`, `Cancel`.
+- **Deterministic Data Quality Intelligence**: `GET /analytics/data-quality` reporting uncategorized transactions with 1-click suggested actions, potential duplicate clusters, and pending receipts.
 
-Phase 9 will focus on **Data Export, Backup, Import & Audit Trail**:
+---
+
+## 15. What Phase 10 Should Implement
+
+Phase 10 will focus on **Production Hardening, Dedicated Migration Container & Export/Audit Trail**:
+- Dedicated migration/init container to guarantee migrations complete before the API and worker begin database-dependent work.
 - Complete JSON & CSV export for transactions, accounts, categories, and budgets.
-- Date range and account-filtered exports.
 - CSV import with column mapping and duplicate detection.
-- Data export password/PIN protection or secure download tokens.
 - Complete user data deletion / account reset capability (privacy & GDPR compliance).
+- End-to-end production performance, load testing, and Docker optimization.
 
 ---
 
@@ -341,6 +353,7 @@ Phase 9 will focus on **Data Export, Backup, Import & Audit Trail**:
 >    - Keep budget spending dynamic (derived from actual expense transactions).
 >    - Ensure recurring transactions have database-level idempotency (`RecurringOccurrence` unique constraint).
 >    - Never combine different currencies into single numbers without explicit multi-currency structures.
+>    - Original transaction amounts and currencies must remain permanently unmodified (converted values are derived reporting info only).
 > 5. **Run Regression Tests After Every Change**: Ensure `npm test`, `npm run type-check`, and `npm run lint` all exit with code 0.
 > 6. **Make Small, Logical Git Commits**: Commit each feature chunk cleanly with descriptive conventional commit messages.
 > 7. **Push After Each Completed Phase**: Always push commits to `origin/main` upon phase completion.

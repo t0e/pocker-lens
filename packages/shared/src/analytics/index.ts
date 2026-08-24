@@ -17,6 +17,7 @@ export const AnalyticsQuerySchema = z.object({
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
   currency: z.string().length(3).optional(),
+  reportingCurrency: z.string().length(3).optional(),
 });
 export type AnalyticsQuery = z.infer<typeof AnalyticsQuerySchema>;
 
@@ -53,9 +54,19 @@ export interface CurrencyFinancialSummary {
   } | null;
 }
 
+export interface ConvertedFinancialSummary {
+  reportingCurrency: string;
+  totalIncome: number;
+  totalExpenses: number;
+  totalNet: number;
+  savingsRate: number | null;
+  convertedFromCurrencies: string[];
+}
+
 export interface FinancialSummaryResponse {
   period: AnalyticsPeriod;
   summaries: CurrencyFinancialSummary[];
+  convertedSummary?: ConvertedFinancialSummary | null;
 }
 
 // 2. Cash Flow & Monthly Trends DTO
@@ -147,10 +158,18 @@ export interface AccountActivityItem {
   transactionCount: number;
 }
 
+export interface NetWorthSummary {
+  reportingCurrency: string;
+  totalNetWorth: number;
+  isConverted: boolean;
+  convertedFromCurrencies: string[];
+}
+
 export interface AccountActivityResponse {
   currency: string;
   period: AnalyticsPeriod;
   accounts: AccountActivityItem[];
+  netWorth?: NetWorthSummary | null;
 }
 
 // 7. Budget Performance & Spending Pace DTO

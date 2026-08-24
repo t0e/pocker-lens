@@ -12,3 +12,5 @@ export * from './ocr/index.js';
 export * from './budget/index.js';
 export * from './recurring/index.js';
 export * from './analytics/index.js';
+export * from './fx/index.js';
+export * from './intelligence/index.js';

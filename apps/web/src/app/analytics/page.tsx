@@ -37,6 +37,9 @@ import {
   RefreshCw,
 } from "lucide-react";
 
+import { ReportingCurrencySelector } from "@/components/fx/ReportingCurrencySelector";
+import { formatCurrencyAmount } from "@pocketlens/shared";
+
 const TIME_RANGES: { value: TimeRangeType; label: string }[] = [
   { value: "current_month", label: "This Month" },
   { value: "previous_month", label: "Last Month" },
@@ -48,6 +51,7 @@ const TIME_RANGES: { value: TimeRangeType; label: string }[] = [
 export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState<TimeRangeType>("current_month");
   const [selectedCurrency, setSelectedCurrency] = useState<string>("VND");
+  const [reportingCurrency, setReportingCurrency] = useState<string>("VND");
   const [isLoading, setIsLoading] = useState(true);
 
   // Analytics Datasets
@@ -66,6 +70,7 @@ export default function AnalyticsPage() {
       const queryParams = new URLSearchParams({
         timeRange,
         currency: selectedCurrency,
+        reportingCurrency,
       }).toString();
 
       const [
@@ -106,7 +111,7 @@ export default function AnalyticsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [timeRange, selectedCurrency]);
+  }, [timeRange, selectedCurrency, reportingCurrency]);
 
   useEffect(() => {
     fetchAnalytics();
@@ -124,15 +129,21 @@ export default function AnalyticsPage() {
             <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
               Financial Analytics
             </h1>
-            <Badge variant="phase">Deterministic Engine</Badge>
+            <Badge variant="phase">Phase 9 Multi-Currency</Badge>
           </div>
           <p className="text-xs sm:text-sm text-zinc-500 mt-1">
-            Cashflow trends, spending paces, category breakdowns, and commitment projections.
+            Multi-currency cashflow trends, spending pace, category breakdowns, and cross-currency converted insights.
           </p>
         </div>
 
         {/* Time Range and Currency Selectors */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Reporting Currency Selector */}
+          <ReportingCurrencySelector
+            currentCurrency={reportingCurrency}
+            onCurrencyChange={(c) => setReportingCurrency(c)}
+          />
+
           {/* Time Range Selector */}
           <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs">
             {TIME_RANGES.map((tr) => (
@@ -183,6 +194,28 @@ export default function AnalyticsPage() {
         </div>
       ) : (
         <>
+          {/* Converted Summary Banner (when user has multi-currency data) */}
+          {summary?.convertedSummary && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-zinc-900 to-zinc-900 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+              <div className="space-y-0.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+                  Cross-Currency Converted Period Total ({summary.convertedSummary.reportingCurrency})
+                </span>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-xl sm:text-2xl font-black text-white">
+                    Net: ≈ {formatCurrencyAmount(summary.convertedSummary.totalNet, summary.convertedSummary.reportingCurrency)}
+                  </span>
+                  <span className="text-xs text-zinc-400">
+                    (Income: {formatCurrencyAmount(summary.convertedSummary.totalIncome, summary.convertedSummary.reportingCurrency)} • Expense: {formatCurrencyAmount(summary.convertedSummary.totalExpenses, summary.convertedSummary.reportingCurrency)})
+                  </span>
+                </div>
+              </div>
+              <div className="text-[11px] text-zinc-400">
+                Converted from: {summary.convertedSummary.convertedFromCurrencies.join(", ") || selectedCurrency}
+              </div>
+            </div>
+          )}
+
           {/* Section 1: Financial Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Total Income */}

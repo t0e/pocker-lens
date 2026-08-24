@@ -14,6 +14,8 @@ import { receiptRoutes } from './routes/receipts.js';
 import { budgetRoutes } from './routes/budgets.js';
 import { recurringRoutes } from './routes/recurring.js';
 import { analyticsRoutes } from './routes/analytics.js';
+import { fxRoutes } from './routes/fx.js';
+import { intelligenceRoutes } from './routes/intelligence.js';
 import { config } from './config/env.js';
 import { MAX_RECEIPT_FILE_SIZE } from '@pocketlens/shared';
 
@@ -69,6 +71,8 @@ export function buildApp(): FastifyInstance {
   app.register(budgetRoutes);
   app.register(recurringRoutes);
   app.register(analyticsRoutes);
+  app.register(fxRoutes);
+  app.register(intelligenceRoutes);
 
   // Centralized error handler
   app.setErrorHandler((error, request, reply) => {

@@ -43,6 +43,10 @@ import { TransactionModal } from '@/components/transactions/TransactionModal';
 import { apiClient } from '@/lib/api-client';
 import { formatMoney } from '@/lib/utils';
 
+import { ReportingCurrencySelector } from '@/components/fx/ReportingCurrencySelector';
+import { DataQualityCard } from '@/components/intelligence/DataQualityCard';
+import { convertCurrency, formatCurrencyAmount } from '@pocketlens/shared';
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<AccountResponse[]>([]);
@@ -51,6 +55,7 @@ export default function DashboardPage() {
   const [monthlySummary, setMonthlySummary] = useState<MonthlyFinancialSummaryResponse | null>(null);
   const [monthlyBudgets, setMonthlyBudgets] = useState<MonthlyBudgetsResponse | null>(null);
   const [upcomingPayments, setUpcomingPayments] = useState<UpcomingOccurrenceResponse[]>([]);
+  const [reportingCurrency, setReportingCurrency] = useState<string>('VND');
   const [isLoading, setIsLoading] = useState(true);
   const [showBalance, setShowBalance] = useState(true);
 
@@ -61,13 +66,14 @@ export default function DashboardPage() {
     try {
       setIsLoading(true);
       const currentMonth = new Date().toISOString().slice(0, 7);
-      const [accData, catData, txData, summaryData, budgetData, upcomingData] = await Promise.all([
+      const [accData, catData, txData, summaryData, budgetData, upcomingData, repCurrData] = await Promise.all([
         apiClient<AccountResponse[]>('/accounts'),
         apiClient<CategoryResponse[]>('/categories'),
         apiClient<PaginatedTransactionsResponse>('/transactions?limit=5'),
         apiClient<MonthlyFinancialSummaryResponse>('/transactions/summary'),
         apiClient<MonthlyBudgetsResponse>(`/budgets?month=${currentMonth}`).catch(() => null),
         apiClient<{ upcoming: UpcomingOccurrenceResponse[] }>('/recurring/upcoming?days=14').catch(() => ({ upcoming: [] })),
+        apiClient<{ reportingCurrency: string }>('/fx/reporting-currency').catch(() => ({ reportingCurrency: 'VND' })),
       ]);
 
       setAccounts(accData);
@@ -76,6 +82,9 @@ export default function DashboardPage() {
       setMonthlySummary(summaryData);
       setMonthlyBudgets(budgetData);
       setUpcomingPayments(upcomingData.upcoming || []);
+      if (repCurrData?.reportingCurrency) {
+        setReportingCurrency(repCurrData.reportingCurrency);
+      }
     } catch {
       // Fallback
     } finally {
@@ -97,6 +106,12 @@ export default function DashboardPage() {
     return acc;
   }, {} as Record<string, number>);
 
+  // Compute Total Converted Net Worth in reportingCurrency
+  const totalNetWorth = Object.entries(currencyTotals).reduce((sum, [cur, amt]) => {
+    const converted = convertCurrency(amt, cur, reportingCurrency) || amt;
+    return sum + converted;
+  }, 0);
+
   const activeAccounts = accounts.filter((a) => !a.isArchived);
 
   return (
@@ -110,14 +125,18 @@ export default function DashboardPage() {
             </h2>
             <Badge variant="success" className="space-x-1 hidden sm:inline-flex">
               <ShieldCheck className="h-3 w-3" />
-              <span>Phase 8 Active</span>
+              <span>Phase 9 Active</span>
             </Badge>
           </div>
           <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
-            Real-time balance tracking, category budgets, subscriptions, analytics, and receipt scanning.
+            Multi-currency reporting, exchange rates, smart categorization, duplicate protection, and receipt OCR.
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center flex-wrap gap-2">
+          <ReportingCurrencySelector
+            currentCurrency={reportingCurrency}
+            onCurrencyChange={(c) => setReportingCurrency(c)}
+          />
           <Button
             variant="primary"
             size="sm"
@@ -142,14 +161,14 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Main Total Balances Banner */}
+      {/* Main Total Balances & Converted Net Worth Banner */}
       <Card className="bg-gradient-to-br from-zinc-900 to-zinc-800 text-white dark:from-zinc-900 dark:to-zinc-950 border-zinc-700/50 shadow-md">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Layers className="h-4 w-4 text-emerald-400" />
               <span className="text-xs sm:text-sm font-medium text-zinc-400 uppercase tracking-wider">
-                Total Balance by Currency
+                Total Net Worth & Balance Breakdown
               </span>
             </div>
             <button
@@ -171,22 +190,43 @@ export default function DashboardPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-3">
-              {Object.entries(currencyTotals).map(([currency, total]) => (
-                <div
-                  key={currency}
-                  className="p-4 rounded-xl bg-zinc-800/80 border border-zinc-700/60 flex flex-col justify-between"
-                >
-                  <span className="text-xs font-semibold text-zinc-400">{currency} Balance</span>
-                  <span className="text-2xl sm:text-3xl font-black text-zinc-50 mt-1">
-                    {showBalance ? formatMoney(total, currency) : '••••••••'}
+            <div className="space-y-4 pt-3">
+              {/* Converted Net Worth Pill */}
+              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <span className="text-xs font-semibold text-emerald-300 uppercase tracking-wider">
+                    Total Estimated Net Worth ({reportingCurrency})
                   </span>
+                  <div className="text-2xl sm:text-3xl font-black text-emerald-400 mt-0.5">
+                    {showBalance ? `≈ ${formatCurrencyAmount(totalNetWorth, reportingCurrency)}` : '••••••••'}
+                  </div>
                 </div>
-              ))}
+                <span className="text-[11px] text-emerald-300/80 italic">
+                  Converted using historical & latest exchange rates
+                </span>
+              </div>
+
+              {/* Individual Currency Totals */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {Object.entries(currencyTotals).map(([currency, total]) => (
+                  <div
+                    key={currency}
+                    className="p-3.5 rounded-xl bg-zinc-800/80 border border-zinc-700/60 flex flex-col justify-between"
+                  >
+                    <span className="text-xs font-semibold text-zinc-400">{currency} Balance</span>
+                    <span className="text-xl sm:text-2xl font-bold text-zinc-50 mt-1">
+                      {showBalance ? formatMoney(total, currency) : '••••••••'}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </CardHeader>
       </Card>
+
+      {/* Data Quality & Smart Hygiene Card */}
+      <DataQualityCard />
 
       {/* Monthly Budgets & Upcoming Payments Widgets */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

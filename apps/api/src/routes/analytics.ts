@@ -23,6 +23,7 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
       startDate?: string;
       endDate?: string;
       currency?: string;
+      reportingCurrency?: string;
     };
     const userId = request.user.id;
 
@@ -38,7 +39,8 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
       query.month,
       query.startDate,
       query.endDate,
-      query.currency
+      query.currency,
+      query.reportingCurrency
     );
 
     return reply.send(result);
@@ -159,6 +161,7 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
       startDate?: string;
       endDate?: string;
       currency?: string;
+      reportingCurrency?: string;
     };
     const userId = request.user.id;
     const timeRange = (
@@ -173,7 +176,8 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
       query.month,
       query.startDate,
       query.endDate,
-      query.currency
+      query.currency,
+      query.reportingCurrency
     );
 
     return reply.send(result);

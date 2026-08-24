@@ -1,6 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client.js";
 import {
+  ConvertedFinancialSummary,
+  NetWorthSummary,
   AnalyticsPeriod,
   CurrencyFinancialSummary,
   FinancialSummaryResponse,
@@ -26,6 +28,7 @@ import {
   calculateEstimatedMonthlyCost,
   getMonthBounds,
 } from "@pocketlens/shared";
+import { fxService } from "./fx.js";
 
 function formatNumber(num: Prisma.Decimal | number | null | undefined): number {
   if (num === null || num === undefined) return 0;
@@ -39,7 +42,8 @@ export async function getFinancialSummary(
   customMonth?: string,
   customStartDate?: string,
   customEndDate?: string,
-  currencyFilter?: string
+  currencyFilter?: string,
+  reportingCurrency?: string
 ): Promise<FinancialSummaryResponse> {
   const now = new Date();
   const bounds = getAnalyticsPeriodBounds(timeRange, customMonth, customStartDate, customEndDate, now);
@@ -173,7 +177,37 @@ export async function getFinancialSummary(
     });
   }
 
-  return { period, summaries };
+  let convertedSummary: ConvertedFinancialSummary | null = null;
+  if (reportingCurrency) {
+    let totalIncome = 0;
+    let totalExpenses = 0;
+    const target = reportingCurrency.toUpperCase();
+    const currenciesUsed = new Set<string>();
+
+    for (const s of summaries) {
+      if (s.income === 0 && s.expenses === 0) continue;
+      currenciesUsed.add(s.currency);
+      const convIncome = await fxService.convertAmount(s.income, s.currency, target, bounds.current.end);
+      const convExpenses = await fxService.convertAmount(s.expenses, s.currency, target, bounds.current.end);
+      totalIncome += convIncome.convertedAmount;
+      totalExpenses += convExpenses.convertedAmount;
+    }
+
+    const totalNet = totalIncome - totalExpenses;
+    const savingsRate =
+      totalIncome > 0 ? Math.round(((totalIncome - totalExpenses) / totalIncome) * 1000) / 10 : null;
+
+    convertedSummary = {
+      reportingCurrency: target,
+      totalIncome: Math.round(totalIncome * 100) / 100,
+      totalExpenses: Math.round(totalExpenses * 100) / 100,
+      totalNet: Math.round(totalNet * 100) / 100,
+      savingsRate,
+      convertedFromCurrencies: Array.from(currenciesUsed),
+    };
+  }
+
+  return { period, summaries, convertedSummary };
 }
 
 export async function getCashFlowTrends(
@@ -542,7 +576,8 @@ export async function getAccountActivity(
   customMonth?: string,
   customStartDate?: string,
   customEndDate?: string,
-  currencyFilter?: string
+  currencyFilter?: string,
+  reportingCurrency?: string
 ): Promise<AccountActivityResponse> {
   const now = new Date();
   const bounds = getAnalyticsPeriodBounds(timeRange, customMonth, customStartDate, customEndDate, now);
@@ -657,10 +692,37 @@ export async function getAccountActivity(
     };
   });
 
+  let netWorth: NetWorthSummary | null = null;
+  if (reportingCurrency) {
+    const target = reportingCurrency.toUpperCase();
+    let totalNetWorth = 0;
+    const currenciesUsed = new Set<string>();
+
+    const allUserAccounts = await prisma.account.findMany({
+      where: { userId, isArchived: false },
+      select: { currency: true, currentBalance: true },
+    });
+
+    for (const a of allUserAccounts) {
+      const bal = formatNumber(a.currentBalance);
+      currenciesUsed.add(a.currency);
+      const conv = await fxService.convertAmount(bal, a.currency, target, now);
+      totalNetWorth += conv.convertedAmount;
+    }
+
+    netWorth = {
+      reportingCurrency: target,
+      totalNetWorth: Math.round(totalNetWorth * 100) / 100,
+      isConverted: true,
+      convertedFromCurrencies: Array.from(currenciesUsed),
+    };
+  }
+
   return {
     currency: currencyFilter || "ALL",
     period,
     accounts: accountItems,
+    netWorth,
   };
 }
 

@@ -27,10 +27,15 @@ import {
   FieldConfidence,
   AccountResponse,
   CategoryResponse,
+  CategorySuggestionResponse,
+  DuplicateMatch,
+  DuplicateCheckResult,
 } from '@pocketlens/shared';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { apiClient } from '@/lib/api-client';
+import { CategorySuggestionBadge } from '../intelligence/CategorySuggestionBadge';
+import { DuplicateWarningModal } from '../intelligence/DuplicateWarningModal';
 
 interface ReceiptDetailModalProps {
   receipt: ReceiptResponse | null;
@@ -67,6 +72,40 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
   const [isReprocessing, setIsReprocessing] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [confirmSuccess, setConfirmSuccess] = useState(false);
+
+  // Intelligence States
+  const [suggestedCategory, setSuggestedCategory] = useState<CategorySuggestionResponse | null>(null);
+  const [duplicateMatch, setDuplicateMatch] = useState<DuplicateMatch | null>(null);
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (categoryId || (!merchant.trim() && !description.trim())) {
+      setSuggestedCategory(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiClient<CategorySuggestionResponse>('/categories/suggest', {
+          method: 'POST',
+          body: JSON.stringify({
+            merchant: merchant.trim() || undefined,
+            description: description.trim() || undefined,
+            amount: parseFloat(amount) || undefined,
+          }),
+        });
+        if (res && res.categoryId && res.confidence !== 'NONE') {
+          setSuggestedCategory(res);
+        } else {
+          setSuggestedCategory(null);
+        }
+      } catch {
+        setSuggestedCategory(null);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [merchant, description, amount, categoryId]);
 
   // Load user accounts and categories
   useEffect(() => {
@@ -171,8 +210,8 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
     }
   };
 
-  const handleConfirmTransaction = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleConfirmTransaction = async (e?: React.FormEvent, forceConfirm = false) => {
+    if (e) e.preventDefault();
     if (isSubmitting || receipt.transactionId) return;
 
     if (!amount || parseFloat(amount) <= 0) {
@@ -183,6 +222,31 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
     if (!accountId) {
       setConfirmError('Please select a payment account');
       return;
+    }
+
+    if (!forceConfirm) {
+      try {
+        const dupRes = await apiClient<DuplicateCheckResult>('/transactions/check-duplicates', {
+          method: 'POST',
+          body: JSON.stringify({
+            accountId,
+            amount: parseFloat(amount),
+            currency,
+            transactionDate: new Date(transactionDate).toISOString(),
+            description: description || merchant || 'Receipt expense',
+            merchant: merchant || undefined,
+            type: 'EXPENSE',
+          }),
+        });
+
+        if (dupRes && dupRes.hasDuplicate && dupRes.matches.length > 0) {
+          setDuplicateMatch(dupRes.matches[0]);
+          setIsDuplicateModalOpen(true);
+          return;
+        }
+      } catch {
+        // Continue
+      }
     }
 
     setIsSubmitting(true);
@@ -436,6 +500,14 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
                           </option>
                         ))}
                       </select>
+                      {suggestedCategory && !categoryId && !receipt.transactionId && (
+                        <div className="mt-1.5">
+                          <CategorySuggestionBadge
+                            suggestion={suggestedCategory}
+                            onApply={(catId) => setCategoryId(catId)}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -605,6 +677,39 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
             )}
           </div>
         </div>
+
+        {/* Phase 9: Duplicate Warning Modal */}
+        {duplicateMatch && (
+          <DuplicateWarningModal
+            isOpen={isDuplicateModalOpen}
+            match={duplicateMatch}
+            newTransactionData={{
+              description: description || merchant || 'Receipt expense',
+              amount: parseFloat(amount) || 0,
+              currency,
+              transactionDate: transactionDate || new Date().toISOString(),
+            }}
+            onKeepBoth={() => {
+              setIsDuplicateModalOpen(false);
+              handleConfirmTransaction(undefined, true);
+            }}
+            onUseExisting={async (existingId) => {
+              setIsDuplicateModalOpen(false);
+              // Link receipt to existing transaction
+              try {
+                await apiClient(`/receipts/${receipt.id}/link`, {
+                  method: 'POST',
+                  body: JSON.stringify({ transactionId: existingId }),
+                });
+              } catch {}
+              if (onConfirmed) onConfirmed();
+              onClose();
+            }}
+            onCancel={() => {
+              setIsDuplicateModalOpen(false);
+            }}
+          />
+        )}
       </div>
     </div>
   );
