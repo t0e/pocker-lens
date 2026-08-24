@@ -41,20 +41,99 @@ const CURRENCY_PATTERNS: Array<{ regex: RegExp; code: string }> = [
   { regex: /\b(GBP|£|pound|pounds)\b/i, code: 'GBP' },
 ];
 
-const TOTAL_KEYWORDS_REGEX = /(TỔNG\s*CỘNG|THÀNH\s*TIỀN|TỔNG\s*TIỀN|TỔNG\s*THANH\s*TOÁN|THANH\s*TOÁN|GRAND\s*TOTAL|TOTAL\s*DUE|AMOUNT\s*DUE|BALANCE\s*DUE|TOTAL\s*PAID|PAYMENT\s*TOTAL|\bTOTAL\b|\bTỔNG\b)/i;
+// Scored total keywords: [regex, scoreBonus] — includes both diacritic and diacritic-free variants
+const TOTAL_KEYWORDS_SCORED: Array<{ regex: RegExp; bonus: number }> = [
+  { regex: /TỔNG\s*CỘNG/i, bonus: 30 },
+  { regex: /TONG\s*CONG/i, bonus: 30 },  // OCR without diacritics
+  { regex: /GRAND\s*TOTAL/i, bonus: 30 },
+  { regex: /THÀNH\s*TIỀN/i, bonus: 25 },
+  { regex: /THANH\s*TIEN/i, bonus: 25 },  // OCR without diacritics
+  { regex: /TỔNG\s*TIỀN/i, bonus: 25 },
+  { regex: /TONG\s*TIEN/i, bonus: 25 },
+  { regex: /TỔNG\s*THANH\s*TOÁN/i, bonus: 25 },
+  { regex: /TONG\s*THANH\s*TOAN/i, bonus: 25 },
+  { regex: /TOTAL\s*DUE/i, bonus: 25 },
+  { regex: /AMOUNT\s*DUE/i, bonus: 25 },
+  { regex: /BALANCE\s*DUE/i, bonus: 20 },
+  { regex: /TOTAL\s*PAID/i, bonus: 20 },
+  { regex: /PAYMENT\s*TOTAL/i, bonus: 20 },
+  { regex: /\bTOTAL\b/i, bonus: 15 },
+  { regex: /\bTỔNG\b/i, bonus: 15 },
+  { regex: /\bTONG\b/i, bonus: 15 },
+  { regex: /THANH\s*TOÁN/i, bonus: 15 },
+  { regex: /THANH\s*TOAN/i, bonus: 15 },
+];
 
 const NON_TOTAL_KEYWORDS_REGEX = /(SUBTOTAL|SUB\s*TOTAL|TIỀN\s*HÀNG|TỔNG\s*TIỀN\s*HÀNG|TẠM\s*TÍNH|TAX|VAT|THUẾ|DISCOUNT|GIẢM\s*GIÁ|CHIẾT\s*KHẤU|TIỀN\s*KHÁCH\s*ĐƯA|TIỀN\s*MẶT|CASH\b|TIỀN\s*THỐI|TIỀN\s*TRẢ\s*LẠI|CHANGE\b)/i;
 
 const HEADER_IGNORE_REGEX = /^(RECEIPT|INVOICE|HOÁ\s*ĐƠN|HÓA\s*ĐƠN|PHIẾU\s*THANH\s*TOÁN|PHIẾU\s*TÍNH\s*TIỀN|BIÊN\s*LAI|BIÊN\s*NHẬN|CỬA\s*HÀNG|STORE|SHOP|WELCOME|THANK\s*YOU|CẢM\s*ƠN|TEL|HOTLINE|ĐT|ĐIỆN\s*THOẠI|FAX|MST|MÃ\s*SỐ\s*THUẾ|TAX\s*ID|ĐỊA\s*CHỈ|Đ\/C|ADDRESS|DATE|NGÀY|TIME|GIỜ|STT|NO\.|QUẦY|THU\s*NGÂN|CASHIER)/i;
 
 /**
- * Parses numeric currency strings taking Vietnamese vs English decimal/thousand conventions into account.
+ * Normalize OCR text: clean up Unicode artifacts, repeated spaces, common OCR mistakes.
+ */
+export function normalizeOCRText(text: string): string {
+  let normalized = text;
+  // Replace weird Unicode whitespace with regular space
+  normalized = normalized.replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000\uFEFF]/g, ' ');
+  // Collapse multiple spaces
+  normalized = normalized.replace(/ {2,}/g, ' ');
+  // Normalize line breaks
+  normalized = normalized.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  // Remove trailing whitespace per line
+  normalized = normalized.split('\n').map((l) => l.trimEnd()).join('\n');
+  return normalized.trim();
+}
+
+/**
+ * Fix common OCR confusions in numeric/currency contexts only.
+ * Only applies corrections where the token is clearly numeric.
+ */
+export function fixOCRNumericConfusions(text: string): string {
+  let fixed = text;
+  // Fix "O" → "0" in tokens that are predominantly numeric
+  // e.g., "8O.OOO" → "80.000", "45O00" → "45000", "2O26" → "2026"
+  fixed = fixed.replace(/\b(\d[Oo\d]*[.,]?[Oo\d]*)\b/g, (match) => {
+    // If it contains at least one digit and at least one O, fix the O's
+    if (/\d/.test(match) && /[Oo]/.test(match)) {
+      return match.replace(/[Oo]/g, '0');
+    }
+    return match;
+  });
+  // Fix standalone O's between digits (e.g., "24/O8" → "24/08")
+  fixed = fixed.replace(/(\d)\/([Oo])(\d)/g, '$1/0$3');
+  fixed = fixed.replace(/(\d)([Oo])(\d)/g, '$10$3');
+  return fixed;
+}
+
+/**
+ * Fix VND-specific OCR variations.
+ * "45 000" → "45000", "45.OOO" → "45000" (when context is VND)
+ */
+export function fixVNDAmountOCR(text: string): string {
+  // Fix dot-as-thousand-separator OCR errors: "1.25O.00O" → "1.250.000"
+  let fixed = text.replace(/(\d{1,3})\.(\d{3})\.(\d{3})/g, (match, p1, p2, p3) => {
+    const fixedP2 = p2.replace(/[OoO]/g, '0');
+    const fixedP3 = p3.replace(/[OoO]/g, '0');
+    return `${p1}.${fixedP2}.${fixedP3}`;
+  });
+  // Fix space-separated thousands: "45 000" → "45000" (when surrounded by other numbers)
+  fixed = fixed.replace(/\b(\d{1,3})\s(\d{3})\b/g, '$1$2');
+  return fixed;
+}
+
+/**
+ * Parse numeric currency strings taking Vietnamese vs English decimal/thousand conventions into account.
  */
 export function parseReceiptAmount(amountStr: string, isVNDContext = true): number | null {
   if (!amountStr) return null;
 
+  // Fix OCR confusions: replace O/o → 0 and l/I → 1 in the raw amount string
+  // Safe because at this point we expect a numeric amount string
+  let clean = amountStr.replace(/[Oo]/g, '0');
+  clean = clean.replace(/(\d)[lI](\d)/g, '$11$2'); // l/I → 1 only between digits
+
   // Clean currency symbols and non-numeric chars except . , -
-  let clean = amountStr.replace(/[^0-9.,]/g, '').trim();
+  clean = clean.replace(/[^0-9.,]/g, '').trim();
   if (!clean) return null;
 
   // Case 1: Multiple dots e.g., "1.250.000" or "80.000" (Vietnamese thousands)
@@ -110,11 +189,13 @@ export function parseReceiptAmount(amountStr: string, isVNDContext = true): numb
 }
 
 /**
- * Extracts date from text lines
+ * Extract date from text lines with improved multi-format support.
  */
 export function extractDate(lines: string[]): { date: Date | null; confidence: 'high' | 'medium' | 'low' | 'none' } {
+  const candidates: Array<{ date: Date; confidence: 'high' | 'medium' | 'low' }> = [];
+
   for (const line of lines) {
-    // 1. DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+    // 1. DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY (most common in VN receipts)
     const dmyMatch = line.match(/\b([0-3]?[0-9])[\/\-.]([0-1]?[0-9])[\/\-.](20\d{2})\b/);
     if (dmyMatch) {
       const day = parseInt(dmyMatch[1], 10);
@@ -122,11 +203,23 @@ export function extractDate(lines: string[]): { date: Date | null; confidence: '
       const year = parseInt(dmyMatch[3], 10);
       if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
         const d = new Date(Date.UTC(year, month, day, 12, 0, 0));
-        return { date: d, confidence: 'high' };
+        candidates.push({ date: d, confidence: 'high' });
       }
     }
 
-    // 2. YYYY-MM-DD or YYYY/MM/DD
+    // 2. DD/MM/YY
+    const dmyShort = line.match(/\b([0-3]?[0-9])[\/\-.]([0-1]?[0-9])[\/\-.](\d{2})\b/);
+    if (dmyShort && !dmyMatch) {
+      const day = parseInt(dmyShort[1], 10);
+      const month = parseInt(dmyShort[2], 10) - 1;
+      const year = 2000 + parseInt(dmyShort[3], 10);
+      if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
+        const d = new Date(Date.UTC(year, month, day, 12, 0, 0));
+        candidates.push({ date: d, confidence: 'medium' });
+      }
+    }
+
+    // 3. YYYY-MM-DD or YYYY/MM/DD
     const ymdMatch = line.match(/\b(20\d{2})[\/\-.]([0-1]?[0-9])[\/\-.]([0-3]?[0-9])\b/);
     if (ymdMatch) {
       const year = parseInt(ymdMatch[1], 10);
@@ -134,12 +227,14 @@ export function extractDate(lines: string[]): { date: Date | null; confidence: '
       const day = parseInt(ymdMatch[3], 10);
       if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
         const d = new Date(Date.UTC(year, month, day, 12, 0, 0));
-        return { date: d, confidence: 'high' };
+        candidates.push({ date: d, confidence: 'high' });
       }
     }
 
-    // 3. DD Month YYYY (e.g. 24 Aug 2026 or 24 Thg 8 2026)
-    const textMonthMatch = line.match(/\b([0-3]?[0-9])\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Tháng\s*\d+|Thg\s*\d+)[,\s]+(20\d{2})\b/i);
+    // 4. DD Month YYYY (e.g. 24 Aug 2026 or 24 Thg 8 2026)
+    const textMonthMatch = line.match(
+      /\b([0-3]?[0-9])\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Tháng\s*\d+|Thg\s*\d+|Thang\s*\d+)[,\s]+(20\d{2})\b/i
+    );
     if (textMonthMatch) {
       const day = parseInt(textMonthMatch[1], 10);
       const year = parseInt(textMonthMatch[3], 10);
@@ -153,21 +248,49 @@ export function extractDate(lines: string[]): { date: Date | null; confidence: '
         if (vnM) month = parseInt(vnM[0], 10) - 1;
       }
       if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
-        return { date: new Date(Date.UTC(year, month, day, 12, 0, 0)), confidence: 'high' };
+        candidates.push({ date: new Date(Date.UTC(year, month, day, 12, 0, 0)), confidence: 'high' });
+      }
+    }
+
+    // 5. DD-MM-YY (short year, common in receipts)
+    const dmyShort2 = line.match(/\b([0-3]?[0-9])[\/\-.]([0-1]?[0-9])[\/\-.](\d{2})\b/);
+    if (dmyShort2 && !dmyShort && !dmyMatch) {
+      const day = parseInt(dmyShort2[1], 10);
+      const month = parseInt(dmyShort2[2], 10) - 1;
+      const year = 2000 + parseInt(dmyShort2[3], 10);
+      if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
+        candidates.push({ date: new Date(Date.UTC(year, month, day, 12, 0, 0)), confidence: 'medium' });
+      }
+    }
+
+    // 6. "Ngày DD tháng MM năm YYYY" (Vietnamese full date)
+    const vnFullDate = line.match(/(?:ngày|ngay)\s+(\d{1,2})\s+(?:tháng|thang|th)\s+(\d{1,2})\s+(?:năm|nam)\s+(20\d{2})/i);
+    if (vnFullDate) {
+      const day = parseInt(vnFullDate[1], 10);
+      const month = parseInt(vnFullDate[2], 10) - 1;
+      const year = parseInt(vnFullDate[3], 10);
+      if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
+        candidates.push({ date: new Date(Date.UTC(year, month, day, 12, 0, 0)), confidence: 'high' });
       }
     }
   }
 
-  return { date: null, confidence: 'none' };
+  if (candidates.length === 0) return { date: null, confidence: 'none' };
+
+  // Sort by confidence (high > medium > low), prefer earlier in text
+  const confOrder = { high: 3, medium: 2, low: 1 };
+  candidates.sort((a, b) => (confOrder[b.confidence] - confOrder[a.confidence]));
+  const best = candidates[0];
+  return { date: best.date, confidence: best.confidence };
 }
 
 /**
- * Extracts merchant name from header lines
+ * Extract merchant name from header lines with improved heuristics.
  */
 export function extractMerchant(lines: string[]): { merchant: string | null; confidence: 'high' | 'medium' | 'low' | 'none' } {
-  const candidateLines: string[] = [];
+  const candidateLines: Array<{ text: string; score: number }> = [];
 
-  for (let i = 0; i < Math.min(lines.length, 8); i++) {
+  for (let i = 0; i < Math.min(lines.length, 10); i++) {
     const line = lines[i].trim();
     if (!line || line.length < 2) continue;
 
@@ -175,18 +298,37 @@ export function extractMerchant(lines: string[]): { merchant: string | null; con
     if (HEADER_IGNORE_REGEX.test(line)) continue;
     if (line.includes('===') || line.includes('---') || line.includes('***')) continue;
     if (/^\d+$/.test(line)) continue;
+    // Ignore lines that are mostly numbers (addresses, phone, tax codes)
+    const digitRatio = (line.match(/\d/g) || []).length / line.length;
+    if (digitRatio > 0.5) continue;
+    // Ignore lines that look like addresses (contain digits + commas)
+    if (/^\d+.*,.*\d+/.test(line) && line.length > 20) continue;
+    // Ignore lines that look like phone numbers
+    if (/^(?:\+?84|0)\d{9,10}$/.test(line.replace(/[\s\-().]/g, ''))) continue;
 
-    candidateLines.push(line);
+    // Score: prefer short, text-heavy, early lines
+    let score = 0;
+    score += Math.max(0, 10 - i); // Earlier lines score higher
+    const alphaRatio = (line.replace(/[^a-zA-ZÀ-ỹ]/g, '').length) / line.length;
+    score += alphaRatio * 10; // More alphabetic = better
+    if (line.length >= 3 && line.length <= 50) score += 5; // Reasonable length
+    if (/^[A-ZÀ-Ỹ]/.test(line)) score += 3; // Starts with capital
+    if (/[A-ZÀ-Ỹ]{2,}/.test(line)) score += 2; // Has multiple caps (brand-like)
+
+    candidateLines.push({ text: line, score });
   }
 
   if (candidateLines.length > 0) {
-    const best = candidateLines[0]
+    candidateLines.sort((a, b) => b.score - a.score);
+    const best = candidateLines[0];
+    const cleaned = best.text
       .replace(/^[\s\-–—:;.,*#]+/, '')
       .replace(/[\s\-–—:;.,*#]+$/, '')
       .trim();
 
-    if (best.length >= 2) {
-      return { merchant: best, confidence: candidateLines.length === 1 ? 'high' : 'medium' };
+    if (cleaned.length >= 2) {
+      const confidence = candidateLines.length === 1 ? 'high' : best.score > 10 ? 'high' : 'medium';
+      return { merchant: cleaned, confidence };
     }
   }
 
@@ -194,7 +336,63 @@ export function extractMerchant(lines: string[]): { merchant: string | null; con
 }
 
 /**
- * Main receipt data extractor
+ * Score a line as a total candidate. Returns score + parsed amount.
+ */
+function scoreTotalCandidate(line: string, nextLine: string | undefined, lineIndex: number, totalLines: number, isVND: boolean): { score: number; amount: number | null } {
+  let score = 0;
+  let amount: number | null = null;
+
+  // Check for total keywords
+  for (const { regex, bonus } of TOTAL_KEYWORDS_SCORED) {
+    if (regex.test(line)) {
+      score += bonus;
+      break;
+    }
+  }
+
+  // If line also has a NON_TOTAL keyword (but not a grand total), penalize
+  if (NON_TOTAL_KEYWORDS_REGEX.test(line) && !/(TỔNG\s*CỘNG|GRAND\s*TOTAL|TOTAL\s*DUE|AMOUNT\s*DUE)/i.test(line)) {
+    score -= 50;
+  }
+
+  // Extract amounts from this line
+  const amounts = line.match(/([0-9.,]{2,})/g);
+  if (amounts && amounts.length > 0) {
+    const parsed = parseReceiptAmount(amounts[amounts.length - 1], isVND);
+    if (parsed !== null && parsed > 0) {
+      amount = parsed;
+      score += 10;
+    }
+  }
+
+  // Check next line for amount if this line has keyword but no amount
+  if (score > 0 && amount === null && nextLine) {
+    const nextAmounts = nextLine.match(/([0-9.,]{2,})/g);
+    if (nextAmounts && nextAmounts.length > 0) {
+      const parsed = parseReceiptAmount(nextAmounts[nextAmounts.length - 1], isVND);
+      if (parsed !== null && parsed > 0) {
+        amount = parsed;
+        score += 8;
+      }
+    }
+  }
+
+  // Position bonus: totals are usually near the bottom
+  const positionRatio = lineIndex / Math.max(totalLines - 1, 1);
+  if (positionRatio > 0.7) score += 15;
+  else if (positionRatio > 0.5) score += 8;
+
+  // Amount sanity: totals are usually > 1000 VND or > 1 USD
+  if (amount !== null) {
+    if (isVND && amount >= 1000 && amount <= 100000000) score += 5;
+    else if (!isVND && amount >= 1 && amount <= 100000) score += 5;
+  }
+
+  return { score, amount };
+}
+
+/**
+ * Main receipt data extractor with improved detection.
  */
 export function extractReceiptData(rawText: string, context?: ExtractionContext): ExtractedReceiptData {
   if (!rawText || !rawText.trim()) {
@@ -218,14 +416,19 @@ export function extractReceiptData(rawText: string, context?: ExtractionContext)
     };
   }
 
-  const lines = rawText
+  // Normalize text first
+  let normalizedText = normalizeOCRText(rawText);
+  normalizedText = fixOCRNumericConfusions(normalizedText);
+  normalizedText = fixVNDAmountOCR(normalizedText);
+
+  const lines = normalizedText
     .split('\n')
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
   // 1. Language Detection
-  const hasVnDiacritics = VN_DIACRITICS_REGEX.test(rawText);
-  const hasVnKeywords = /\b(hoá đơn|hóa đơn|phiếu|thanh toán|tổng cộng|thành tiền|tiền mặt|cà phê|quán|bán hàng|cửa hàng)\b/i.test(rawText);
+  const hasVnDiacritics = VN_DIACRITICS_REGEX.test(normalizedText);
+  const hasVnKeywords = /\b(hoá đơn|hóa đơn|phiếu|thanh toán|tổng cộng|thành tiền|tiền mặt|cà phê|quán|bán hàng|cửa hàng)\b/i.test(normalizedText);
   const isVietnamese = hasVnDiacritics || hasVnKeywords;
   const detectedLanguage: 'vi' | 'en' | 'mixed' = isVietnamese ? 'vi' : 'en';
 
@@ -234,7 +437,7 @@ export function extractReceiptData(rawText: string, context?: ExtractionContext)
   let currencyConfidence: FieldConfidence = 'none';
 
   for (const { regex, code } of CURRENCY_PATTERNS) {
-    if (regex.test(rawText)) {
+    if (regex.test(normalizedText)) {
       detectedCurrency = code;
       currencyConfidence = 'high';
       break;
@@ -259,52 +462,36 @@ export function extractReceiptData(rawText: string, context?: ExtractionContext)
   // 4. Date Detection
   const { date: transactionDate, confidence: dateConfidence } = extractDate(lines);
 
-  // 5. Total and Line Items Detection
+  // 5. Total Detection — scored multi-candidate approach
   let totalAmount: number | null = null;
   let amountConfidence: FieldConfidence = 'none';
-  const extractedItems: ExtractedReceiptItem[] = [];
 
-  // Reverse scan to prioritize bottom totals
-  for (let i = lines.length - 1; i >= 0; i--) {
+  // Collect total candidates
+  const totalCandidates: Array<{ line: string; index: number; score: number; amount: number | null }> = [];
+
+  for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-
-    // Check if line contains Total keyword
-    if (TOTAL_KEYWORDS_REGEX.test(line)) {
-      // Ensure it's not a Subtotal or discount or change line unless explicitly matching grand total
-      if (NON_TOTAL_KEYWORDS_REGEX.test(line) && !/(TỔNG\s*CỘNG|GRAND\s*TOTAL|TOTAL\s*DUE|AMOUNT\s*DUE)/i.test(line)) {
-        continue;
-      }
-
-      // Extract numeric values in this line or subsequent line
-      const amounts = line.match(/([0-9.,]{2,})/g);
-      if (amounts && amounts.length > 0) {
-        // Pick the last amount on the total line
-        const parsed = parseReceiptAmount(amounts[amounts.length - 1], isVND);
-        if (parsed !== null && parsed > 0) {
-          totalAmount = parsed;
-          amountConfidence = 'high';
-          break;
-        }
-      } else if (i + 1 < lines.length) {
-        // Next line might contain the amount
-        const nextAmounts = lines[i + 1].match(/([0-9.,]{2,})/g);
-        if (nextAmounts && nextAmounts.length > 0) {
-          const parsed = parseReceiptAmount(nextAmounts[nextAmounts.length - 1], isVND);
-          if (parsed !== null && parsed > 0) {
-            totalAmount = parsed;
-            amountConfidence = 'high';
-            break;
-          }
-        }
-      }
+    const nextLine = i + 1 < lines.length ? lines[i + 1] : undefined;
+    const { score, amount } = scoreTotalCandidate(line, nextLine, i, lines.length, isVND);
+    if (score > 0 && amount !== null) {
+      totalCandidates.push({ line, index: i, score, amount });
     }
   }
 
-  // Fallback: If no explicit total keyword found, find largest reasonable amount
+  // Sort by score descending, pick best
+  if (totalCandidates.length > 0) {
+    totalCandidates.sort((a, b) => b.score - a.score);
+    const best = totalCandidates[0];
+    totalAmount = best.amount;
+    amountConfidence = best.score >= 30 ? 'high' : best.score >= 15 ? 'medium' : 'low';
+  }
+
+  // Fallback: largest reasonable amount on non-excluded lines
   if (totalAmount === null) {
     let maxAmount = 0;
     for (const line of lines) {
       if (NON_TOTAL_KEYWORDS_REGEX.test(line)) continue;
+      if (HEADER_IGNORE_REGEX.test(line)) continue;
       const matches = line.match(/([0-9.,]{3,})/g);
       if (matches) {
         for (const m of matches) {
@@ -321,14 +508,14 @@ export function extractReceiptData(rawText: string, context?: ExtractionContext)
     }
   }
 
-  // 6. Line Item Extraction (between top header and total lines)
+  // 6. Line Item Extraction
+  const extractedItems: ExtractedReceiptItem[] = [];
   for (const line of lines) {
-    if (HEADER_IGNORE_REGEX.test(line) || TOTAL_KEYWORDS_REGEX.test(line) || NON_TOTAL_KEYWORDS_REGEX.test(line)) {
-      continue;
-    }
+    if (HEADER_IGNORE_REGEX.test(line) || NON_TOTAL_KEYWORDS_REGEX.test(line)) continue;
+    // Skip lines with total keywords
+    if (TOTAL_KEYWORDS_SCORED.some((tk) => tk.regex.test(line))) continue;
     if (line.length < 4 || line.includes('===') || line.includes('---')) continue;
 
-    // Pattern: Description ... [Qty x Price] ... Total
     const itemMatch = line.match(/^(.+?)\s+([0-9.,]{2,})$/);
     if (itemMatch) {
       const desc = itemMatch[1].trim();
@@ -336,7 +523,6 @@ export function extractReceiptData(rawText: string, context?: ExtractionContext)
       const parsedPrice = parseReceiptAmount(amountStr, isVND);
 
       if (desc.length > 2 && parsedPrice !== null && parsedPrice > 0 && parsedPrice <= (totalAmount || 1000000000)) {
-        // Check for quantity in description e.g. "Cà phê x 2" or "2x Coffee"
         let qty: number | null = 1;
         const qtyMatch = desc.match(/\b([1-9]\d*)\s*[xX]\b/) || desc.match(/\b[xX]\s*([1-9]\d*)\b/);
         if (qtyMatch) {
@@ -360,7 +546,6 @@ export function extractReceiptData(rawText: string, context?: ExtractionContext)
 
   const combinedSearchText = `${merchant || ''} ${lines.join(' ')}`.toLowerCase();
 
-  // Keyword to category mappings
   const categoryKeywords: Record<string, string[]> = {
     ...enDictionary.categoryKeywords,
     ...viDictionary.categoryKeywords,
@@ -386,13 +571,14 @@ export function extractReceiptData(rawText: string, context?: ExtractionContext)
     }
   }
 
-  // Calculate overall confidence score (0 to 100)
+  // 8. Overall confidence score
   let score = 0;
   if (merchantConfidence === 'high') score += 25;
   else if (merchantConfidence === 'medium') score += 15;
 
   if (amountConfidence === 'high') score += 35;
-  else if (amountConfidence === 'low') score += 15;
+  else if (amountConfidence === 'medium') score += 20;
+  else if (amountConfidence === 'low') score += 10;
 
   if (dateConfidence === 'high') score += 20;
   else if (dateConfidence === 'medium') score += 10;
@@ -409,7 +595,7 @@ export function extractReceiptData(rawText: string, context?: ExtractionContext)
     totalAmount: amountConfidence,
     currency: currencyConfidence,
     category: categoryConfidence,
-    account: 'low', // Account is always low/suggestion since receipt does not prove account
+    account: 'low',
   };
 
   return {
@@ -419,7 +605,7 @@ export function extractReceiptData(rawText: string, context?: ExtractionContext)
     currency: detectedCurrency,
     suggestedCategoryId,
     suggestedCategoryName,
-    rawText,
+    rawText: normalizedText,
     detectedLanguage,
     confidence: Math.min(score, 100),
     fieldConfidences,
