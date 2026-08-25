@@ -50,7 +50,9 @@ export type SemanticTotalRole =
   | 'subtotal'        // "Subtotal", "Tiền hàng", "Tạm tính"
   | 'discount'        // "Giảm giá", "Chiết khấu"
   | 'tax'             // "Tax", "VAT", "Thuế"
-  | 'line_item_sum';  // Computed sum of line items
+  | 'item_count'      // "Tổng số lượng", "Tổng số: 1", "Total items"
+  | 'line_item_sum'   // Computed sum of line items
+  | 'fallback';
 
 export interface ScoredTotalCandidate {
   amount: number;
@@ -62,9 +64,10 @@ export interface ScoredTotalCandidate {
   reasons: string[];
 }
 
-const GRAND_TOTAL_REGEX = /(?:^|\s)(?:TỔNG\s*CỘNG|TONG\s*CONG|GRAND\s*TOTAL|TOTAL\s*DUE|AMOUNT\s*DUE|TỔNG\s*THANH\s*TOÁN|TONG\s*THANH\s*TOAN|BALANCE\s*DUE|TOTAL\s*PAID|PAYMENT\s*TOTAL|\bTOTAL\b|\bAMOUNT\b|\bSỐ\s*TIỀN\b|\bSO\s*TIEN\b)(?!\s*item|\s*qty|\s*unit)/i;
-const PURCHASE_VALUE_REGEX = /(?:^|\s)(?:GIÁ\s*TRỊ\s*MUA|GIA\s*TRI\s*MUA|THÀNH\s*TIỀN|THANH\s*TIEN|TỔNG\s*TIỀN|TONG\s*TIEN|NET\s*TOTAL|FINAL\s*AMOUNT|\bTỔNG\b|\bTONG\b)(?!\s*item|\s*qty|\s*unit)/i;
+const GRAND_TOTAL_REGEX = /(?:^|\s)(?:TỔNG\s*CỘNG|TONG\s*CONG|GRAND\s*TOTAL|TOTAL\s*DUE|AMOUNT\s*DUE|TỔNG\s*THANH\s*TOÁN|TONG\s*THANH\s*TOAN|BALANCE\s*DUE|TOTAL\s*PAID|PAYMENT\s*TOTAL|\bTOTAL\b|\bAMOUNT\b|\bSỐ\s*TIỀN\b|\bSO\s*TIEN\b)(?!\s*item|\s*qty|\s*unit|\s*món|\s*sp|\s*mặt\s*hàng)/i;
+const PURCHASE_VALUE_REGEX = /(?:^|\s)(?:GIÁ\s*TRỊ\s*MUA|GIA\s*TRI\s*MUA|THÀNH\s*TIỀN|THANH\s*TIEN|TỔNG\s*TIỀN|TONG\s*TIEN|NET\s*TOTAL|FINAL\s*AMOUNT)(?!\s*item|\s*qty|\s*unit|\s*món|\s*sp|\s*mặt\s*hàng)/i;
 const PAYMENT_KEYWORDS_REGEX = /(?:^|\s|\+)(?:MOMO|VNPAY|ZALOPAY|THANH\s*TOÁN\s*QR|CHUYỂN\s*KHOẢN|CARD\b|VISA\b|MASTERCARD|TIỀN\s*KHÁCH\s*TRẢ|TIEN\s*KHACH\s*TRA|THANH\s*TOÁN|THANH\s*TOAN|BANK\b|AGRI\b|VCB\b|VTB\b|TPB\b|MB\b|ACB\b|SHB\b|HDB\b|OCB\b|EXIMBANK|VIETIN\b|TECHCOMBANK|SACOMBANK)/i;
+const TOTAL_ITEMS_COUNT_REGEX = /(?:TỔNG\s*SỐ(?:\s*LƯỢNG|\s*MÓN|\s*SP|\s*MẶT\s*HÀNG)?|TONG\s*SO(?:\s*LUONG|\s*MON|\s*SP)?|\bTOTAL\s*ITEMS\b|\bTOTAL\s*QTY\b|\bQTY\s*TOTAL\b|\bITEMS?\s*COUNT\b)/i;
 const CASH_GIVEN_REGEX = /(?:^|\s)(?:TIỀN\s*KHÁCH\s*ĐƯA|TIEN\s*KHACH\s*DUA|TIỀN\s*MẶT|TIEN\s*MAT|CASH\s*TENDERED|CASH\s*RECEIVED|\bCASH\b|\bGIVEN\b)/i;
 const CHANGE_REGEX = /(?:^|\s)(?:TIỀN\s*THỐI|TIEN\s*THOI|TIỀN\s*THỪA|TIEN\s*THUA|TIỀN\s*TRẢ\s*LẠI|TIEN\s*TRA\s*LAI|\bCHANGE\b)/i;
 const SUBTOTAL_REGEX = /(?:^|\s)(?:SUBTOTAL|SUB\s*TOTAL|TIỀN\s*HÀNG|TIEN\s*HANG|TỔNG\s*TIỀN\s*HÀNG|TẠM\s*TÍNH|TAM\s*TINH)/i;
@@ -151,6 +154,13 @@ export function fixVNDAmountOCR(text: string): string {
 }
 
 /**
+ * Check if a raw number string possesses formatted monetary characteristics (e.g. 376,120 or 376.120 or 12.50).
+ */
+export function isFormattedMonetary(rawStr: string): boolean {
+  return /^\d{1,3}(?:[.,]\d{3})+$/.test(rawStr) || /^\d{1,3}(?:,\d{3})*\.\d{2}$/.test(rawStr) || /^\d{1,3}(?:\.\d{3})*,\d{2}$/.test(rawStr);
+}
+
+/**
  * Parse numeric currency strings taking Vietnamese vs English decimal/thousand conventions into account.
  */
 export function parseReceiptAmount(amountStr: string, isVNDContext = true): number | null {
@@ -168,7 +178,7 @@ export function parseReceiptAmount(amountStr: string, isVNDContext = true): numb
     return parseInt(clean.replace(/\./g, ''), 10);
   }
 
-  // Multiple commas: 1,250,000 or 80,000 (English thousands)
+  // Multiple commas: 1,250,000 or 80,000 (English thousands / VND comma thousands)
   if (/^\d{1,3}(,\d{3})+$/.test(clean)) {
     return parseInt(clean.replace(/,/g, ''), 10);
   }
@@ -355,18 +365,22 @@ export function extractMerchant(lines: string[]): { merchant: string | null; con
 }
 
 /**
- * Extract line items from the receipt text.
+ * Extract line items from the receipt text with protection against barcode/code prefixes and summary labels.
  */
 export function extractLineItems(lines: string[], isVND: boolean): ExtractedReceiptItem[] {
   const items: ExtractedReceiptItem[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const prevLine = i > 0 ? lines[i - 1] : '';
+    const nextLine = i < lines.length - 1 ? lines[i + 1] : '';
+
     if (
       HEADER_IGNORE_REGEX.test(line) ||
       GRAND_TOTAL_REGEX.test(line) ||
       PURCHASE_VALUE_REGEX.test(line) ||
       PAYMENT_KEYWORDS_REGEX.test(line) ||
+      TOTAL_ITEMS_COUNT_REGEX.test(line) ||
       CASH_GIVEN_REGEX.test(line) ||
       CHANGE_REGEX.test(line) ||
       SUBTOTAL_REGEX.test(line) ||
@@ -384,12 +398,19 @@ export function extractLineItems(lines: string[], isVND: boolean): ExtractedRece
     // Match numbers on the line
     const amounts = line.match(/\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?\b/g);
     if (amounts && amounts.length > 0) {
-      // Last amount on the line is the line item total
       const lastAmountStr = amounts[amounts.length - 1];
       const parsedTotalPrice = parseReceiptAmount(lastAmountStr, isVND);
 
-      const prefix = line.substring(0, line.lastIndexOf(lastAmountStr)).trim();
+      let prefix = line.substring(0, line.lastIndexOf(lastAmountStr)).trim();
+
+      // Strip leading product barcode / item ID digits (e.g. "324583 Banh mi" -> "Banh mi")
+      prefix = prefix.replace(/^\s*\d{4,}\s+/, '');
       const desc = prefix.replace(/[0-9.,]+$/, '').trim();
+
+      // Ignore noise descriptions like "1 4 Ệ_...wam" or single letter junk
+      const alphaCount = (desc.match(/[a-zA-ZÀ-ỹ]/g) || []).length;
+      if (alphaCount < 2 || desc.includes('...') || desc.includes('___')) continue;
+      if (/^[0-9\s]{2,}[^a-zA-ZÀ-ỹ0-9]/.test(prefix)) continue;
 
       if (desc.length >= 2 && parsedTotalPrice !== null && parsedTotalPrice > 0) {
         let qty: number | null = 1;
@@ -422,7 +443,7 @@ export function extractLineItems(lines: string[], isVND: boolean): ExtractedRece
 }
 
 /**
- * Enhanced semantic candidate extraction, arithmetic validation, and conflict resolution.
+ * Enhanced semantic candidate extraction, multi-line neighborhood search, arithmetic validation, and conflict resolution.
  */
 export function resolveReceiptTotal(
   lines: string[],
@@ -434,6 +455,7 @@ export function resolveReceiptTotal(
   hasConflict: boolean;
   uncertaintyWarning: string | null;
   reasons: string[];
+  candidates: ScoredTotalCandidate[];
 } {
   const candidates: ScoredTotalCandidate[] = [];
 
@@ -443,9 +465,11 @@ export function resolveReceiptTotal(
   let cashGivenAmount: number | null = null;
   let changeAmount: number | null = null;
 
-  // 1. Scan lines for semantic amounts
+  // 1. Scan lines for semantic amounts and multi-line total associations
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const prevLine = i > 0 ? lines[i - 1] : '';
+    const nextLine = i < lines.length - 1 ? lines[i + 1] : '';
     const positionRatio = i / Math.max(lines.length - 1, 1);
 
     if (ITEM_BREAKDOWN_REGEX.test(line)) {
@@ -455,141 +479,179 @@ export function resolveReceiptTotal(
     const amounts = line.match(/\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?\b/g);
     if (!amounts || amounts.length === 0) continue;
 
-    const parsedAmount = parseReceiptAmount(amounts[amounts.length - 1], isVND);
-    if (parsedAmount === null || parsedAmount <= 0) continue;
+    // Check all numbers found on the line as candidate amounts
+    for (let aIdx = 0; aIdx < amounts.length; aIdx++) {
+      const rawStr = amounts[aIdx];
+      const parsedAmount = parseReceiptAmount(rawStr, isVND);
+      if (parsedAmount === null || parsedAmount <= 0) continue;
 
-    if (CHANGE_REGEX.test(line)) {
-      changeAmount = parsedAmount;
-      candidates.push({
-        amount: parsedAmount,
-        rawString: amounts[amounts.length - 1],
-        sourceLine: line,
-        lineIndex: i,
-        role: 'change',
-        score: -40,
-        reasons: ['Negative: Change returned amount'],
-      });
-      continue;
-    }
+      const isLastOnLine = aIdx === amounts.length - 1;
+      const formatted = isFormattedMonetary(rawStr);
 
-    if (CASH_GIVEN_REGEX.test(line) && !GRAND_TOTAL_REGEX.test(line)) {
-      cashGivenAmount = parsedAmount;
-      candidates.push({
-        amount: parsedAmount,
-        rawString: amounts[amounts.length - 1],
-        sourceLine: line,
-        lineIndex: i,
-        role: 'cash_given',
-        score: -40,
-        reasons: ['Negative: Cash given/tendered amount'],
-      });
-      continue;
-    }
+      // Handle explicit negative/subordinate semantic roles
+      if (CHANGE_REGEX.test(line) && isLastOnLine) {
+        changeAmount = parsedAmount;
+        candidates.push({
+          amount: parsedAmount,
+          rawString: rawStr,
+          sourceLine: line,
+          lineIndex: i,
+          role: 'change',
+          score: -50,
+          reasons: ['Change returned amount (-50)'],
+        });
+        continue;
+      }
 
-    if (SUBTOTAL_REGEX.test(line) && !GRAND_TOTAL_REGEX.test(line)) {
-      subtotalAmount = parsedAmount;
-      candidates.push({
-        amount: parsedAmount,
-        rawString: amounts[amounts.length - 1],
-        sourceLine: line,
-        lineIndex: i,
-        role: 'subtotal',
-        score: 15,
-        reasons: ['Subtotal line'],
-      });
-      continue;
-    }
+      if (CASH_GIVEN_REGEX.test(line) && !GRAND_TOTAL_REGEX.test(line) && isLastOnLine) {
+        cashGivenAmount = parsedAmount;
+        candidates.push({
+          amount: parsedAmount,
+          rawString: rawStr,
+          sourceLine: line,
+          lineIndex: i,
+          role: 'cash_given',
+          score: -50,
+          reasons: ['Cash tendered amount (-50)'],
+        });
+        continue;
+      }
 
-    if (DISCOUNT_REGEX.test(line) && !GRAND_TOTAL_REGEX.test(line)) {
-      discountAmount = parsedAmount;
-      candidates.push({
-        amount: parsedAmount,
-        rawString: amounts[amounts.length - 1],
-        sourceLine: line,
-        lineIndex: i,
-        role: 'discount',
-        score: -25,
-        reasons: ['Negative: Discount line'],
-      });
-      continue;
-    }
+      if (TOTAL_ITEMS_COUNT_REGEX.test(line)) {
+        candidates.push({
+          amount: parsedAmount,
+          rawString: rawStr,
+          sourceLine: line,
+          lineIndex: i,
+          role: 'item_count',
+          score: -60,
+          reasons: ['Total item quantity / count label (-60)'],
+        });
+        continue;
+      }
 
-    if (TAX_REGEX.test(line) && !GRAND_TOTAL_REGEX.test(line)) {
-      taxAmount = parsedAmount;
-      candidates.push({
-        amount: parsedAmount,
-        rawString: amounts[amounts.length - 1],
-        sourceLine: line,
-        lineIndex: i,
-        role: 'tax',
-        score: -25,
-        reasons: ['Negative: Tax line'],
-      });
-      continue;
-    }
+      if (SUBTOTAL_REGEX.test(line) && !GRAND_TOTAL_REGEX.test(line) && isLastOnLine) {
+        subtotalAmount = parsedAmount;
+        candidates.push({
+          amount: parsedAmount,
+          rawString: rawStr,
+          sourceLine: line,
+          lineIndex: i,
+          role: 'subtotal',
+          score: 15,
+          reasons: ['Subtotal line'],
+        });
+        continue;
+      }
 
-    // Grand total keywords
-    if (GRAND_TOTAL_REGEX.test(line)) {
-      let score = 40;
-      const reasons = ['Grand Total keyword match (+40)'];
+      if (DISCOUNT_REGEX.test(line) && !GRAND_TOTAL_REGEX.test(line) && isLastOnLine) {
+        discountAmount = parsedAmount;
+        candidates.push({
+          amount: parsedAmount,
+          rawString: rawStr,
+          sourceLine: line,
+          lineIndex: i,
+          role: 'discount',
+          score: -30,
+          reasons: ['Discount line (-30)'],
+        });
+        continue;
+      }
+
+      if (TAX_REGEX.test(line) && !GRAND_TOTAL_REGEX.test(line) && isLastOnLine) {
+        taxAmount = parsedAmount;
+        candidates.push({
+          amount: parsedAmount,
+          rawString: rawStr,
+          sourceLine: line,
+          lineIndex: i,
+          role: 'tax',
+          score: -30,
+          reasons: ['Tax line (-30)'],
+        });
+        continue;
+      }
+
+      // Check Grand Total, Purchase Value, or Payment labels (same line or neighboring lines)
+      let role: SemanticTotalRole = 'fallback';
+      let score = 10;
+      const reasons: string[] = [];
+
+      // Same-line label matches
+      if (GRAND_TOTAL_REGEX.test(line)) {
+        role = 'grand_total';
+        score += 40;
+        reasons.push('Grand Total keyword match (+40)');
+      } else if (PURCHASE_VALUE_REGEX.test(line)) {
+        role = 'purchase_value';
+        score += 30;
+        reasons.push('Purchase value keyword match (+30)');
+      } else if (PAYMENT_KEYWORDS_REGEX.test(line)) {
+        role = 'payment_amount';
+        score += 25;
+        reasons.push('Payment method keyword match (+25)');
+      }
+      // Multi-line neighborhood label association (e.g. Label on prev/next line, value on current line)
+      else if (GRAND_TOTAL_REGEX.test(prevLine) || GRAND_TOTAL_REGEX.test(nextLine)) {
+        role = 'grand_total';
+        score += 35;
+        reasons.push(`Adjacent line Grand Total label match (+35)`);
+      } else if (PURCHASE_VALUE_REGEX.test(prevLine) || PURCHASE_VALUE_REGEX.test(nextLine)) {
+        role = 'purchase_value';
+        score += 28;
+        reasons.push(`Adjacent line Purchase Value label match (+28)`);
+      } else if (PAYMENT_KEYWORDS_REGEX.test(prevLine) || PAYMENT_KEYWORDS_REGEX.test(nextLine)) {
+        role = 'payment_amount';
+        score += 25;
+        reasons.push(`Adjacent line Payment label match (+25)`);
+      }
+
+      // Position scoring
       if (positionRatio > 0.5) {
         score += 10;
-        reasons.push('Bottom position bonus (+10)');
+        reasons.push('Bottom half position (+10)');
       }
+      if (positionRatio > 0.75) {
+        score += 10;
+        reasons.push('Bottom quartile position (+10)');
+      }
+
+      // Monetary formatting bonus / noise penalty
+      if (formatted) {
+        score += isVND ? 30 : 15;
+        reasons.push(`Formatted monetary pattern '${rawStr}' (+${isVND ? 30 : 15})`);
+      } else if (isVND) {
+        // Severe penalty for tiny unformatted integers in VND (e.g. 1, 4, 23)
+        if (parsedAmount < 1000) {
+          score -= 60;
+          reasons.push(`Unformatted tiny integer < 1000 VND (-60)`);
+        }
+        // Penalty for isolated barcode/product code strings (plain 5+ digits)
+        if (/^\d{5,}$/.test(rawStr)) {
+          score -= 40;
+          reasons.push(`Unformatted plain integer / barcode pattern (-40)`);
+        }
+      }
+
+      // Prefer the last number on a line over intermediate quantities
+      if (isLastOnLine && amounts.length > 1) {
+        score += 10;
+        reasons.push('Last number on line (+10)');
+      }
+
       candidates.push({
         amount: parsedAmount,
-        rawString: amounts[amounts.length - 1],
+        rawString: rawStr,
         sourceLine: line,
         lineIndex: i,
-        role: 'grand_total',
+        role,
         score,
         reasons,
       });
-      continue;
-    }
-
-    // Purchase value keywords ("Giá trị mua", "Thành tiền", etc.)
-    if (PURCHASE_VALUE_REGEX.test(line)) {
-      let score = 30;
-      const reasons = ['Purchase value keyword match (+30)'];
-      if (positionRatio > 0.5) {
-        score += 10;
-        reasons.push('Bottom position bonus (+10)');
-      }
-      candidates.push({
-        amount: parsedAmount,
-        rawString: amounts[amounts.length - 1],
-        sourceLine: line,
-        lineIndex: i,
-        role: 'purchase_value',
-        score,
-        reasons,
-      });
-      continue;
-    }
-
-    // Payment method lines
-    if (PAYMENT_KEYWORDS_REGEX.test(line)) {
-      let score = 25;
-      const reasons = ['Payment method keyword match (+25)'];
-      if (positionRatio > 0.5) {
-        score += 10;
-        reasons.push('Bottom position bonus (+10)');
-      }
-      candidates.push({
-        amount: parsedAmount,
-        rawString: amounts[amounts.length - 1],
-        sourceLine: line,
-        lineIndex: i,
-        role: 'payment_amount',
-        score,
-        reasons,
-      });
-      continue;
     }
   }
 
-  // 2. Arithmetic Validation
+  // 2. Arithmetic Cross-Validation
   let hasArithmeticProof = false;
 
   // A. Check Subtotal + Tax - Discount (ONLY if tax or discount explicitly exists)
@@ -638,8 +700,8 @@ export function resolveReceiptTotal(
         sourceLine: `Arithmetic sum of ${items.length} line items`,
         lineIndex: lines.length,
         role: 'line_item_sum',
-        score: 45,
-        reasons: [`Arithmetic sum of line items (${lineItemSum}) (+45)`],
+        score: 50,
+        reasons: [`Arithmetic sum of line items (${lineItemSum}) (+50)`],
       });
 
       for (const c of candidates) {
@@ -652,34 +714,9 @@ export function resolveReceiptTotal(
     }
   }
 
-  // 3. Fallback if no total candidates
-  if (candidates.length === 0 || candidates.every((c) => c.score < 20)) {
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (HEADER_IGNORE_REGEX.test(line) || CHANGE_REGEX.test(line) || CASH_GIVEN_REGEX.test(line)) continue;
-      const amounts = line.match(/\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?\b/g);
-      if (amounts) {
-        for (const m of amounts) {
-          const parsed = parseReceiptAmount(m, isVND);
-          if (parsed !== null && parsed > 0 && parsed < 1000000000) {
-            candidates.push({
-              amount: parsed,
-              rawString: m,
-              sourceLine: line,
-              lineIndex: i,
-              role: 'purchase_value',
-              score: 25,
-              reasons: ['Fallback summary amount'],
-            });
-          }
-        }
-      }
-    }
-  }
-
-  // Filter valid positive candidates
+  // Filter valid positive candidates (strictly exclude negative roles and item count)
   const validCandidates = candidates.filter(
-    (c) => c.role !== 'cash_given' && c.role !== 'change' && c.role !== 'discount' && c.role !== 'tax'
+    (c) => c.role !== 'cash_given' && c.role !== 'change' && c.role !== 'discount' && c.role !== 'tax' && c.role !== 'item_count' && c.score > 0
   );
 
   if (validCandidates.length === 0) {
@@ -687,12 +724,13 @@ export function resolveReceiptTotal(
       totalAmount: null,
       confidence: 'none',
       hasConflict: false,
-      uncertaintyWarning: null,
+      uncertaintyWarning: 'No valid total candidates found',
       reasons: ['No valid total candidates found'],
+      candidates,
     };
   }
 
-  // 4. Candidate Clustering and Agreement Boosting
+  // 3. Candidate Clustering and Agreement Boosting
   for (const c of validCandidates) {
     const exactMatches = validCandidates.filter((other) => other !== c && Math.abs(other.amount - c.amount) < 0.01);
     for (const match of exactMatches) {
@@ -701,7 +739,7 @@ export function resolveReceiptTotal(
     }
   }
 
-  // 5. OCR Confusable Numbers & Disambiguation
+  // 4. OCR Confusable Numbers & Disambiguation
   for (const c of validCandidates) {
     for (const other of validCandidates) {
       if (c !== other && areNumericallyConfusable(c.amount, other.amount)) {
@@ -722,9 +760,21 @@ export function resolveReceiptTotal(
   validCandidates.sort((a, b) => b.score - a.score);
   const bestCandidate = validCandidates[0];
 
-  // 6. Detect Conflicting Candidates & Numeric Confusion
+  // If even the best candidate is very weak (< 20), do not fabricate
+  if (bestCandidate.score < 20) {
+    return {
+      totalAmount: null,
+      confidence: 'low',
+      hasConflict: false,
+      uncertaintyWarning: 'Amount detected with uncertainty — please verify.',
+      reasons: ['Candidate score below minimum confidence threshold'],
+      candidates,
+    };
+  }
+
+  // 5. Detect Conflicting Candidates & Numeric Confusion
   const competingCandidates = validCandidates.filter(
-    (c) => Math.abs(c.amount - bestCandidate.amount) >= 0.01 && c.score > 20
+    (c) => Math.abs(c.amount - bestCandidate.amount) >= 0.01 && c.score > 25
   );
 
   let hasConflict = false;
@@ -741,19 +791,19 @@ export function resolveReceiptTotal(
     }
   }
 
-  // 7. Confidence Assignment
+  // 6. Confidence Assignment
   let confidence: FieldConfidence = 'low';
 
   const exactAgreements = validCandidates.filter((c) => Math.abs(c.amount - bestCandidate.amount) < 0.01).length;
   const matchesLineItemSum = lineItemSum > 0 && Math.abs(bestCandidate.amount - lineItemSum) < 0.01;
 
-  if (bestCandidate.score >= 80 || hasArithmeticProof) {
+  if (bestCandidate.score >= 70 || hasArithmeticProof) {
     confidence = 'high';
   } else if (exactAgreements >= 2 && !hasConfusableConflict) {
     confidence = 'high';
   } else if (matchesLineItemSum && exactAgreements >= 1) {
     confidence = 'high';
-  } else if (bestCandidate.score >= 40) {
+  } else if (bestCandidate.score >= 35) {
     confidence = 'medium';
   } else {
     confidence = 'low';
@@ -774,6 +824,7 @@ export function resolveReceiptTotal(
     hasConflict,
     uncertaintyWarning,
     reasons: bestCandidate.reasons,
+    candidates,
   };
 }
 
@@ -814,7 +865,7 @@ export function extractReceiptData(rawText: string, context?: ExtractionContext)
 
   // 1. Language Detection
   const hasVnDiacritics = VN_DIACRITICS_REGEX.test(normalizedText);
-  const hasVnKeywords = /\b(hoá đơn|hóa đơn|phiếu|thanh toán|thanh toan|tổng cộng|tong cong|thành tiền|thanh tien|tiền mặt|tien mat|cà phê|ca phe|quán|quan|bán hàng|ban hang|cửa hàng|cua hang|giá trị mua|gia tri mua|siêu thị|sieu thi|fujimart|momo)\b/i.test(normalizedText);
+  const hasVnKeywords = /\b(hoá đơn|hóa đơn|phiếu|thanh toán|thanh toan|tổng cộng|tong cong|thành tiền|thanh tien|tiền mặt|tien mat|cà phê|ca phe|quán|quan|bán hàng|ban hang|cửa hàng|cua hang|giá trị mua|gia tri mua|siêu thị|sieu thi|fujimart|momo|tiền khách trả|tien khach tra)\b/i.test(normalizedText);
   const isVietnamese = hasVnDiacritics || hasVnKeywords;
   const detectedLanguage: 'vi' | 'en' | 'mixed' = isVietnamese ? 'vi' : 'en';
 

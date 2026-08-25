@@ -477,5 +477,91 @@ Gia tri mua  376.120
       expect(result.fieldConfidences.totalAmount).toBe('high');
       expect(result.fieldConfidences.amountUncertaintyWarning).toBeNull();
     });
+
+    it('Regression: handles isolated OCR noise and item counts without mistaking them for total', () => {
+      const noisyReceipt = `
+SIEU THI FUJIMART
+Dia chi: Ha Noi
+Ngay: 22/08/2026 17:54
+
+324583 Banh mi               17.500
+327788 Sua tuoi              55.000
+Tra sua                      29.160
+Nuoc khoang                  20.000
+Cherry 520.000              123.760
+Keo                           8.500
+Mi tom                       56.300
+Kem                          47.000
+Giay                         18.900
+
+Tổngsố 023 :1
+1 4 Ệ_...wam 376,120
+Tiền khách trả (VND):
+      `;
+      const result = extractReceiptData(noisyReceipt);
+      expect(result.merchant).toBe('SIEU THI FUJIMART');
+      expect(result.totalAmount).toBe(376120);
+      expect(result.currency).toBe('VND');
+    });
+
+    it('Multi-line A: handles label on separate line before total amount', () => {
+      const receipt = `
+STORE
+Tổng cộng:
+376,120
+      `;
+      const result = extractReceiptData(receipt);
+      expect(result.totalAmount).toBe(376120);
+    });
+
+    it('Multi-line B: handles dot separator with VNĐ suffix', () => {
+      const receipt = `
+STORE
+Tổng cộng 376.120 VNĐ
+      `;
+      const result = extractReceiptData(receipt);
+      expect(result.totalAmount).toBe(376120);
+    });
+
+    it('Multi-line C: distinguishes item count line from total amount line', () => {
+      const receipt = `
+STORE
+Tổng số: 1
+Tổng cộng: 376,120
+      `;
+      const result = extractReceiptData(receipt);
+      expect(result.totalAmount).toBe(376120);
+    });
+
+    it('Multi-line D: ignores unit price in favor of receipt total', () => {
+      const receipt = `
+STORE
+Unit Price 520,000
+Total 376,120
+      `;
+      const result = extractReceiptData(receipt);
+      expect(result.totalAmount).toBe(376120);
+    });
+
+    it('Multi-line E: handles payment method line preceding total amount', () => {
+      const receipt = `
+STORE
+Tiền khách trả (VND):
+376,120
+      `;
+      const result = extractReceiptData(receipt);
+      expect(result.totalAmount).toBe(376120);
+      expect(result.currency).toBe('VND');
+    });
+
+    it('Corrupted F: does not fabricate a total when text contains corrupted total characters', () => {
+      const receipt = `
+STORE
+Tổng cộng ???
+      `;
+      const result = extractReceiptData(receipt);
+      expect(result.totalAmount).toBeNull();
+      expect(result.fieldConfidences.totalAmount).toBe('none');
+    });
   });
 });
