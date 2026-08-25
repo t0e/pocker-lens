@@ -23,8 +23,9 @@ RUN npm run build --workspace=@pocketlens/worker
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV RECEIPT_WORKER_CONCURRENCY=1
 
-RUN apk add --no-cache openssl libc6-compat
+RUN apk add --no-cache openssl libc6-compat tesseract-ocr tesseract-ocr-data-eng tesseract-ocr-data-vie
 
 RUN mkdir -p /data/receipts
 
@@ -36,4 +37,4 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/shared ./packages/shared
 COPY --from=builder /app/apps/worker ./apps/worker
 
-CMD ["node", "--max-old-space-size=1536", "./apps/worker/dist/index.js"]
+CMD ["node", "--max-old-space-size=3072", "./apps/worker/dist/index.js"]

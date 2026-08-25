@@ -28,17 +28,12 @@ export interface OCRDebugInfo {
   candidateLabels: string[];
 }
 
-const MAX_DIMENSION = 2000;
-const TARGET_DIMENSION = 1600;
-const MIN_DIMENSION = 800;
-
-function memMB(): string {
-  const m = process.memoryUsage();
-  return `rss=${(m.rss / 1048576).toFixed(0)}MB heap=${(m.heapUsed / 1048576).toFixed(0)}/${(m.heapTotal / 1048576).toFixed(0)}MB ext=${(m.external / 1048576).toFixed(0)}MB`;
-}
+const MAX_DIMENSION = 1600;
+const MIN_DIMENSION = 600;
 
 /**
- * Assess image quality for OCR suitability.
+ * Assess image quality for OCR suitability using native Sharp stats
+ * without converting raw pixels to JavaScript arrays.
  */
 export async function assessImageQuality(buffer: Buffer): Promise<ImageQuality> {
   const metadata = await sharp(buffer).metadata();
@@ -46,54 +41,45 @@ export async function assessImageQuality(buffer: Buffer): Promise<ImageQuality> 
   const height = metadata.height || 0;
   const details: string[] = [];
 
-  const analysisBuffer = await sharp(buffer)
-    .resize(400, 400, { fit: 'inside' })
+  // Compute brightness and contrast via native libvips stats (zero JS array allocations)
+  const stats = await sharp(buffer)
+    .rotate()
     .greyscale()
-    .raw()
-    .toBuffer();
+    .stats();
 
-  const pixels = Array.from(analysisBuffer);
-  const n = pixels.length;
+  const channelStats = stats.channels[0];
+  const brightness = channelStats ? channelStats.mean : 128;
+  const contrast = channelStats ? channelStats.stdev : 40;
 
-  const brightness = pixels.reduce((s, v) => s + v, 0) / n;
-  const mean = brightness;
-  const variance = pixels.reduce((s, v) => s + (v - mean) ** 2, 0) / n;
-  const contrast = Math.sqrt(variance);
-
-  const smallBuf = await sharp(buffer)
-    .resize(200, 200, { fit: 'inside' })
-    .greyscale()
-    .raw()
-    .toBuffer();
-  const sp = Array.from(smallBuf);
-  const sw = await sharp(buffer).resize(200, 200, { fit: 'inside' }).metadata();
-  const sWidth = sw.width || 200;
-  const sHeight = sw.height || 200;
-  let laplacianSum = 0;
-  let laplacianCount = 0;
-  for (let y = 1; y < sHeight - 1; y++) {
-    for (let x = 1; x < sWidth - 1; x++) {
-      const idx = y * sWidth + x;
-      const center = sp[idx] * 4;
-      const top = sp[(y - 1) * sWidth + x];
-      const bottom = sp[(y + 1) * sWidth + x];
-      const left = sp[y * sWidth + (x - 1)];
-      const right = sp[y * sWidth + (x + 1)];
-      const lap = center - top - bottom - left - right;
-      laplacianSum += lap * lap;
-      laplacianCount++;
-    }
+  // Sharpness approximation using small resized edge detection
+  let sharpness = 25;
+  try {
+    const edgeStats = await sharp(buffer)
+      .rotate()
+      .resize(200, 200, { fit: 'inside' })
+      .greyscale()
+      .convolve({
+        width: 3,
+        height: 3,
+        kernel: [0, -1, 0, -1, 4, -1, 0, -1, 0],
+      })
+      .stats();
+    sharpness = edgeStats.channels[0]?.stdev || 25;
+  } catch {
+    sharpness = 25;
   }
-  const sharpness = laplacianCount > 0 ? Math.sqrt(laplacianSum / laplacianCount) : 0;
 
   let score = 0;
   if (width >= MIN_DIMENSION && height >= MIN_DIMENSION) score += 1;
   else details.push('low resolution');
+
   if (brightness > 60 && brightness < 220) score += 1;
   else details.push(brightness <= 60 ? 'too dark' : 'too bright');
-  if (contrast > 30) score += 1;
+
+  if (contrast > 25) score += 1;
   else details.push('low contrast');
-  if (sharpness > 15) score += 1;
+
+  if (sharpness > 10) score += 1;
   else details.push('blurry');
 
   let rating: 'good' | 'fair' | 'poor';
@@ -105,8 +91,8 @@ export async function assessImageQuality(buffer: Buffer): Promise<ImageQuality> 
 }
 
 /**
- * Normalize image: auto-orient, downscale large images, ensure RGB.
- * Never upscales — only downscales for memory efficiency.
+ * Normalize image: auto-orient, downscale large images, ensure grayscale for OCR.
+ * Never upscales — only downscales for memory and CPU efficiency.
  */
 export async function normalizeImage(buffer: Buffer): Promise<Buffer> {
   const metadata = await sharp(buffer).metadata();
@@ -125,101 +111,94 @@ export async function normalizeImage(buffer: Buffer): Promise<Buffer> {
     });
   }
 
-  return pipeline.flatten({ background: '#ffffff' }).png({ compressionLevel: 1 }).toBuffer();
+  return pipeline
+    .greyscale()
+    .flatten({ background: '#ffffff' })
+    .png({ compressionLevel: 1 })
+    .toBuffer();
 }
 
 /**
- * Enhance contrast using histogram normalization.
+ * Enhance contrast using histogram normalization on normalized working image.
  */
 export async function enhanceContrast(buffer: Buffer): Promise<Buffer> {
-  const result = await sharp(buffer)
-    .rotate()
-    .greyscale()
+  return sharp(buffer)
     .normalize()
     .png({ compressionLevel: 1 })
     .toBuffer();
-  return result;
 }
 
 /**
  * Adaptive threshold for uneven lighting.
  */
 export async function adaptiveThreshold(buffer: Buffer): Promise<Buffer> {
-  const stats = await sharp(buffer).rotate().greyscale().stats();
+  const stats = await sharp(buffer).stats();
   const avgIntensity = stats.channels[0]?.mean ?? 128;
-  const threshold = Math.min(255, Math.max(0, Math.round(avgIntensity + 10)));
-  const grey = await sharp(buffer).rotate().greyscale().toBuffer();
-  return sharp(grey).threshold(threshold).png({ compressionLevel: 1 }).toBuffer();
+  const threshold = Math.min(240, Math.max(20, Math.round(avgIntensity + 8)));
+  return sharp(buffer)
+    .threshold(threshold)
+    .png({ compressionLevel: 1 })
+    .toBuffer();
 }
 
 /**
- * Contrast + sharpen combo.
- */
-export async function contrastPlusSharpen(buffer: Buffer): Promise<Buffer> {
-  const normed = await sharp(buffer).rotate().greyscale().normalize().toBuffer();
-  return sharp(normed).sharpen({ sigma: 1.0, m1: 0.3, m2: 0.3 }).png({ compressionLevel: 1 }).toBuffer();
-}
-
-/**
- * Candidate generator — yields candidates one at a time.
- * Each candidate is generated from the source buffer and can be discarded
- * after OCR runs on it. This avoids holding all candidates in memory.
- *
- * Usage:
- *   for await (const candidate of generateCandidateSequence(normalized, cropped)) {
- *     const result = await runOCR(candidate);
- *     // candidate can be GC'd after this iteration
- *   }
+ * Candidate generator — yields a small set of 2-3 bounded candidates sequentially.
+ * Each candidate is generated on demand and can be discarded immediately.
  */
 export async function* generateCandidateSequence(
-  normalized: Buffer,
-  cropped: Buffer | null,
-  debug: OCRDebugInfo,
+  workingImage: Buffer,
+  isCropped: boolean,
+  quality: ImageQuality,
 ): AsyncGenerator<CandidateImage, void, unknown> {
-  if (cropped) {
-    // Cropped candidates first — best for OCR (less background noise)
-    yield { label: 'crop:normalized', buffer: cropped, isCropped: true };
-    const cropContrast = await enhanceContrast(cropped);
-    yield { label: 'crop:contrast', buffer: cropContrast, isCropped: true };
-    // Discard cropContrast after yield — GC will collect it
+  const prefix = isCropped ? 'crop' : 'full';
 
-    const cropThreshold = await adaptiveThreshold(cropped);
-    yield { label: 'crop:threshold', buffer: cropThreshold, isCropped: true };
+  // Candidate 1: Normalized grayscale (best default pass)
+  yield {
+    label: `${prefix}:normalized`,
+    buffer: workingImage,
+    isCropped,
+  };
 
-    const cropContrastSharp = await contrastPlusSharpen(cropped);
-    yield { label: 'crop:contrast+sharp', buffer: cropContrastSharp, isCropped: true };
+  // Candidate 2: Contrast-enhanced
+  const contrastBuf = await enhanceContrast(workingImage);
+  yield {
+    label: `${prefix}:contrast`,
+    buffer: contrastBuf,
+    isCropped,
+  };
+
+  // Candidate 3: Adaptive threshold only if quality rating is poor or contrast is low
+  if (quality.rating === 'poor' || quality.contrast < 30 || quality.brightness < 80) {
+    const thresholdBuf = await adaptiveThreshold(workingImage);
+    yield {
+      label: `${prefix}:threshold`,
+      buffer: thresholdBuf,
+      isCropped,
+    };
   }
-
-  // Full-image candidates as fallback
-  yield { label: 'full:normalized', buffer: normalized, isCropped: false };
-
-  const fullContrast = await enhanceContrast(normalized);
-  yield { label: 'full:contrast', buffer: fullContrast, isCropped: false };
-
-  const fullThreshold = await adaptiveThreshold(normalized);
-  yield { label: 'full:threshold', buffer: fullThreshold, isCropped: false };
-
-  const fullContrastSharp = await contrastPlusSharpen(normalized);
-  yield { label: 'full:contrast+sharp', buffer: fullContrastSharp, isCropped: false };
 }
 
 /**
  * Full preprocessing pipeline.
  * Returns a candidate generator and debug info.
- * Candidates are yielded one at a time to minimize peak memory.
+ * Limits candidate count to max 2-3 variants.
  */
 export async function preprocessForOCR(buffer: Buffer): Promise<{
   generateCandidates: () => AsyncGenerator<CandidateImage, void, unknown>;
   debug: OCRDebugInfo;
   normalized: Buffer;
+  quality: ImageQuality;
 }> {
   const metadata = await sharp(buffer).metadata();
   const originalDims = `${metadata.width || 0}x${metadata.height || 0}`;
 
-  // 1. Normalize (EXIF orient, downscale if huge)
+  // 1. Assess quality using native stats
+  const quality = await assessImageQuality(buffer);
+
+  // 2. Normalize (EXIF orient, downscale if huge to <= 1600px, greyscale)
   const normalized = await normalizeImage(buffer);
 
-  // 2. Detect document boundary (operates on small internal copy)
+  // 3. Detect document boundary
   const boundary = await detectDocument(normalized);
 
   const debug: OCRDebugInfo = {
@@ -232,28 +211,37 @@ export async function preprocessForOCR(buffer: Buffer): Promise<{
     candidateLabels: [],
   };
 
-  let croppedBuffer: Buffer | null = null;
+  let primaryWorkingBuffer = normalized;
+  let isCropped = false;
 
-  // 3. If document detected, perspective-correct and crop
-  if (boundary && boundary.confidence > 0.3) {
+  // 4. If high-confidence document detected, perspective-correct
+  if (boundary && boundary.confidence >= 0.35 && boundary.areaFraction >= 0.15) {
     try {
-      croppedBuffer = await perspectiveCorrect(normalized, boundary.corners);
-      const croppedMeta = await sharp(croppedBuffer).metadata();
+      const warped = await perspectiveCorrect(normalized, boundary.corners);
+      const croppedMeta = await sharp(warped).metadata();
       debug.croppedDimensions = `${croppedMeta.width || 0}x${croppedMeta.height || 0}`;
       debug.perspectiveCorrected = true;
+      primaryWorkingBuffer = warped;
+      isCropped = true;
     } catch {
-      croppedBuffer = null;
+      primaryWorkingBuffer = normalized;
+      isCropped = false;
     }
   }
 
-  const labels: string[] = [];
-  if (croppedBuffer) labels.push('crop:normalized', 'crop:contrast', 'crop:threshold', 'crop:contrast+sharp');
-  labels.push('full:normalized', 'full:contrast', 'full:threshold', 'full:contrast+sharp');
+  const labels: string[] = [
+    `${isCropped ? 'crop' : 'full'}:normalized`,
+    `${isCropped ? 'crop' : 'full'}:contrast`,
+  ];
+  if (quality.rating === 'poor' || quality.contrast < 30 || quality.brightness < 80) {
+    labels.push(`${isCropped ? 'crop' : 'full'}:threshold`);
+  }
   debug.candidateLabels = labels;
 
   return {
-    generateCandidates: () => generateCandidateSequence(normalized, croppedBuffer, debug),
+    generateCandidates: () => generateCandidateSequence(primaryWorkingBuffer, isCropped, quality),
     debug,
     normalized,
+    quality,
   };
 }

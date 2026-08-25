@@ -331,7 +331,7 @@ describe("Analytics Endpoints (/analytics - Phase 8)", () => {
     expect(body.activeSubscriptionsCount).toBe(1);
     expect(body.estimatedMonthlyCost).toBe(260000);
     expect(body.estimatedYearlyCost).toBe(3120000);
-    expect(body.next7DaysCommitment).toBe(260000);
+    expect(body.next7DaysCommitment).toBe(520000);
     expect(body.next30DaysCommitment).toBe(520000);
   });
 

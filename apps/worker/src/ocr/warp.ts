@@ -1,12 +1,12 @@
 import sharp from 'sharp';
 import { Point } from './detect.js';
 
-const MAX_OUTPUT_DIMENSION = 2000;
+const MAX_OUTPUT_DIMENSION = 1200;
 
 /**
  * Perspective-correct a document image given 4 corner points.
  * Transforms the quadrilateral region to a rectangular output.
- * Caps output size to avoid memory explosion.
+ * Optimized for low memory and high performance.
  */
 export async function perspectiveCorrect(
   buffer: Buffer,
@@ -30,7 +30,7 @@ export async function perspectiveCorrect(
   let outW = outputWidth || Math.round(Math.max(topWidth, bottomWidth));
   let outH = outputHeight || Math.round(Math.max(leftHeight, rightHeight));
 
-  if (outW < 10 || outH < 10) return buffer;
+  if (outW < 20 || outH < 20) return buffer;
 
   // Cap output dimensions to prevent memory explosion
   const outMaxDim = Math.max(outW, outH);
@@ -52,19 +52,28 @@ export async function perspectiveCorrect(
 
   if (!H) return buffer;
 
-  // Single raw decode — read once, use for all pixel lookups
+  // Work with 1-channel grayscale to use 1/4th the memory of RGBA
   const raw = await sharp(buffer)
-    .ensureAlpha()
+    .greyscale()
     .raw()
     .toBuffer();
-  const srcCh = 4;
 
-  // Create output buffer
-  const out = Buffer.alloc(outW * outH * srcCh, 255);
+  // Create output grayscale buffer
+  const out = Buffer.alloc(outW * outH, 255);
+
+  const h0 = H[0], h1 = H[1], h2 = H[2];
+  const h3 = H[3], h4 = H[4], h5 = H[5];
+  const h6 = H[6], h7 = H[7], h8 = H[8];
 
   for (let oy = 0; oy < outH; oy++) {
+    const outRowOffset = oy * outW;
     for (let ox = 0; ox < outW; ox++) {
-      const [sx, sy] = applyHomography(H, ox, oy);
+      // Inlined homography projection (avoids array allocation per pixel)
+      const denom = h6 * ox + h7 * oy + h8;
+      if (Math.abs(denom) < 1e-10) continue;
+
+      const sx = (h0 * ox + h1 * oy + h2) / denom;
+      const sy = (h3 * ox + h4 * oy + h5) / denom;
 
       const x0 = Math.floor(sx);
       const y0 = Math.floor(sy);
@@ -76,27 +85,25 @@ export async function perspectiveCorrect(
       const fx = sx - x0;
       const fy = sy - y0;
 
-      const idx00 = (y0 * srcWidth + x0) * srcCh;
-      const idx10 = (y0 * srcWidth + x1) * srcCh;
-      const idx01 = (y1 * srcWidth + x0) * srcCh;
-      const idx11 = (y1 * srcWidth + x1) * srcCh;
+      const idx00 = y0 * srcWidth + x0;
+      const idx10 = y0 * srcWidth + x1;
+      const idx01 = y1 * srcWidth + x0;
+      const idx11 = y1 * srcWidth + x1;
 
-      const outIdx = (oy * outW + ox) * srcCh;
-      for (let c = 0; c < srcCh; c++) {
-        const v =
-          raw[idx00 + c] * (1 - fx) * (1 - fy) +
-          raw[idx10 + c] * fx * (1 - fy) +
-          raw[idx01 + c] * (1 - fx) * fy +
-          raw[idx11 + c] * fx * fy;
-        out[outIdx + c] = Math.round(Math.min(255, Math.max(0, v)));
-      }
+      const v =
+        raw[idx00] * (1 - fx) * (1 - fy) +
+        raw[idx10] * fx * (1 - fy) +
+        raw[idx01] * (1 - fx) * fy +
+        raw[idx11] * fx * fy;
+
+      out[outRowOffset + ox] = Math.round(Math.min(255, Math.max(0, v)));
     }
   }
 
-  // Allow raw source buffer to be GC'd
+  // Release raw buffer reference
   (raw as any) = null;
 
-  return sharp(out, { raw: { width: outW, height: outH, channels: srcCh } })
+  return sharp(out, { raw: { width: outW, height: outH, channels: 1 } })
     .png({ compressionLevel: 1 })
     .toBuffer();
 }
@@ -165,12 +172,4 @@ function computeHomography(src: Point[], dst: Point[]): number[] | null {
   }
 
   return [x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], 1];
-}
-
-function applyHomography(H: number[], x: number, y: number): [number, number] {
-  const denom = H[6] * x + H[7] * y + H[8];
-  if (Math.abs(denom) < 1e-10) return [0, 0];
-  const hx = (H[0] * x + H[1] * y + H[2]) / denom;
-  const hy = (H[3] * x + H[4] * y + H[5]) / denom;
-  return [hx, hy];
 }

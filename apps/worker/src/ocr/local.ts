@@ -1,7 +1,10 @@
-import { createWorker } from 'tesseract.js';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+import crypto from 'node:crypto';
 import { OCRProvider, OCRResult } from '@pocketlens/shared';
 import {
-  assessImageQuality,
   preprocessForOCR,
   ImageQuality,
   CandidateImage,
@@ -67,111 +70,226 @@ export function scoreOCRText(text: string, tesseractConfidence: number, isCroppe
   return Math.round(score);
 }
 
+let nativeTesseractChecked = false;
+let hasNativeTesseract = false;
+
+async function checkNativeTesseract(): Promise<boolean> {
+  if (nativeTesseractChecked) return hasNativeTesseract;
+
+  return new Promise((resolve) => {
+    const child = spawn('tesseract', ['--version']);
+    child.on('error', () => {
+      nativeTesseractChecked = true;
+      hasNativeTesseract = false;
+      resolve(false);
+    });
+    child.on('close', (code) => {
+      nativeTesseractChecked = true;
+      hasNativeTesseract = code === 0;
+      resolve(hasNativeTesseract);
+    });
+  });
+}
+
 /**
- * Run OCR on a single image candidate and immediately release the buffer.
+ * Execute OCR in an isolated child process reading an image file path.
+ * This completely isolates OCR / WASM memory from the main Node worker.
  */
-async function runOCROnCandidate(
-  candidate: CandidateImage,
+async function runIsolatedOCR(
+  imagePath: string,
   languages: string,
   timeoutMs: number,
 ): Promise<{ rawText: string; confidence: number }> {
-  let worker: any = null;
+  const isNative = await checkNativeTesseract();
 
-  let timeoutTimer: NodeJS.Timeout | null = null;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutTimer = setTimeout(() => {
-      reject(new Error(`OCR candidate timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-    if (timeoutTimer && typeof timeoutTimer.unref === 'function') {
-      timeoutTimer.unref();
-    }
-  });
+  if (isNative) {
+    // Native C++ Tesseract CLI (installed in Docker / production)
+    return new Promise((resolve, reject) => {
+      const child = spawn('tesseract', [imagePath, 'stdout', '-l', languages, '--psm', '6'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
 
-  const ocrPromise = (async () => {
-    worker = await createWorker(languages, 1, {});
-    await worker.setParameters({
-      tessedit_pageseg_mode: '6',
+      let stdout = '';
+      let stderr = '';
+
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL');
+        reject(new Error(`Native OCR timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      child.stdout.on('data', (chunk) => {
+        stdout += chunk.toString('utf-8');
+      });
+
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk.toString('utf-8');
+      });
+
+      child.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        if (code === 0 || stdout.trim().length > 0) {
+          resolve({
+            rawText: stdout,
+            confidence: 85,
+          });
+        } else {
+          reject(new Error(`Tesseract exited with code ${code}: ${stderr}`));
+        }
+      });
     });
-    const ret = await worker.recognize(candidate.buffer);
-    await worker.terminate();
-    worker = null;
-    return {
-      rawText: ret.data.text || '',
-      confidence: ret.data.confidence || 50,
-    };
-  })();
-
-  try {
-    const result = await Promise.race([ocrPromise, timeoutPromise]);
-    if (timeoutTimer) clearTimeout(timeoutTimer);
-    return result;
-  } catch (err: any) {
-    if (timeoutTimer) clearTimeout(timeoutTimer);
-    if (worker) {
-      try { await worker.terminate(); } catch { /* ignore */ }
-    }
-    throw err;
   }
+
+  // Node child process runner fallback (for local dev / environments without native tesseract)
+  return new Promise((resolve, reject) => {
+    // Determine path to cli-runner.js or cli-runner.ts
+    const runnerDir = path.dirname(new URL(import.meta.url).pathname);
+    let runnerScript = path.join(runnerDir, 'cli-runner.js');
+
+    // In development / ts-node / tsx environments, use ts file if js not found
+    const runnerArgs = [runnerScript, imagePath, languages];
+
+    const child = spawn(process.execPath, runnerArgs, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      reject(new Error(`Child OCR timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString('utf-8');
+    });
+
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString('utf-8');
+    });
+
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (code === 0) {
+        try {
+          const parsed = JSON.parse(stdout);
+          resolve({
+            rawText: parsed.rawText || '',
+            confidence: parsed.confidence || 50,
+          });
+        } catch {
+          resolve({
+            rawText: stdout,
+            confidence: 50,
+          });
+        }
+      } else {
+        reject(new Error(`OCR child process exited with code ${code}: ${stderr}`));
+      }
+    });
+  });
 }
 
 /**
  * Multi-pass OCR provider.
- * Uses a generator to process candidates one at a time.
- * Never holds all candidate buffers in memory simultaneously.
+ * Uses isolated child processes and temp files.
+ * Zero persistent memory retention in Node.
  */
 export class LocalOCRProvider implements OCRProvider {
   private languages: string;
   private timeoutMs: number;
 
-  constructor(languages = 'eng+vie', timeoutMs = 60000) {
+  constructor(languages = 'eng+vie', timeoutMs = 45000) {
     this.languages = languages;
     this.timeoutMs = timeoutMs;
   }
 
   async extractText(imageBuffer: Buffer, mimeType: string): Promise<OCRResult> {
     const startTime = Date.now();
+    const jobId = crypto.randomUUID();
+    const tempDir = path.join(os.tmpdir(), `pocketlens-ocr-${jobId}`);
 
-    // 1. Assess image quality
-    const quality = await assessImageQuality(imageBuffer);
+    await fs.mkdir(tempDir, { recursive: true });
 
-    // 2. Preprocessing: detect document, prepare candidates (generator-based)
-    const { generateCandidates, debug } = await preprocessForOCR(imageBuffer);
-
-    // 3. Run OCR on candidates sequentially — one at a time
     let bestText = '';
     let bestScore = -1;
     let bestConfidence = 0;
     let bestCandidateLabel = 'none';
     let candidateCount = 0;
 
-    // Limit max candidates processed (early exit if we find a good one)
-    const MAX_CANDIDATES_TO_TRY = 5;
-    let candidatesTried = 0;
+    let quality: ImageQuality = {
+      width: 0,
+      height: 0,
+      brightness: 128,
+      contrast: 40,
+      sharpness: 25,
+      rating: 'fair',
+      details: [],
+    };
 
-    for await (const candidate of generateCandidates()) {
-      if (candidatesTried >= MAX_CANDIDATES_TO_TRY) break;
-      candidatesTried++;
+    let debug: OCRDebugInfo = {
+      documentDetected: false,
+      documentConfidence: 0,
+      documentAreaFraction: 0,
+      perspectiveCorrected: false,
+      originalDimensions: '',
+      croppedDimensions: '',
+      candidateLabels: [],
+    };
 
-      const perCandidateTimeout = Math.floor(this.timeoutMs / MAX_CANDIDATES_TO_TRY);
+    try {
+      // 1. Preprocessing: bounded candidate generator
+      const preprocessResult = await preprocessForOCR(imageBuffer);
+      quality = preprocessResult.quality;
+      debug = preprocessResult.debug;
 
-      try {
-        const result = await runOCROnCandidate(candidate, this.languages, perCandidateTimeout);
+      // 2. Process candidates sequentially
+      let candidateIndex = 0;
+      for await (const candidate of preprocessResult.generateCandidates()) {
+        candidateIndex++;
         candidateCount++;
-        const score = scoreOCRText(result.rawText, result.confidence, candidate.isCropped);
 
-        if (score > bestScore) {
-          bestScore = score;
-          bestText = result.rawText;
-          bestConfidence = result.confidence;
-          bestCandidateLabel = candidate.label;
+        const candidateFilePath = path.join(tempDir, `cand-${candidateIndex}.png`);
+
+        try {
+          // Write candidate to temp file
+          await fs.writeFile(candidateFilePath, candidate.buffer);
+
+          // Run OCR in isolated child process
+          const perCandidateTimeout = Math.floor(this.timeoutMs / 2);
+          const result = await runIsolatedOCR(candidateFilePath, this.languages, perCandidateTimeout);
+
+          const score = scoreOCRText(result.rawText, result.confidence, candidate.isCropped);
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestText = result.rawText;
+            bestConfidence = result.confidence;
+            bestCandidateLabel = candidate.label;
+          }
+
+          // Early exit: If high-quality score reached, stop and do not run further passes
+          if (score >= 60) {
+            break;
+          }
+        } finally {
+          // Immediately delete candidate file to release disk space
+          await fs.unlink(candidateFilePath).catch(() => {});
         }
-
-        // Early exit: if we found a good-enough result, stop processing more candidates
-        if (score >= 80 && candidate.isCropped) break;
-      } catch {
-        // Candidate failed, continue to next
       }
-      // candidate.buffer can now be GC'd — we don't hold a reference
+    } finally {
+      // Clean up temp directory
+      await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
     }
 
     const durationMs = Date.now() - startTime;
@@ -181,7 +299,7 @@ export class LocalOCRProvider implements OCRProvider {
       confidence: bestConfidence,
       detectedLanguage: this.languages.includes('vie') ? 'vie' : 'eng',
       durationMs,
-      provider: 'tesseract.js-local',
+      provider: hasNativeTesseract ? 'tesseract-native-cli' : 'tesseract.js-child-process',
       quality,
       candidateCount,
       bestCandidate: bestCandidateLabel,

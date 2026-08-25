@@ -23,9 +23,26 @@ const storage = createStorageProvider({
 
 let ocrProvider: OCRProvider = new LocalOCRProvider();
 
-function memMB(stage: string): string {
+export function getMemoryStats(): {
+  rss: number;
+  heapUsed: number;
+  heapTotal: number;
+  external: number;
+  arrayBuffers: number;
+} {
   const m = process.memoryUsage();
-  return `${stage} rss=${(m.rss / 1048576).toFixed(0)}MB heap=${(m.heapUsed / 1048576).toFixed(0)}/${(m.heapTotal / 1048576).toFixed(0)}MB`;
+  return {
+    rss: Math.round((m.rss / 1048576) * 10) / 10,
+    heapUsed: Math.round((m.heapUsed / 1048576) * 10) / 10,
+    heapTotal: Math.round((m.heapTotal / 1048576) * 10) / 10,
+    external: Math.round((m.external / 1048576) * 10) / 10,
+    arrayBuffers: Math.round((m.arrayBuffers / 1048576) * 10) / 10,
+  };
+}
+
+export function formatMemUsage(stage: string): string {
+  const m = getMemoryStats();
+  return `[${stage}] rss=${m.rss}MB heapUsed=${m.heapUsed}MB heapTotal=${m.heapTotal}MB ext=${m.external}MB arrayBuffers=${m.arrayBuffers}MB`;
 }
 
 export function setOCRProvider(provider: OCRProvider) {
@@ -36,7 +53,7 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
   const { receiptId } = job.data;
   const startTime = Date.now();
 
-  logger.info({ receiptId, jobId: job.id }, 'receipt.processing started');
+  logger.info({ receiptId, jobId: job.id, mem: getMemoryStats() }, formatMemUsage('job.start'));
 
   // 1. Fetch receipt and user details from database
   const receipt = await prisma.receipt.findUnique({
@@ -87,7 +104,7 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
     if (!fileBuffer || fileBuffer.length === 0) {
       throw new Error('Stored receipt image file is empty or corrupted');
     }
-    logger.info({ receiptId, sizeKB: Math.round(fileBuffer.length / 1024) }, memMB('after.file-read'));
+    logger.info({ receiptId, sizeKB: Math.round(fileBuffer.length / 1024), mem: getMemoryStats() }, formatMemUsage('after.file-read'));
 
     const magicCheck = validateImageMagicBytes(fileBuffer);
     if (!magicCheck.valid) {
@@ -95,9 +112,9 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
     }
 
     // 4. Perform multi-pass OCR text extraction with preprocessing
-    logger.info({ receiptId }, 'receipt.ocr extracting text (multi-pass)...');
+    logger.info({ receiptId }, formatMemUsage('before.ocr'));
     const ocrResult = await ocrProvider.extractText(fileBuffer, receipt.mimeType);
-    logger.info({ receiptId }, memMB('after.ocr'));
+    logger.info({ receiptId, mem: getMemoryStats() }, formatMemUsage('after.ocr'));
 
     // Extract quality and debug info if available (EnhancedOCRResult)
     const enhancedResult = ocrResult as EnhancedOCRResult;
@@ -112,6 +129,7 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
       userCategories,
       defaultCurrency: defaultAccount?.currency || 'VND',
     });
+    logger.info({ receiptId, mem: getMemoryStats() }, formatMemUsage('after.extraction'));
 
     // 6. Persist extraction and line items in database atomically
     await prisma.$transaction(async (tx) => {
@@ -206,8 +224,9 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
         candidateCount: enhancedResult.candidateCount || 1,
         bestCandidate: enhancedResult.bestCandidate || 'unknown',
         durationMs,
+        mem: getMemoryStats(),
       },
-      'receipt.ready (enhanced OCR & extraction complete)'
+      formatMemUsage('job.end')
     );
 
     return {
@@ -217,7 +236,7 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
     };
   } catch (err: any) {
     const durationMs = Date.now() - startTime;
-    logger.error({ err: err.message, receiptId, durationMs }, 'receipt.failed');
+    logger.error({ err: err.message, receiptId, durationMs, mem: getMemoryStats() }, 'receipt.failed');
 
     await prisma.receipt.update({
       where: { id: receiptId },
