@@ -186,6 +186,89 @@ describe('Accounts Endpoints (/accounts/*)', () => {
       );
     });
 
+    it('returns a plain array (not wrapped in an object) for receipt form consumption', async () => {
+      const mockAccounts = [
+        {
+          id: 'acc_1',
+          userId: userA.id,
+          name: 'Cash',
+          type: 'CASH',
+          currency: 'VND',
+          openingBalance: new Prisma.Decimal('500000'),
+          currentBalance: new Prisma.Decimal('500000'),
+          isArchived: false,
+          isDefault: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'acc_2',
+          userId: userA.id,
+          name: 'Vietcombank',
+          type: 'BANK',
+          currency: 'VND',
+          openingBalance: new Prisma.Decimal('10000000'),
+          currentBalance: new Prisma.Decimal('10000000'),
+          isArchived: false,
+          isDefault: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+
+      vi.spyOn(prisma.account, 'findMany').mockResolvedValue(mockAccounts as any);
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/accounts',
+        headers: { authorization: 'Bearer test_token' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      // CRITICAL: response must be a plain array, not { accounts: [...] }
+      expect(Array.isArray(body)).toBe(true);
+      expect(body).toHaveLength(2);
+      expect(body[0].id).toBe('acc_1');
+      expect(body[1].id).toBe('acc_2');
+    });
+
+    it('returns empty array when user has no accounts', async () => {
+      vi.spyOn(prisma.account, 'findMany').mockResolvedValue([]);
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/accounts',
+        headers: { authorization: 'Bearer test_token' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(Array.isArray(body)).toBe(true);
+      expect(body).toHaveLength(0);
+    });
+
+    it('does not return other users accounts (ownership isolation)', async () => {
+      vi.spyOn(prisma.account, 'findMany').mockResolvedValue([]);
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/accounts',
+        headers: { authorization: 'Bearer test_token' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(Array.isArray(body)).toBe(true);
+      expect(body).toHaveLength(0);
+      // Verify the query filters by userA.id
+      expect(prisma.account.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ userId: userA.id }),
+        })
+      );
+    });
+
     it('includes archived accounts when includeArchived=true query param is set', async () => {
       const findManySpy = vi.spyOn(prisma.account, 'findMany').mockResolvedValue([]);
 

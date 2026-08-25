@@ -63,6 +63,84 @@ describe('Categories Endpoints (/categories)', () => {
     expect(body[1].userId).toBe(userA.id);
   });
 
+  it('returns a plain array (not wrapped in an object) for receipt form consumption', async () => {
+    const mockCategories = [
+      {
+        id: 'cat_groceries',
+        userId: null,
+        name: 'Groceries',
+        type: 'EXPENSE',
+        icon: 'shopping-cart',
+        isSystem: true,
+        isArchived: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+
+    vi.spyOn(prisma.category, 'findMany').mockResolvedValue(mockCategories as any);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/categories?type=expense',
+      headers: { authorization: 'Bearer token' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    // CRITICAL: response must be a plain array, not { categories: [...] }
+    expect(Array.isArray(body)).toBe(true);
+    expect(body).toHaveLength(1);
+    expect(body[0].id).toBe('cat_groceries');
+    expect(body[0].type).toBe('expense');
+  });
+
+  it('returns empty array when no categories match type filter', async () => {
+    vi.spyOn(prisma.category, 'findMany').mockResolvedValue([]);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/categories?type=income',
+      headers: { authorization: 'Bearer token' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(Array.isArray(body)).toBe(true);
+    expect(body).toHaveLength(0);
+  });
+
+  it('does not return other users custom categories (ownership isolation)', async () => {
+    // System categories + userA custom categories only
+    const mockCategories = [
+      {
+        id: 'cat_system',
+        userId: null,
+        name: 'Food',
+        type: 'EXPENSE',
+        icon: 'utensils',
+        isSystem: true,
+        isArchived: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+
+    vi.spyOn(prisma.category, 'findMany').mockResolvedValue(mockCategories as any);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/categories',
+      headers: { authorization: 'Bearer token' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(Array.isArray(body)).toBe(true);
+    // Only system categories, no other user's custom categories
+    expect(body.every((c: any) => c.isSystem || c.userId === userA.id)).toBe(true);
+  });
+
   it('POST /categories creates a custom category for authenticated user', async () => {
     const mockCreated = {
       id: 'cat_custom_1',

@@ -56,6 +56,10 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
 }) => {
   const [accounts, setAccounts] = useState<AccountResponse[]>([]);
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
   const [showRawText, setShowRawText] = useState(false);
 
   // Form draft state
@@ -165,13 +169,19 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    apiClient<{ accounts: AccountResponse[] }>('/accounts')
-      .then((res) => setAccounts(res.accounts || []))
-      .catch(() => {});
+    setIsLoadingAccounts(true);
+    setAccountsError(null);
+    apiClient<AccountResponse[]>('/accounts')
+      .then((res) => setAccounts(Array.isArray(res) ? res : []))
+      .catch(() => setAccountsError('Unable to load accounts.'))
+      .finally(() => setIsLoadingAccounts(false));
 
-    apiClient<{ categories: CategoryResponse[] }>('/categories?type=expense')
-      .then((res) => setCategories(res.categories || []))
-      .catch(() => {});
+    setIsLoadingCategories(true);
+    setCategoriesError(null);
+    apiClient<CategoryResponse[]>('/categories?type=expense')
+      .then((res) => setCategories(Array.isArray(res) ? res : []))
+      .catch(() => setCategoriesError('Unable to load categories.'))
+      .finally(() => setIsLoadingCategories(false));
   }, [isOpen]);
 
   // Pre-fill form from extraction whenever receipt changes
@@ -586,19 +596,34 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
                         </label>
                         {getConfidenceBadge(extraction.fieldConfidences?.category)}
                       </div>
-                      <select
-                        value={categoryId}
-                        onChange={(e) => setCategoryId(e.target.value)}
-                        disabled={!!receipt.transactionId}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:opacity-60"
-                      >
-                        <option value="">-- Select Category --</option>
-                        {categories.map((cat) => (
-                          <option key={cat.id} value={cat.id}>
-                            {cat.name}
-                          </option>
-                        ))}
-                      </select>
+                      {isLoadingCategories ? (
+                        <div className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 text-zinc-400 flex items-center space-x-2">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <span>Loading categories...</span>
+                        </div>
+                      ) : categoriesError ? (
+                        <div className="w-full px-3 py-2 text-xs rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400">
+                          {categoriesError}
+                        </div>
+                      ) : categories.length === 0 ? (
+                        <div className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 text-zinc-400">
+                          No categories available
+                        </div>
+                      ) : (
+                        <select
+                          value={categoryId}
+                          onChange={(e) => setCategoryId(e.target.value)}
+                          disabled={!!receipt.transactionId}
+                          className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:opacity-60"
+                        >
+                          <option value="">-- Select Category --</option>
+                          {categories.map((cat) => (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       {suggestedCategory && !categoryId && !receipt.transactionId && (
                         <div className="mt-1.5">
                           <CategorySuggestionBadge
@@ -618,20 +643,35 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
                       </label>
                       {getConfidenceBadge('low')}
                     </div>
-                    <select
-                      value={accountId}
-                      onChange={(e) => setAccountId(e.target.value)}
-                      disabled={!!receipt.transactionId}
-                      required
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:opacity-60"
-                    >
-                      <option value="">-- Select Account --</option>
-                      {accounts.map((acc) => (
-                        <option key={acc.id} value={acc.id}>
-                          {acc.name} ({acc.currency})
-                        </option>
-                      ))}
-                    </select>
+                    {isLoadingAccounts ? (
+                      <div className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 text-zinc-400 flex items-center space-x-2">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <span>Loading accounts...</span>
+                      </div>
+                    ) : accountsError ? (
+                      <div className="w-full px-3 py-2 text-xs rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400">
+                        {accountsError}
+                      </div>
+                    ) : accounts.length === 0 ? (
+                      <div className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 text-zinc-400">
+                        No payment accounts available
+                      </div>
+                    ) : (
+                      <select
+                        value={accountId}
+                        onChange={(e) => setAccountId(e.target.value)}
+                        disabled={!!receipt.transactionId}
+                        required
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:opacity-60"
+                      >
+                        <option value="">-- Select Account --</option>
+                        {accounts.map((acc) => (
+                          <option key={acc.id} value={acc.id}>
+                            {acc.name} ({acc.currency})
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
 
                   {/* Description / Notes */}
