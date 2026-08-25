@@ -386,4 +386,96 @@ TỔNG CỘNG:        100.000 VNĐ
       expect(result.currency).toBe('VND');
     });
   });
+
+  describe('Post-OCR Understanding & Conflict Resolution (Real-world cases)', () => {
+    it('resolves conflicting OCR totals using line-item arithmetic and independent fields (Synthetic Fujimart)', () => {
+      // Real-world failure pattern:
+      // Tổng cộng: 378,120 (OCR misread 6 as 8)
+      // +Momo: 378,120 (copied/confused OCR reading)
+      // Giá trị mua: 376,120 (independent field)
+      // Line items sum: 17500+55000+29160+20000+123760+8500+56300+47000+18900 = 376,120
+      const syntheticFujimart = `
+SIEU THI FUJIMART
+Dia chi: Hoan Kiem, Ha Noi
+Ngay hoa don: 22/08/2026-17:54
+
+Banh mi               17.500
+Sua tuoi              55.000
+Tra sua               29.160
+Nuoc khoang           20.000
+Cherry 520.000       123.760
+Keo                    8.500
+Mi tom                56.300
+Kem                   47.000
+Giay                  18.900
+
+Tong cong: 378.120
+Tien khach tra:
++Momo: 378.120
+Gia tri mua: 376.120
+      `;
+
+      const result = extractReceiptData(syntheticFujimart);
+
+      expect(result.merchant).toBe('SIEU THI FUJIMART');
+      expect(result.totalAmount).toBe(376120);
+      expect(result.currency).toBe('VND');
+      expect(result.transactionDate).toBeInstanceOf(Date);
+      expect(result.transactionDate?.getUTCFullYear()).toBe(2026);
+      expect(result.transactionDate?.getUTCMonth()).toBe(7); // August
+      expect(result.transactionDate?.getUTCDate()).toBe(22);
+      expect(result.transactionDate?.getUTCHours()).toBe(17);
+      expect(result.transactionDate?.getUTCMinutes()).toBe(54);
+      expect(result.items.length).toBe(9);
+    });
+
+    it('Test A: correctly selects total using Cash and Change arithmetic validation', () => {
+      const receipt = `
+MINI MART
+TOTAL       150.000
+Cash        200.000
+Change       50.000
+      `;
+      const result = extractReceiptData(receipt);
+      expect(result.totalAmount).toBe(150000);
+      expect(result.fieldConfidences.totalAmount).toBe('high');
+    });
+
+    it('Test B: correctly ignores unit price in favor of item total and receipt total', () => {
+      const receipt = `
+SUPERMARKET
+Unit price  520.000
+Line total  123.760
+TOTAL       376.120
+      `;
+      const result = extractReceiptData(receipt);
+      expect(result.totalAmount).toBe(376120);
+    });
+
+    it('Test C: sets uncertainty warning when OCR totals conflict without line-item arithmetic', () => {
+      const receipt = `
+STORE
+Tong cong    378.120
+Gia tri mua  376.120
+      `;
+      const result = extractReceiptData(receipt);
+      expect(result.fieldConfidences.amountUncertaintyWarning).toBe(
+        'Amount detected with uncertainty — please verify.'
+      );
+      expect(result.fieldConfidences.totalAmount).not.toBe('high');
+    });
+
+    it('Test D: assigns HIGH confidence when all candidate fields agree', () => {
+      const receipt = `
+SUPERMARKET
+Tong cong    376.120
+MoMo         376.120
+Gia tri mua  376.120
+      `;
+      const result = extractReceiptData(receipt);
+      expect(result.totalAmount).toBe(376120);
+      expect(result.fieldConfidences.totalAmount).toBe('high');
+      expect(result.fieldConfidences.amountUncertaintyWarning).toBeNull();
+    });
+  });
 });

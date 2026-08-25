@@ -38,6 +38,7 @@ export interface FieldConfidences {
   currency: FieldConfidence;
   category: FieldConfidence;
   account: FieldConfidence;
+  amountUncertaintyWarning?: string | null;
 }
 
 export interface ReceiptItemResponse {

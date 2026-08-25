@@ -531,6 +531,12 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
                         className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:opacity-60"
                         placeholder="80000"
                       />
+                      {extraction?.fieldConfidences?.amountUncertaintyWarning && (
+                        <div className="mt-1 flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+                          <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                          <span>Amount detected with uncertainty — please verify.</span>
+                        </div>
+                      )}
                     </div>
 
                     <div>
