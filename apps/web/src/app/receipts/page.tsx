@@ -159,7 +159,7 @@ export default function ReceiptsPage() {
         return <Badge variant="success">Ready</Badge>;
       case 'processing':
         return (
-          <Badge variant="phase" className="space-x-1">
+          <Badge variant="info" className="space-x-1">
             <Loader2 className="h-2.5 w-2.5 animate-spin" />
             <span>Processing...</span>
           </Badge>
@@ -178,12 +178,9 @@ export default function ReceiptsPage() {
       {/* Header and Upload Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-2">
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-              Receipt Scanner & OCR
-            </h2>
-            <Badge variant="phase" className="text-[10px]">Phase 6 Multilingual OCR</Badge>
-          </div>
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Receipt Scanner & OCR
+          </h2>
           <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
             Extract details from English & Vietnamese receipts and confirm transactions with a tap
           </p>

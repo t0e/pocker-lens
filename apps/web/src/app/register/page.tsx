@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { AlertCircle, Lock, Mail, User, Loader2, ArrowRight } from 'lucide-react';
 
 export default function RegisterPage() {
@@ -58,10 +57,7 @@ export default function RegisterPage() {
 
         <Card className="shadow-lg border-zinc-200/80 dark:border-zinc-800">
           <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Sign Up</CardTitle>
-              <Badge variant="phase">Phase 2</Badge>
-            </div>
+            <CardTitle className="text-lg">Sign Up</CardTitle>
             <CardDescription className="text-xs">
               Create your private, secure financial ledger
             </CardDescription>

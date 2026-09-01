@@ -205,7 +205,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     }
   };
 
-  // Submit confirmed transaction to existing Phase 3 endpoint
+  // Submit confirmed transaction
   const handleConfirmAndSave = async (forceSave = false) => {
     setError(null);
 
@@ -306,9 +306,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
               {editingTransaction ? 'Edit Transaction' : repeatTransaction ? 'Repeat Transaction' : 'Add Transaction'}
             </h3>
-            {!editingTransaction && !repeatTransaction && (
-              <Badge variant="phase" className="text-[10px]">Phase 4</Badge>
-            )}
           </div>
           <button
             onClick={onClose}
@@ -427,7 +424,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     </span>
                   </div>
                   <Badge
-                    variant={type === 'expense' ? 'default' : type === 'income' ? 'success' : 'phase'}
+                    variant={type === 'expense' ? 'default' : type === 'income' ? 'success' : 'info'}
                     className="capitalize text-[11px]"
                   >
                     {type}
@@ -764,7 +761,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           </form>
         )}
 
-        {/* Phase 9: Duplicate Warning Modal */}
+        {/* Duplicate Warning Modal */}
         {duplicateMatch && (
           <DuplicateWarningModal
             isOpen={isDuplicateModalOpen}

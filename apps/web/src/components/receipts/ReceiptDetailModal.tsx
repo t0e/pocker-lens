@@ -235,7 +235,7 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
       case 'ready':
         return <Badge variant="success">Ready for Review</Badge>;
       case 'processing':
-        return <Badge variant="phase">Processing OCR...</Badge>;
+        return <Badge variant="info">Processing OCR...</Badge>;
       case 'queued':
         return <Badge variant="info">Queued</Badge>;
       case 'failed':
@@ -817,7 +817,7 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
           </div>
         </div>
 
-        {/* Phase 9: Duplicate Warning Modal */}
+        {/* Duplicate Warning Modal */}
         {duplicateMatch && (
           <DuplicateWarningModal
             isOpen={isDuplicateModalOpen}

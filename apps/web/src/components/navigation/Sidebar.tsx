@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
-import { Badge } from '../ui/Badge';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -46,7 +45,6 @@ export const Sidebar: React.FC = () => {
             <span className="text-xs text-zinc-400 font-medium">Finance Tracker</span>
           </div>
         </Link>
-        <Badge variant="phase">Phase 9</Badge>
       </div>
 
       {/* Navigation Links */}

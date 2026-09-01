@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { MAX_RECEIPT_FILE_SIZE, ALLOWED_RECEIPT_MIME_TYPES } from '@pocketlens/shared';
 import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
 import { apiClient } from '@/lib/api-client';
 
 interface ReceiptUploadModalProps {
@@ -125,12 +124,9 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
         {/* Modal Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
+          <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
               Upload Receipt
             </h3>
-            <Badge variant="phase" className="text-[10px]">Phase 5</Badge>
-          </div>
           <button
             onClick={() => {
               handleClear();

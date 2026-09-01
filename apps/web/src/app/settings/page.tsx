@@ -12,16 +12,13 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Settings & Profile
-          </h2>
-          <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
-            Manage your user session, account security, and application preferences
-          </p>
-        </div>
-        <Badge variant="success">Phase 2 Active</Badge>
+      <div>
+        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+          Settings & Profile
+        </h2>
+        <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
+          Manage your user session, account security, and application preferences
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

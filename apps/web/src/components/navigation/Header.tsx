@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 import { Sparkles, LogOut } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
 import { TransactionModal } from '../transactions/TransactionModal';
 import { AccountResponse, CategoryResponse } from '@pocketlens/shared';
 import { apiClient } from '@/lib/api-client';
@@ -49,9 +48,6 @@ export const Header: React.FC = () => {
         <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
           {title}
         </h1>
-        <div className="hidden sm:inline-flex">
-          <Badge variant="success">Phase 7 Active</Badge>
-        </div>
       </div>
 
       <div className="flex items-center space-x-2 sm:space-x-3">

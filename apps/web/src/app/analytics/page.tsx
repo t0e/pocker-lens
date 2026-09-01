@@ -15,7 +15,6 @@ import {
 import { apiClient } from "@/lib/api-client";
 import { formatMoney } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { CashFlowChart } from "@/components/analytics/CashFlowChart";
 import { CategoryBreakdownChart } from "@/components/analytics/CategoryBreakdownChart";
 import { SpendingPaceIndicator } from "@/components/analytics/SpendingPaceIndicator";
@@ -125,12 +124,9 @@ export default function AnalyticsPage() {
       {/* Page Header & Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-3">
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
               Financial Analytics
             </h1>
-            <Badge variant="phase">Phase 9 Multi-Currency</Badge>
-          </div>
           <p className="text-xs sm:text-sm text-zinc-500 mt-1">
             Multi-currency cashflow trends, spending pace, category breakdowns, and cross-currency converted insights.
           </p>

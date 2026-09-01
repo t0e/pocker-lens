@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { AlertCircle, Lock, Mail, Loader2, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
@@ -51,10 +50,7 @@ export default function LoginPage() {
 
         <Card className="shadow-lg border-zinc-200/80 dark:border-zinc-800">
           <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Sign In</CardTitle>
-              <Badge variant="phase">Phase 2</Badge>
-            </div>
+            <CardTitle className="text-lg">Sign In</CardTitle>
             <CardDescription className="text-xs">
               Enter your credentials to access your financial dashboard
             </CardDescription>

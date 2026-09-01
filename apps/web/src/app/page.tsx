@@ -5,16 +5,8 @@ import Link from 'next/link';
 import {
   Eye,
   EyeOff,
-  Wallet,
   Plus,
-  Landmark,
-  CreditCard,
-  PiggyBank,
-  Smartphone,
-  CircleDot,
   ArrowRight,
-  ShieldCheck,
-  Sparkles,
   Layers,
   ArrowDownLeft,
   ArrowUpRight,
@@ -27,7 +19,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import {
   AccountResponse,
@@ -123,10 +114,6 @@ export default function DashboardPage() {
             <h2 className="text-lg sm:text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
               Welcome back, {user?.displayName || 'User'}!
             </h2>
-            <Badge variant="success" className="space-x-1 hidden sm:inline-flex">
-              <ShieldCheck className="h-3 w-3" />
-              <span>Phase 9 Active</span>
-            </Badge>
           </div>
           <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
             Multi-currency reporting, exchange rates, smart categorization, duplicate protection, and receipt OCR.
@@ -358,10 +345,8 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Grid: Recent Transactions & Implementation Stage */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Transactions List */}
-        <Card className="lg:col-span-2">
+      {/* Recent Transactions */}
+      <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <div>
               <CardTitle className="text-base sm:text-lg">Recent Transactions</CardTitle>
@@ -457,39 +442,6 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-
-        {/* Roadmap & Status Card */}
-        <Card className="flex flex-col justify-between">
-          <CardHeader className="pb-3">
-            <div className="flex items-center space-x-2">
-              <Sparkles className="h-4 w-4 text-emerald-500" />
-              <CardTitle className="text-base">Implementation Stage</CardTitle>
-            </div>
-            <CardDescription className="text-xs">Phase progress</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-xs">
-            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 space-y-1">
-              <div className="font-bold text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
-                <span>Phase 7: Budgets & Subscriptions</span>
-                <Badge variant="success">Active & Verified</Badge>
-              </div>
-              <p className="text-emerald-700 dark:text-emerald-400 text-[11px] leading-relaxed">
-                Category spending limits, subscription tracking, and idempotent recurring execution.
-              </p>
-            </div>
-
-            <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 space-y-1 opacity-80">
-              <div className="font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between">
-                <span>Phase 8: Multi-Currency Analytics</span>
-                <Badge variant="phase">Next Phase</Badge>
-              </div>
-              <p className="text-zinc-500 text-[11px] leading-relaxed">
-                Comprehensive analytics charts, exchange rate trends, and multi-currency reporting.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Quick Add Transaction Modal */}
       <TransactionModal

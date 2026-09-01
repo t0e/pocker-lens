@@ -259,12 +259,9 @@ export default function BudgetsPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-2">
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-              Budgets & Recurring Planning
-            </h2>
-            <Badge variant="phase" className="text-[10px]">Phase 7 Planning</Badge>
-          </div>
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Budgets & Recurring Planning
+          </h2>
           <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
             Category spending limits, subscription tracking, and automated recurring expenses
           </p>

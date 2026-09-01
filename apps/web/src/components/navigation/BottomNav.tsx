@@ -30,7 +30,7 @@ export const BottomNav: React.FC = () => {
                 key={item.href}
                 href={item.href}
                 className="flex flex-col items-center justify-center -mt-5 focus:outline-none"
-                title="Quick Add / Scan (Phase 2 Preview)"
+                title="Quick Add"
               >
                 <div className="h-12 w-12 rounded-full bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white flex items-center justify-center shadow-lg shadow-emerald-500/25 transition-all">
                   <Icon className="h-6 w-6 stroke-[2.5]" />

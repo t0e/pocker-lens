@@ -44,7 +44,6 @@ import {
   PaginatedTransactionsResponse,
 } from '@pocketlens/shared';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { TransactionModal } from '@/components/transactions/TransactionModal';
 import { apiClient } from '@/lib/api-client';
@@ -256,12 +255,9 @@ export default function TransactionsPage() {
       {/* Header and Quick Add Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-2">
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
               Transactions
             </h2>
-            <Badge variant="phase" className="text-[10px] hidden sm:inline-flex">Press &apos;N&apos; for Quick Add</Badge>
-          </div>
           <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
             Log and manage your expenses, income, and account transfers
           </p>

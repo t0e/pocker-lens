@@ -1,5 +1,4 @@
-// PocketLens Demo Mock Data (Phase 1 Application Shell)
-// Isolated to ensure clean replacement with real API data in subsequent phases.
+// PocketLens Demo Mock Data
 
 export interface MockTransaction {
   id: string;
