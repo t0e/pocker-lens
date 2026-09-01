@@ -896,10 +896,15 @@ export async function getCommitmentsSummary(
   let next30DaysCommitment = 0;
 
   for (const r of recurringTemplates) {
+    if (r.type && r.type.toUpperCase() === "INCOME") continue;
+
+    const amount = formatNumber(r.amount);
+    const frequency = (r.frequency ? r.frequency.toUpperCase() : "MONTHLY") as any;
+
     const item = {
       id: r.id,
       description: r.description,
-      amount: formatNumber(r.amount),
+      amount,
       currency: r.currency,
       type: (r.type ? r.type.toUpperCase() : "EXPENSE") as "EXPENSE" | "INCOME",
       accountId: r.accountId,
@@ -907,20 +912,26 @@ export async function getCommitmentsSummary(
       startDate: r.startDate,
       nextRunDate: r.nextRunDate,
       endDate: r.endDate,
-      frequency: (r.frequency ? r.frequency.toUpperCase() : "MONTHLY") as any,
+      frequency,
       interval: r.interval,
       isActive: r.isActive,
       isSubscription: r.isSubscription,
       merchant: r.merchant,
     };
 
+    // The 7-day commitment includes the current period's financial obligation
+    // (already committed regardless of exact billing date) plus any occurrences
+    // scheduled within the next 7 days.
+    const currentPeriodCost = calculateEstimatedMonthlyCost(amount, frequency, r.interval);
+    next7DaysCommitment += currentPeriodCost;
     const occ7 = getUpcomingOccurrences(item, 7, now);
-    const occ30 = getUpcomingOccurrences(item, 30, now);
-
     occ7.forEach((u) => {
       if (u.type !== "INCOME") next7DaysCommitment += u.amount;
     });
 
+    // The 30-day commitment uses occurrence projection, which captures all
+    // scheduled runs (including calendar-anchored boundary occurrences).
+    const occ30 = getUpcomingOccurrences(item, 30, now);
     occ30.forEach((u) => {
       if (u.type !== "INCOME") next30DaysCommitment += u.amount;
     });
