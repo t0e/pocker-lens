@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { User, RecurringTransaction, Account, Category } from '@prisma/client'
 import { buildApp } from '../app.js'
 import { prisma } from '../db/client.js'
 import * as authService from '../auth/service.js'
@@ -67,14 +68,16 @@ describe('Recurring Transactions & Subscriptions Endpoints (/recurring - Phase 7
   beforeEach(() => {
     vi.restoreAllMocks()
     app = buildApp()
-    vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any)
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(
+      userA as unknown as User,
+    )
   })
 
   describe('GET /recurring', () => {
     it('returns list of recurring transactions with estimated monthly cost', async () => {
       vi.spyOn(prisma.recurringTransaction, 'findMany').mockResolvedValue([
         sampleRecurring,
-      ] as any)
+      ] as unknown as RecurringTransaction[])
 
       const res = await app.inject({
         method: 'GET',
@@ -98,7 +101,7 @@ describe('Recurring Transactions & Subscriptions Endpoints (/recurring - Phase 7
     it('projects upcoming occurrences within horizon without affecting balances', async () => {
       vi.spyOn(prisma.recurringTransaction, 'findMany').mockResolvedValue([
         sampleRecurring,
-      ] as any)
+      ] as unknown as RecurringTransaction[])
 
       const res = await app.inject({
         method: 'GET',
@@ -118,7 +121,7 @@ describe('Recurring Transactions & Subscriptions Endpoints (/recurring - Phase 7
     it('returns subscriptions and estimated monthly breakdown per currency', async () => {
       vi.spyOn(prisma.recurringTransaction, 'findMany').mockResolvedValue([
         sampleRecurring,
-      ] as any)
+      ] as unknown as RecurringTransaction[])
 
       const res = await app.inject({
         method: 'GET',
@@ -136,13 +139,13 @@ describe('Recurring Transactions & Subscriptions Endpoints (/recurring - Phase 7
   describe('POST /recurring', () => {
     it('creates a new recurring transaction / subscription', async () => {
       vi.spyOn(prisma.account, 'findFirst').mockResolvedValue(
-        sampleAccount as any,
+        sampleAccount as unknown as Account,
       )
       vi.spyOn(prisma.category, 'findFirst').mockResolvedValue(
-        sampleCategory as any,
+        sampleCategory as unknown as Category,
       )
       vi.spyOn(prisma.recurringTransaction, 'create').mockResolvedValue(
-        sampleRecurring as any,
+        sampleRecurring as unknown as RecurringTransaction,
       )
 
       const res = await app.inject({
@@ -194,12 +197,12 @@ describe('Recurring Transactions & Subscriptions Endpoints (/recurring - Phase 7
   describe('PATCH /recurring/:id and status toggle', () => {
     it('pauses recurring item by setting isActive = false', async () => {
       vi.spyOn(prisma.recurringTransaction, 'findFirst').mockResolvedValue(
-        sampleRecurring as any,
+        sampleRecurring as unknown as RecurringTransaction,
       )
       vi.spyOn(prisma.recurringTransaction, 'update').mockResolvedValue({
         ...sampleRecurring,
         isActive: false,
-      } as any)
+      } as unknown as RecurringTransaction)
 
       const res = await app.inject({
         method: 'PATCH',
@@ -217,11 +220,11 @@ describe('Recurring Transactions & Subscriptions Endpoints (/recurring - Phase 7
   describe('DELETE /recurring/:id', () => {
     it('deletes recurring template while preserving historical transactions', async () => {
       vi.spyOn(prisma.recurringTransaction, 'findFirst').mockResolvedValue(
-        sampleRecurring as any,
+        sampleRecurring as unknown as RecurringTransaction,
       )
       const deleteSpy = vi
         .spyOn(prisma.recurringTransaction, 'delete')
-        .mockResolvedValue(sampleRecurring as any)
+        .mockResolvedValue(sampleRecurring as unknown as RecurringTransaction)
 
       const res = await app.inject({
         method: 'DELETE',
@@ -244,7 +247,7 @@ describe('Recurring Transactions & Subscriptions Endpoints (/recurring - Phase 7
       }
       vi.spyOn(prisma.recurringTransaction, 'findMany').mockResolvedValue([
         dueRecurring,
-      ] as any)
+      ] as unknown as RecurringTransaction[])
 
       const mockTx = {
         recurringOccurrence: {
@@ -257,9 +260,9 @@ describe('Recurring Transactions & Subscriptions Endpoints (/recurring - Phase 7
         recurringTransaction: { update: vi.fn().mockResolvedValue({}) },
       }
 
-      vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) =>
-        cb(mockTx),
-      )
+      vi.spyOn(prisma, '$transaction').mockImplementation(((
+        cb: (tx: unknown) => Promise<unknown>,
+      ) => cb(mockTx)) as never)
 
       const res = await app.inject({
         method: 'POST',
@@ -281,7 +284,7 @@ describe('Recurring Transactions & Subscriptions Endpoints (/recurring - Phase 7
       }
       vi.spyOn(prisma.recurringTransaction, 'findMany').mockResolvedValue([
         dueRecurring,
-      ] as any)
+      ] as unknown as RecurringTransaction[])
 
       // Occurrence already exists for this date!
       const mockTx = {
@@ -295,9 +298,9 @@ describe('Recurring Transactions & Subscriptions Endpoints (/recurring - Phase 7
         recurringTransaction: { update: vi.fn().mockResolvedValue({}) },
       }
 
-      vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) =>
-        cb(mockTx),
-      )
+      vi.spyOn(prisma, '$transaction').mockImplementation(((
+        cb: (tx: unknown) => Promise<unknown>,
+      ) => cb(mockTx)) as never)
 
       const res = await app.inject({
         method: 'POST',

@@ -86,9 +86,11 @@ async function startWorker() {
     // Run recurring scheduler immediately on startup, then periodically every 60s
     try {
       await runRecurringScheduler()
-    } catch (schedErr: any) {
+    } catch (schedErr) {
+      const message =
+        schedErr instanceof Error ? schedErr.message : String(schedErr)
       logger.warn(
-        { err: schedErr.message },
+        { err: message },
         'Initial recurring scheduler run completed with errors',
       )
     }
@@ -96,8 +98,9 @@ async function startWorker() {
     recurringTimer = setInterval(async () => {
       try {
         await runRecurringScheduler()
-      } catch (err: any) {
-        logger.error({ err: err.message }, 'Recurring scheduler tick error')
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        logger.error({ err: message }, 'Recurring scheduler tick error')
       }
     }, 60000)
 

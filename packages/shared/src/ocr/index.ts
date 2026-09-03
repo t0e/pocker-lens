@@ -19,7 +19,10 @@ export class MockOCRProvider implements OCRProvider {
     this.confidence = confidence
   }
 
-  async extractText(imageBuffer: Buffer, mimeType: string): Promise<OCRResult> {
+  async extractText(
+    _imageBuffer: Buffer,
+    _mimeType: string,
+  ): Promise<OCRResult> {
     return {
       rawText: this.mockText,
       confidence: this.confidence,

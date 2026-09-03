@@ -1,8 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { Job } from 'bullmq'
+import { Receipt } from '@prisma/client'
 import { processReceiptJob, setOCRProvider } from './receipt.js'
 import { prisma } from '../db/client.js'
 import { LocalStorageProvider } from '@pocketlens/shared/server'
-import { MockOCRProvider, OCRResult } from '@pocketlens/shared'
+import {
+  OCRResult,
+  OCRProvider,
+  ReceiptJobData,
+  ReceiptJobResult,
+} from '@pocketlens/shared'
 
 // Mock OCR provider that returns quality info (simulates EnhancedOCRResult)
 class MockEnhancedOCRProvider {
@@ -35,7 +42,7 @@ describe('Receipt Background Worker Processor (processReceiptJob Phase 6)', () =
     accounts: [
       {
         id: 'acc_1',
-        name: 'Cash',
+        name: 'Checking',
         currency: 'VND',
         isDefault: true,
         isArchived: false,
@@ -44,20 +51,13 @@ describe('Receipt Background Worker Processor (processReceiptJob Phase 6)', () =
   }
 
   const mockReceipt = {
-    id: 'receipt_worker_1',
+    id: 'rcpt_1',
     userId: 'user_1',
-    originalFilename: 'highlands.jpg',
-    storageKey: 'receipts/user_1/receipt_worker_1.jpg',
+    storageKey: 'receipts/user_1/sample.jpg',
+    storagePath: '/tmp/receipts/sample.jpg',
+    fileName: 'sample.jpg',
     mimeType: 'image/jpeg',
-    fileSize: 1024,
     status: 'QUEUED',
-    errorCode: null,
-    errorMessage: null,
-    transactionId: null,
-    processingStartedAt: null,
-    processingCompletedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
     user: mockUser,
     extraction: null,
   }
@@ -77,15 +77,19 @@ TỔNG CỘNG         80.000 VNĐ
 
   beforeEach(() => {
     vi.restoreAllMocks()
-    setOCRProvider(new MockEnhancedOCRProvider(sampleOCRText, 95) as any)
+    setOCRProvider(
+      new MockEnhancedOCRProvider(sampleOCRText, 95) as unknown as OCRProvider,
+    )
   })
 
   it('processes valid receipt with OCR and creates structured extraction and items', async () => {
-    vi.spyOn(prisma.receipt, 'findUnique').mockResolvedValue(mockReceipt as any)
+    vi.spyOn(prisma.receipt, 'findUnique').mockResolvedValue(
+      mockReceipt as unknown as Receipt,
+    )
     const updateSpy = vi.spyOn(prisma.receipt, 'update').mockResolvedValue({
       ...mockReceipt,
       status: 'READY',
-    } as any)
+    } as unknown as Receipt)
 
     vi.spyOn(LocalStorageProvider.prototype, 'exists').mockResolvedValue(true)
     vi.spyOn(LocalStorageProvider.prototype, 'getFile').mockResolvedValue(
@@ -98,14 +102,14 @@ TỔNG CỘNG         80.000 VNĐ
       receiptItem: { deleteMany: vi.fn() },
       receipt: { update: updateSpy },
     }
-    vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) =>
-      cb(mockTx),
-    )
+    vi.spyOn(prisma, '$transaction').mockImplementation(((
+      cb: (tx: unknown) => Promise<unknown>,
+    ) => cb(mockTx)) as never)
 
     const mockJob = {
       id: 'job_1',
       data: { receiptId: mockReceipt.id },
-    } as any
+    } as unknown as Job<ReceiptJobData, ReceiptJobResult>
 
     const result = await processReceiptJob(mockJob)
 
@@ -133,14 +137,14 @@ TỔNG CỘNG         80.000 VNĐ
       extraction: { id: 'ext_1', items: [] },
     }
     vi.spyOn(prisma.receipt, 'findUnique').mockResolvedValue(
-      readyReceipt as any,
+      readyReceipt as unknown as Receipt,
     )
     const updateSpy = vi.spyOn(prisma.receipt, 'update')
 
     const mockJob = {
       id: 'job_2',
       data: { receiptId: mockReceipt.id },
-    } as any
+    } as unknown as Job<ReceiptJobData, ReceiptJobResult>
 
     const result = await processReceiptJob(mockJob)
 
@@ -159,12 +163,12 @@ TỔNG CỘNG         80.000 VNĐ
     }
 
     vi.spyOn(prisma.receipt, 'findUnique').mockResolvedValue(
-      existingReceipt as any,
+      existingReceipt as unknown as Receipt,
     )
     const updateSpy = vi.spyOn(prisma.receipt, 'update').mockResolvedValue({
       ...existingReceipt,
       status: 'READY',
-    } as any)
+    } as unknown as Receipt)
 
     vi.spyOn(LocalStorageProvider.prototype, 'exists').mockResolvedValue(true)
     vi.spyOn(LocalStorageProvider.prototype, 'getFile').mockResolvedValue(
@@ -183,14 +187,14 @@ TỔNG CỘNG         80.000 VNĐ
       receiptItem: { deleteMany: mockDeleteItems },
       receipt: { update: updateSpy },
     }
-    vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) =>
-      cb(mockTx),
-    )
+    vi.spyOn(prisma, '$transaction').mockImplementation(((
+      cb: (tx: unknown) => Promise<unknown>,
+    ) => cb(mockTx)) as never)
 
     const mockJob = {
       id: 'job_reprocess',
       data: { receiptId: existingReceipt.id },
-    } as any
+    } as unknown as Job<ReceiptJobData, ReceiptJobResult>
 
     const result = await processReceiptJob(mockJob)
 
@@ -205,11 +209,13 @@ TỔNG CỘNG         80.000 VNĐ
   })
 
   it('marks receipt as FAILED when OCR provider throws an error', async () => {
-    vi.spyOn(prisma.receipt, 'findUnique').mockResolvedValue(mockReceipt as any)
+    vi.spyOn(prisma.receipt, 'findUnique').mockResolvedValue(
+      mockReceipt as unknown as Receipt,
+    )
     const updateSpy = vi.spyOn(prisma.receipt, 'update').mockResolvedValue({
       ...mockReceipt,
       status: 'FAILED',
-    } as any)
+    } as unknown as Receipt)
 
     vi.spyOn(LocalStorageProvider.prototype, 'exists').mockResolvedValue(true)
     vi.spyOn(LocalStorageProvider.prototype, 'getFile').mockResolvedValue(
@@ -224,7 +230,7 @@ TỔNG CỘNG         80.000 VNĐ
     const mockJob = {
       id: 'job_ocr_fail',
       data: { receiptId: mockReceipt.id },
-    } as any
+    } as unknown as Job<ReceiptJobData, ReceiptJobResult>
 
     await expect(processReceiptJob(mockJob)).rejects.toThrow(
       'Corrupted image data',

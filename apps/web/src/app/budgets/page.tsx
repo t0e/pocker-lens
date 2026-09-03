@@ -7,21 +7,15 @@ import {
   RotateCcw,
   Calendar,
   CreditCard,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
-  CheckCircle2,
-  Clock,
   Trash2,
   Edit2,
   Pause,
   Play,
   Copy,
   Loader2,
-  TrendingDown,
-  Layers,
-  ArrowRight,
   Info,
 } from 'lucide-react'
 import {
@@ -33,13 +27,7 @@ import {
   UpcomingOccurrenceResponse,
   SubscriptionSummaryResponse,
 } from '@pocketlens/shared'
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from '@/components/ui/Card'
+import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { BudgetModal } from '@/components/budgets/BudgetModal'
@@ -106,8 +94,10 @@ export default function BudgetsPage() {
         `/budgets?month=${currentMonth}`,
       )
       setBudgetsData(data)
-    } catch (err: any) {
-      setError(err.message || 'Failed to load budgets')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to load budgets'
+      setError(message)
     } finally {
       setIsLoading(false)
     }
@@ -121,8 +111,10 @@ export default function BudgetsPage() {
       const data =
         await apiClient<SubscriptionSummaryResponse>('/subscriptions')
       setSubscriptionsData(data)
-    } catch (err: any) {
-      setError(err.message || 'Failed to load subscriptions')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to load subscriptions'
+      setError(message)
     } finally {
       setIsLoading(false)
     }
@@ -137,8 +129,10 @@ export default function BudgetsPage() {
         '/recurring/upcoming?days=35',
       )
       setUpcomingList(data.upcoming || [])
-    } catch (err: any) {
-      setError(err.message || 'Failed to load upcoming payments')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to load upcoming payments'
+      setError(message)
     } finally {
       setIsLoading(false)
     }
@@ -153,8 +147,12 @@ export default function BudgetsPage() {
         recurringTransactions: RecurringTransactionResponse[]
       }>('/recurring')
       setRecurringList(data.recurringTransactions || [])
-    } catch (err: any) {
-      setError(err.message || 'Failed to load recurring transactions')
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to load recurring transactions'
+      setError(message)
     } finally {
       setIsLoading(false)
     }
@@ -217,8 +215,10 @@ export default function BudgetsPage() {
     try {
       await apiClient(`/budgets/${id}`, { method: 'DELETE' })
       fetchBudgets()
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete budget')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to delete budget'
+      alert(message)
     }
   }
 
@@ -233,7 +233,7 @@ export default function BudgetsPage() {
     const fromMonth = `${prevYear}-${String(prevMonth).padStart(2, '0')}`
 
     try {
-      const res: any = await apiClient('/budgets/copy', {
+      const res = await apiClient<{ message?: string }>('/budgets/copy', {
         method: 'POST',
         body: JSON.stringify({
           fromMonth,
@@ -242,8 +242,12 @@ export default function BudgetsPage() {
       })
       alert(res.message || 'Budgets copied successfully')
       fetchBudgets()
-    } catch (err: any) {
-      alert(err.message || 'Failed to copy budgets from previous month')
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to copy budgets from previous month'
+      alert(message)
     }
   }
 
@@ -258,8 +262,10 @@ export default function BudgetsPage() {
       })
       if (activeTab === 'subscriptions') fetchSubscriptions()
       else if (activeTab === 'recurring') fetchRecurring()
-    } catch (err: any) {
-      alert(err.message || 'Failed to update status')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to update status'
+      alert(message)
     }
   }
 
@@ -275,15 +281,22 @@ export default function BudgetsPage() {
       await apiClient(`/recurring/${id}`, { method: 'DELETE' })
       if (activeTab === 'subscriptions') fetchSubscriptions()
       else if (activeTab === 'recurring') fetchRecurring()
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete recurring transaction')
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to delete recurring transaction'
+      alert(message)
     }
   }
 
   const handleProcessDue = async () => {
     setIsProcessingDue(true)
     try {
-      const res: any = await apiClient('/recurring/process-due', {
+      const res = await apiClient<{
+        processedCount: number
+        generatedCount: number
+      }>('/recurring/process-due', {
         method: 'POST',
       })
       alert(
@@ -292,8 +305,12 @@ export default function BudgetsPage() {
       if (activeTab === 'upcoming') fetchUpcoming()
       else if (activeTab === 'recurring') fetchRecurring()
       else if (activeTab === 'subscriptions') fetchSubscriptions()
-    } catch (err: any) {
-      alert(err.message || 'Failed to process due recurring transactions')
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to process due recurring transactions'
+      alert(message)
     } finally {
       setIsProcessingDue(false)
     }
@@ -369,7 +386,12 @@ export default function BudgetsPage() {
           return (
             <button
               key={tab.value}
-              onClick={() => setActiveTab(tab.value as any)}
+              onClick={() =>
+                setActiveTab(
+                  tab.value as
+                    'budgets' | 'subscriptions' | 'upcoming' | 'recurring',
+                )
+              }
               className={`flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all whitespace-nowrap ${
                 isActive
                   ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-sm'

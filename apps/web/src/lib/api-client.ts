@@ -41,7 +41,7 @@ export async function apiClient<T>(
   }
 
   const contentType = response.headers.get('content-type')
-  let data: any
+  let data: unknown
   if (contentType && contentType.includes('application/json')) {
     data = await response.json()
   } else {
@@ -50,7 +50,12 @@ export async function apiClient<T>(
 
   if (!response.ok) {
     const errorMsg =
-      data?.message || response.statusText || 'An unexpected error occurred'
+      (typeof data === 'object' &&
+      data !== null &&
+      'message' in data &&
+      typeof (data as { message: unknown }).message === 'string'
+        ? (data as { message: string }).message
+        : response.statusText) || 'An unexpected error occurred'
     throw new ApiError(errorMsg, response.status, data)
   }
 

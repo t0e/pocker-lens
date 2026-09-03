@@ -27,6 +27,7 @@ import {
   getUpcomingOccurrences,
   calculateEstimatedMonthlyCost,
   getMonthBounds,
+  RecurrenceFrequency,
 } from '@pocketlens/shared'
 import { fxService } from './fx.js'
 
@@ -75,7 +76,7 @@ export async function getFinancialSummary(
   }
 
   // Group current period by type and currency (strictly excluding transfers)
-  const currentGroups: any[] = await (prisma.transaction.groupBy as any)({
+  const currentGroups = await prisma.transaction.groupBy({
     by: ['type', 'currency'],
     where: {
       userId,
@@ -91,23 +92,22 @@ export async function getFinancialSummary(
   })
 
   // Group previous period if available
-  let prevGroups: any[] = []
-  if (bounds.previous) {
-    prevGroups = await (prisma.transaction.groupBy as any)({
-      by: ['type', 'currency'],
-      where: {
-        userId,
-        type: { in: ['EXPENSE', 'INCOME'] },
-        transactionDate: {
-          gte: bounds.previous.start,
-          lte: bounds.previous.end,
+  const prevGroups = bounds.previous
+    ? await prisma.transaction.groupBy({
+        by: ['type', 'currency'],
+        where: {
+          userId,
+          type: { in: ['EXPENSE', 'INCOME'] },
+          transactionDate: {
+            gte: bounds.previous.start,
+            lte: bounds.previous.end,
+          },
+          ...(currencyFilter ? { currency: currencyFilter } : {}),
         },
-        ...(currencyFilter ? { currency: currencyFilter } : {}),
-      },
-      _sum: { amount: true },
-      _count: { id: true },
-    })
-  }
+        _sum: { amount: true },
+        _count: { id: true },
+      })
+    : []
 
   // Collect all currencies present in user accounts or current/previous groups
   const currenciesSet = new Set<string>()
@@ -390,7 +390,7 @@ export async function getCategoryBreakdown(
   }
 
   // Group current period expense by category
-  const currentCatGroups: any[] = await (prisma.transaction.groupBy as any)({
+  const currentCatGroups = await prisma.transaction.groupBy({
     by: ['categoryId'],
     where: {
       userId,
@@ -406,23 +406,22 @@ export async function getCategoryBreakdown(
   })
 
   // Group previous period if available
-  let prevCatGroups: any[] = []
-  if (bounds.previous) {
-    prevCatGroups = await (prisma.transaction.groupBy as any)({
-      by: ['categoryId'],
-      where: {
-        userId,
-        currency,
-        type: 'EXPENSE',
-        transactionDate: {
-          gte: bounds.previous.start,
-          lte: bounds.previous.end,
+  const prevCatGroups = bounds.previous
+    ? await prisma.transaction.groupBy({
+        by: ['categoryId'],
+        where: {
+          userId,
+          currency,
+          type: 'EXPENSE',
+          transactionDate: {
+            gte: bounds.previous.start,
+            lte: bounds.previous.end,
+          },
         },
-      },
-      _sum: { amount: true },
-      _count: { id: true },
-    })
-  }
+        _sum: { amount: true },
+        _count: { id: true },
+      })
+    : []
 
   // Fetch all relevant category details
   const categoryIds = new Set<string>()
@@ -526,7 +525,7 @@ export async function getMerchantBreakdown(
     daysElapsed,
   }
 
-  const merchantGroups = await (prisma.transaction.groupBy as any)({
+  const merchantGroups = await prisma.transaction.groupBy({
     by: ['merchant'],
     where: {
       userId,
@@ -880,7 +879,7 @@ export async function getBudgetPerformance(
   })
 
   // Calculate actual spending per category in month
-  const expenseGroups: any[] = await (prisma.transaction.groupBy as any)({
+  const expenseGroups = await prisma.transaction.groupBy({
     by: ['categoryId'],
     where: {
       userId,
@@ -1011,7 +1010,7 @@ export async function getCommitmentsSummary(
   subscriptions.forEach((sub) => {
     const monthlyCost = calculateEstimatedMonthlyCost(
       formatNumber(sub.amount),
-      sub.frequency as any,
+      sub.frequency as RecurrenceFrequency,
       sub.interval,
     )
     estimatedMonthlyCost += monthlyCost
@@ -1028,7 +1027,7 @@ export async function getCommitmentsSummary(
     const amount = formatNumber(r.amount)
     const frequency = (
       r.frequency ? r.frequency.toUpperCase() : 'MONTHLY'
-    ) as any
+    ) as RecurrenceFrequency
 
     const item = {
       id: r.id,
@@ -1080,7 +1079,7 @@ export async function getCommitmentsSummary(
       frequency: s.frequency,
       estimatedMonthlyCost: calculateEstimatedMonthlyCost(
         formatNumber(s.amount),
-        s.frequency as any,
+        s.frequency as RecurrenceFrequency,
         s.interval,
       ),
       nextRunDate: s.nextRunDate.toISOString(),

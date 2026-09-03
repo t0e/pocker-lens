@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { CURRENCY_CODES, CurrencyCode } from '../currency/index.js'
 
 export interface ExchangeRateDTO {
   baseCurrency: string

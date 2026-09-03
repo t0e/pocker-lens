@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createAccountSchema, updateAccountSchema } from './index.js'
+import { createAccountSchema } from './index.js'
 import { isValidCurrencyCode, getCurrencyMeta } from '../currency/index.js'
 
 describe('Account & Currency Validation', () => {

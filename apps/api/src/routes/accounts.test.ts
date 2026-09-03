@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { Prisma, User, Account } from '@prisma/client'
 import { buildApp } from '../app.js'
 import { prisma } from '../db/client.js'
 import * as authService from '../auth/service.js'
-import { Prisma } from '@prisma/client'
 
 describe('Accounts Endpoints (/accounts/*)', () => {
   let app: ReturnType<typeof buildApp>
@@ -27,7 +27,9 @@ describe('Accounts Endpoints (/accounts/*)', () => {
     vi.restoreAllMocks()
     app = buildApp()
     // Default mock auth to User A
-    vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any)
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(
+      userA as unknown as User,
+    )
   })
 
   describe('POST /accounts', () => {
@@ -47,10 +49,12 @@ describe('Accounts Endpoints (/accounts/*)', () => {
         updatedAt: new Date(),
       }
 
-      vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) => {
-        return cb(prisma)
-      })
-      vi.spyOn(prisma.account, 'create').mockResolvedValue(mockCreated as any)
+      vi.spyOn(prisma, '$transaction').mockImplementation(((
+        cb: (tx: unknown) => Promise<unknown>,
+      ) => cb(prisma)) as never)
+      vi.spyOn(prisma.account, 'create').mockResolvedValue(
+        mockCreated as unknown as Account,
+      )
 
       const res = await app.inject({
         method: 'POST',
@@ -97,11 +101,13 @@ describe('Accounts Endpoints (/accounts/*)', () => {
         updatedAt: new Date(),
       }
 
-      vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) => {
-        return cb(prisma)
-      })
+      vi.spyOn(prisma, '$transaction').mockImplementation(((
+        cb: (tx: unknown) => Promise<unknown>,
+      ) => cb(prisma)) as never)
       vi.spyOn(prisma.account, 'updateMany').mockResolvedValue({ count: 0 })
-      vi.spyOn(prisma.account, 'create').mockResolvedValue(mockCreated as any)
+      vi.spyOn(prisma.account, 'create').mockResolvedValue(
+        mockCreated as unknown as Account,
+      )
 
       const res = await app.inject({
         method: 'POST',
@@ -158,7 +164,7 @@ describe('Accounts Endpoints (/accounts/*)', () => {
   })
 
   describe('GET /accounts', () => {
-    it('lists only non-archived accounts belonging to authenticated user by default', async () => {
+    it('returns only active accounts by default', async () => {
       const mockAccounts = [
         {
           id: 'acc_1',
@@ -166,7 +172,7 @@ describe('Accounts Endpoints (/accounts/*)', () => {
           name: 'Cash Wallet',
           type: 'CASH',
           currency: 'USD',
-          openingBalance: new Prisma.Decimal('150.00'),
+          openingBalance: new Prisma.Decimal('100.00'),
           currentBalance: new Prisma.Decimal('150.00'),
           isArchived: false,
           isDefault: true,
@@ -177,7 +183,7 @@ describe('Accounts Endpoints (/accounts/*)', () => {
 
       const findManySpy = vi
         .spyOn(prisma.account, 'findMany')
-        .mockResolvedValue(mockAccounts as any)
+        .mockResolvedValue(mockAccounts as unknown as Account[])
 
       const res = await app.inject({
         method: 'GET',
@@ -227,7 +233,7 @@ describe('Accounts Endpoints (/accounts/*)', () => {
       ]
 
       vi.spyOn(prisma.account, 'findMany').mockResolvedValue(
-        mockAccounts as any,
+        mockAccounts as unknown as Account[],
       )
 
       const res = await app.inject({
@@ -346,7 +352,9 @@ describe('Accounts Endpoints (/accounts/*)', () => {
 
     it('Inverse check: User B cannot access User A’s account (returns 404)', async () => {
       // Mock session to User B
-      vi.spyOn(authService, 'validateSession').mockResolvedValue(userB as any)
+      vi.spyOn(authService, 'validateSession').mockResolvedValue(
+        userB as unknown as User,
+      )
       vi.spyOn(prisma.account, 'findFirst').mockResolvedValue(null)
 
       const res = await app.inject({
@@ -386,7 +394,7 @@ describe('Accounts Endpoints (/accounts/*)', () => {
         }
 
         vi.spyOn(prisma.account, 'findFirst').mockResolvedValue(
-          mockAccount as any,
+          mockAccount as unknown as Account,
         )
 
         const res = await app.inject({

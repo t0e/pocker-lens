@@ -4,12 +4,7 @@ import path from 'node:path'
 import os from 'node:os'
 import crypto from 'node:crypto'
 import { OCRProvider, OCRResult } from '@pocketlens/shared'
-import {
-  preprocessForOCR,
-  ImageQuality,
-  CandidateImage,
-  OCRDebugInfo,
-} from './preprocess.js'
+import { preprocessForOCR, ImageQuality, OCRDebugInfo } from './preprocess.js'
 
 export interface EnhancedOCRResult extends OCRResult {
   quality: ImageQuality
@@ -253,7 +248,10 @@ export class LocalOCRProvider implements OCRProvider {
     this.timeoutMs = timeoutMs
   }
 
-  async extractText(imageBuffer: Buffer, mimeType: string): Promise<OCRResult> {
+  async extractText(
+    imageBuffer: Buffer,
+    _mimeType: string,
+  ): Promise<OCRResult> {
     const startTime = Date.now()
     const jobId = crypto.randomUUID()
     const tempDir = path.join(os.tmpdir(), `pocketlens-ocr-${jobId}`)

@@ -9,7 +9,6 @@ import {
   AlertCircle,
   Loader2,
   CheckCircle2,
-  FileText,
 } from 'lucide-react'
 import {
   MAX_RECEIPT_FILE_SIZE,
@@ -44,7 +43,9 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
     setError(null)
 
     // Validate MIME type
-    if (!ALLOWED_RECEIPT_MIME_TYPES.includes(file.type as any)) {
+    if (
+      !(ALLOWED_RECEIPT_MIME_TYPES as readonly string[]).includes(file.type)
+    ) {
       setError(
         `Unsupported file type: ${file.type}. Please upload JPEG, PNG, or WebP.`,
       )
@@ -113,8 +114,10 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
       handleClear()
       onSuccess()
       onClose()
-    } catch (err: any) {
-      setError(err.message || 'Failed to upload receipt')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to upload receipt'
+      setError(message)
     } finally {
       setIsUploading(false)
     }

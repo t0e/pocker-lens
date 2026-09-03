@@ -55,7 +55,7 @@ export async function createSession(
   try {
     const ttlSeconds = config.SESSION_EXPIRY_DAYS * 24 * 60 * 60
     await redis.setex(`${SESSION_PREFIX}${token}`, ttlSeconds, userId)
-  } catch (redisErr) {
+  } catch {
     // Redis cache failure is non-fatal; database remains source of truth
   }
 
@@ -113,7 +113,7 @@ export async function validateSession(token: string): Promise<User | null> {
     }
 
     return session.user
-  } catch (error) {
+  } catch {
     return null
   }
 }

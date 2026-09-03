@@ -146,8 +146,12 @@ export const RecurringModal: React.FC<RecurringModalProps> = ({
 
       onSuccess()
       onClose()
-    } catch (err: any) {
-      setError(err.message || 'Failed to save recurring transaction')
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to save recurring transaction'
+      setError(message)
     } finally {
       setIsSubmitting(false)
     }

@@ -30,7 +30,9 @@ describe('Worker Recurring Scheduler (Phase 7)', () => {
   it('processes due recurring items and creates financial transaction and occurrence', async () => {
     vi.spyOn(prisma.recurringTransaction, 'findMany').mockResolvedValue([
       sampleRecurring,
-    ] as any)
+    ] as unknown as Awaited<
+      ReturnType<typeof prisma.recurringTransaction.findMany>
+    >)
 
     const mockCreateTx = vi.fn().mockResolvedValue({ id: 'tx_sched_1' })
     const mockUpdateAccount = vi.fn().mockResolvedValue({})
@@ -49,9 +51,9 @@ describe('Worker Recurring Scheduler (Phase 7)', () => {
       recurringTransaction: { update: mockUpdateRec },
     }
 
-    vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) =>
-      cb(mockTx),
-    )
+    vi.spyOn(prisma, '$transaction').mockImplementation(((
+      cb: (tx: unknown) => Promise<unknown>,
+    ) => cb(mockTx)) as never)
 
     const result = await runRecurringScheduler(
       new Date('2026-08-02T00:00:00.000Z'),
@@ -71,10 +73,16 @@ describe('Worker Recurring Scheduler (Phase 7)', () => {
     }
     vi.spyOn(prisma.recurringTransaction, 'findMany').mockResolvedValue([
       archivedRecurring,
-    ] as any)
+    ] as unknown as Awaited<
+      ReturnType<typeof prisma.recurringTransaction.findMany>
+    >)
     const updateSpy = vi
       .spyOn(prisma.recurringTransaction, 'update')
-      .mockResolvedValue({} as any)
+      .mockResolvedValue(
+        {} as unknown as Awaited<
+          ReturnType<typeof prisma.recurringTransaction.update>
+        >,
+      )
 
     const result = await runRecurringScheduler(
       new Date('2026-08-02T00:00:00.000Z'),

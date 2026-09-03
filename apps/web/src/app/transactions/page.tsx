@@ -2,13 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import {
-  Plus,
   ArrowDownLeft,
   ArrowUpRight,
   ArrowLeftRight,
-  Filter,
-  Calendar,
-  Layers,
   Edit2,
   Trash2,
   RotateCcw,
@@ -27,7 +23,6 @@ import {
   Zap,
   Plane,
   Sparkles,
-  CircleEllipsis,
   Banknote,
   Briefcase,
   Award,
@@ -38,18 +33,11 @@ import {
 } from 'lucide-react'
 import {
   TransactionResponse,
-  TransactionType,
   AccountResponse,
   CategoryResponse,
   PaginatedTransactionsResponse,
 } from '@pocketlens/shared'
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from '@/components/ui/Card'
+import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { TransactionModal } from '@/components/transactions/TransactionModal'
 import { apiClient } from '@/lib/api-client'
@@ -90,7 +78,7 @@ export default function TransactionsPage() {
         ])
         setAccounts(accs)
         setCategories(cats)
-      } catch (err: any) {
+      } catch (err) {
         console.error('Failed to load accounts or categories:', err)
       }
     }
@@ -130,8 +118,10 @@ export default function TransactionsPage() {
       setTransactions(data.transactions)
       setTotalPages(data.pagination.totalPages)
       setTotalCount(data.pagination.total)
-    } catch (err: any) {
-      setError(err.message || 'Failed to load transactions')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to load transactions'
+      setError(message)
     } finally {
       setIsLoading(false)
     }
@@ -207,8 +197,10 @@ export default function TransactionsPage() {
     try {
       await apiClient(`/transactions/${tx.id}`, { method: 'DELETE' })
       await fetchTransactions()
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete transaction')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to delete transaction'
+      alert(message)
     }
   }
 

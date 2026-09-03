@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { User, Category } from '@prisma/client'
+import { CategoryResponse } from '@pocketlens/shared'
 import { buildApp } from '../app.js'
 import { prisma } from '../db/client.js'
 import * as authService from '../auth/service.js'
@@ -17,7 +19,9 @@ describe('Categories Endpoints (/categories)', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     app = buildApp()
-    vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any)
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(
+      userA as unknown as User,
+    )
   })
 
   it('GET /categories lists system and user custom categories', async () => {
@@ -47,7 +51,7 @@ describe('Categories Endpoints (/categories)', () => {
     ]
 
     vi.spyOn(prisma.category, 'findMany').mockResolvedValue(
-      mockCategories as any,
+      mockCategories as unknown as Category[],
     )
 
     const res = await app.inject({
@@ -81,7 +85,7 @@ describe('Categories Endpoints (/categories)', () => {
     ]
 
     vi.spyOn(prisma.category, 'findMany').mockResolvedValue(
-      mockCategories as any,
+      mockCategories as unknown as Category[],
     )
 
     const res = await app.inject({
@@ -131,7 +135,7 @@ describe('Categories Endpoints (/categories)', () => {
     ]
 
     vi.spyOn(prisma.category, 'findMany').mockResolvedValue(
-      mockCategories as any,
+      mockCategories as unknown as Category[],
     )
 
     const res = await app.inject({
@@ -144,9 +148,9 @@ describe('Categories Endpoints (/categories)', () => {
     const body = JSON.parse(res.body)
     expect(Array.isArray(body)).toBe(true)
     // Only system categories, no other user's custom categories
-    expect(body.every((c: any) => c.isSystem || c.userId === userA.id)).toBe(
-      true,
-    )
+    expect(
+      body.every((c: CategoryResponse) => c.isSystem || c.userId === userA.id),
+    ).toBe(true)
   })
 
   it('POST /categories creates a custom category for authenticated user', async () => {
@@ -163,7 +167,9 @@ describe('Categories Endpoints (/categories)', () => {
     }
 
     vi.spyOn(prisma.category, 'findFirst').mockResolvedValue(null)
-    vi.spyOn(prisma.category, 'create').mockResolvedValue(mockCreated as any)
+    vi.spyOn(prisma.category, 'create').mockResolvedValue(
+      mockCreated as unknown as Category,
+    )
 
     const res = await app.inject({
       method: 'POST',
@@ -188,7 +194,7 @@ describe('Categories Endpoints (/categories)', () => {
     vi.spyOn(prisma.category, 'findFirst').mockResolvedValue({
       id: 'existing_cat',
       name: 'Board Games',
-    } as any)
+    } as unknown as Category)
 
     const res = await app.inject({
       method: 'POST',

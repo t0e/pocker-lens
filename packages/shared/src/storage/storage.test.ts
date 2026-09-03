@@ -55,7 +55,9 @@ describe('LocalStorageProvider', () => {
   it('should prevent path traversal attempts', async () => {
     const maliciousKey = '../../etc/passwd'
     // Path resolution normalizes and contains inside base path, or throws error
-    const fullPath = (provider as any).getFullPath(maliciousKey)
+    const fullPath = (provider as LocalStorageProvider).getFullPath(
+      maliciousKey,
+    )
     expect(fullPath.startsWith(tempDir)).toBe(true)
   })
 })

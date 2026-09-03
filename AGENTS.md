@@ -34,6 +34,7 @@ If information already belongs clearly in one document, avoid duplicating it in 
 `docs/PROJECT_PROGRESS.md` represents the current state of the project, not a daily development diary.
 
 **Update `docs/PROJECT_PROGRESS.md` ONLY when:**
+
 - A feature is added or removed.
 - Significant functionality changes.
 - An important bug is fixed.
@@ -42,6 +43,7 @@ If information already belongs clearly in one document, avoid duplicating it in 
 - Meaningful active work is completed.
 
 **Do NOT update `docs/PROJECT_PROGRESS.md` for:**
+
 - Formatting-only changes.
 - Prettier changes.
 - Simple variable/function renaming.
@@ -78,6 +80,7 @@ Always keep `docs/PROJECT_PROGRESS.md` concise.
 Names must describe their domain purpose.
 
 Avoid vague names such as:
+
 - `data`
 - `item`
 - `thing`
@@ -88,6 +91,7 @@ Avoid vague names such as:
 - `temp`
 
 Prefer domain-specific names:
+
 - `transactions`
 - `receipt`
 - `account`

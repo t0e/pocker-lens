@@ -3,30 +3,16 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import {
   Camera,
-  Upload,
-  Sparkles,
   Loader2,
   AlertCircle,
-  FileText,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
   RotateCcw,
-  Trash2,
   Eye,
   ChevronLeft,
   ChevronRight,
   Receipt,
-  Layers,
 } from 'lucide-react'
 import { ReceiptResponse, PaginatedReceiptsResponse } from '@pocketlens/shared'
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from '@/components/ui/Card'
+import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { ReceiptUploadModal } from '@/components/receipts/ReceiptUploadModal'
@@ -71,9 +57,11 @@ export default function ReceiptsPage() {
         setReceipts(data.receipts)
         setTotalPages(data.pagination.totalPages)
         setTotalCount(data.pagination.total)
-      } catch (err: any) {
+      } catch (err) {
         if (!isPolling) {
-          setError(err.message || 'Failed to load receipts')
+          const message =
+            err instanceof Error ? err.message : 'Failed to load receipts'
+          setError(message)
         }
       } finally {
         if (!isPolling) setIsLoading(false)
@@ -123,8 +111,10 @@ export default function ReceiptsPage() {
       setIsDetailModalOpen(false)
       setSelectedReceipt(null)
       await fetchReceipts()
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete receipt')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to delete receipt'
+      alert(message)
     }
   }
 
@@ -135,8 +125,10 @@ export default function ReceiptsPage() {
       if (selectedReceipt && selectedReceipt.id === id) {
         setIsDetailModalOpen(false)
       }
-    } catch (err: any) {
-      alert(err.message || 'Failed to retry receipt')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to retry receipt'
+      alert(message)
     }
   }
 

@@ -1,10 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '../db/client.js'
-import {
-  ConvertedAmountResult,
-  ExchangeRateDTO,
-  FIXTURE_USD_RATES,
-} from '@pocketlens/shared'
+import { ConvertedAmountResult, FIXTURE_USD_RATES } from '@pocketlens/shared'
 
 export interface IFXProvider {
   name: string

@@ -1,7 +1,6 @@
 'use client'
 
-import React from 'react'
-import { Globe, User, Shield, Server, LogOut, CheckCircle2 } from 'lucide-react'
+import { User, Shield, LogOut } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
   Card,

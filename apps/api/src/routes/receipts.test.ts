@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { User, Receipt, Account, Category } from '@prisma/client'
+import { Queue } from 'bullmq'
 import { buildApp } from '../app.js'
 import { prisma } from '../db/client.js'
 import * as authService from '../auth/service.js'
@@ -61,36 +63,35 @@ describe('Receipts Endpoints (/receipts - Phase 6)', () => {
         updatedAt: new Date(),
       },
     ],
-    category: { id: 'cat_food', name: 'Food & Drink' },
-    account: { id: 'acc_cash', name: 'Cash' },
   }
 
   const sampleReceipt = {
     id: 'receipt_123',
     userId: userA.id,
-    originalFilename: 'highlands-receipt.jpg',
+    originalFilename: 'highlands.jpg',
     storageKey: 'receipts/user_A_id/receipt_123.jpg',
+    storagePath: '/tmp/receipts/user_A_id/receipt_123.jpg',
     mimeType: 'image/jpeg',
-    fileSize: 1024,
+    fileSize: 10240,
     status: 'READY',
     errorCode: null,
     errorMessage: null,
     transactionId: null,
-    processingStartedAt: new Date(),
-    processingCompletedAt: new Date(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    processingStartedAt: new Date('2026-08-24T12:00:00.000Z'),
+    processingCompletedAt: new Date('2026-08-24T12:00:05.000Z'),
+    createdAt: new Date('2026-08-24T12:00:00.000Z'),
+    updatedAt: new Date('2026-08-24T12:00:05.000Z'),
     extraction: sampleExtraction,
   }
 
   const sampleAccount = {
     id: 'acc_cash',
     userId: userA.id,
-    name: 'Cash Wallet',
+    name: 'Cash',
     type: 'CASH',
     currency: 'VND',
-    openingBalance: '1000000',
-    currentBalance: '1000000',
+    openingBalance: '500000',
+    currentBalance: '500000',
     isArchived: false,
     isDefault: true,
     createdAt: new Date(),
@@ -100,7 +101,9 @@ describe('Receipts Endpoints (/receipts - Phase 6)', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     app = buildApp()
-    vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any)
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(
+      userA as unknown as User,
+    )
   })
 
   describe('GET /receipts (List Receipts with Extractions)', () => {
@@ -108,7 +111,7 @@ describe('Receipts Endpoints (/receipts - Phase 6)', () => {
       vi.spyOn(prisma.receipt, 'count').mockResolvedValue(1)
       vi.spyOn(prisma.receipt, 'findMany').mockResolvedValue([
         sampleReceipt,
-      ] as any)
+      ] as unknown as Receipt[])
 
       const res = await app.inject({
         method: 'GET',
@@ -130,7 +133,7 @@ describe('Receipts Endpoints (/receipts - Phase 6)', () => {
   describe('GET /receipts/:id/extraction', () => {
     it('returns extraction draft details', async () => {
       vi.spyOn(prisma.receipt, 'findFirst').mockResolvedValue(
-        sampleReceipt as any,
+        sampleReceipt as unknown as Receipt,
       )
 
       const res = await app.inject({
@@ -163,15 +166,15 @@ describe('Receipts Endpoints (/receipts - Phase 6)', () => {
   describe('POST /receipts/:id/confirm (Create Transaction from Receipt)', () => {
     it('creates transaction, adjusts account balance, links receipt, and updates extraction status', async () => {
       vi.spyOn(prisma.receipt, 'findFirst').mockResolvedValue(
-        sampleReceipt as any,
+        sampleReceipt as unknown as Receipt,
       )
       vi.spyOn(prisma.account, 'findFirst').mockResolvedValue(
-        sampleAccount as any,
+        sampleAccount as unknown as Account,
       )
       vi.spyOn(prisma.category, 'findFirst').mockResolvedValue({
         id: 'cat_food',
         name: 'Food & Drink',
-      } as any)
+      } as unknown as Category)
 
       const createdTransaction = {
         id: 'tx_confirmed_1',
@@ -205,19 +208,17 @@ describe('Receipts Endpoints (/receipts - Phase 6)', () => {
         account: { update: vi.fn().mockResolvedValue({}) },
         transaction: { create: vi.fn().mockResolvedValue(createdTransaction) },
         receipt: {
-          update: vi
-            .fn()
-            .mockResolvedValue({
-              ...sampleReceipt,
-              transactionId: 'tx_confirmed_1',
-            }),
+          update: vi.fn().mockResolvedValue({
+            ...sampleReceipt,
+            transactionId: 'tx_confirmed_1',
+          }),
         },
         receiptExtraction: { update: vi.fn().mockResolvedValue({}) },
       }
 
-      vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) =>
-        cb(mockTx),
-      )
+      vi.spyOn(prisma, '$transaction').mockImplementation(((
+        cb: (tx: unknown) => Promise<unknown>,
+      ) => cb(mockTx)) as never)
 
       const res = await app.inject({
         method: 'POST',
@@ -254,7 +255,7 @@ describe('Receipts Endpoints (/receipts - Phase 6)', () => {
         transactionId: 'tx_already_created',
       }
       vi.spyOn(prisma.receipt, 'findFirst').mockResolvedValue(
-        alreadyConfirmedReceipt as any,
+        alreadyConfirmedReceipt as unknown as Receipt,
       )
 
       const res = await app.inject({
@@ -280,16 +281,16 @@ describe('Receipts Endpoints (/receipts - Phase 6)', () => {
   describe('POST /receipts/:id/reprocess', () => {
     it('re-enqueues receipt for extraction when not confirmed', async () => {
       vi.spyOn(prisma.receipt, 'findFirst').mockResolvedValue(
-        sampleReceipt as any,
+        sampleReceipt as unknown as Receipt,
       )
       vi.spyOn(prisma.receipt, 'update').mockResolvedValue({
         ...sampleReceipt,
         status: 'QUEUED',
-      } as any)
+      } as unknown as Receipt)
 
       const mockQueue = { add: vi.fn().mockResolvedValue({}) }
       vi.spyOn(queueService, 'getReceiptQueue').mockReturnValue(
-        mockQueue as any,
+        mockQueue as unknown as Queue,
       )
 
       const res = await app.inject({
@@ -310,7 +311,7 @@ describe('Receipts Endpoints (/receipts - Phase 6)', () => {
         transactionId: 'tx_existing',
       }
       vi.spyOn(prisma.receipt, 'findFirst').mockResolvedValue(
-        confirmedReceipt as any,
+        confirmedReceipt as unknown as Receipt,
       )
 
       const res = await app.inject({
@@ -355,11 +356,11 @@ describe('Receipts Endpoints (/receipts - Phase 6)', () => {
   describe('DELETE /receipts/:id', () => {
     it('successfully deletes a receipt and unlinks file', async () => {
       vi.spyOn(prisma.receipt, 'findFirst').mockResolvedValue(
-        sampleReceipt as any,
+        sampleReceipt as unknown as Receipt,
       )
       const deleteSpy = vi
         .spyOn(prisma.receipt, 'delete')
-        .mockResolvedValue(sampleReceipt as any)
+        .mockResolvedValue(sampleReceipt as unknown as Receipt)
 
       const res = await app.inject({
         method: 'DELETE',
@@ -376,7 +377,7 @@ describe('Receipts Endpoints (/receipts - Phase 6)', () => {
     it('rejects deleting a receipt currently in PROCESSING status with 400', async () => {
       const processingReceipt = { ...sampleReceipt, status: 'PROCESSING' }
       vi.spyOn(prisma.receipt, 'findFirst').mockResolvedValue(
-        processingReceipt as any,
+        processingReceipt as unknown as Receipt,
       )
 
       const res = await app.inject({

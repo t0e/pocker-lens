@@ -11,12 +11,7 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
-  Calendar,
-  Tag,
-  Building,
-  FileText,
   CornerDownLeft,
-  HelpCircle,
 } from 'lucide-react'
 import {
   TransactionResponse,
@@ -25,7 +20,6 @@ import {
   CategoryResponse,
   CreateTransactionInput,
   ParseTransactionResult,
-  ParsedTransactionDraft,
   CategorySuggestionResponse,
   DuplicateMatch,
   DuplicateCheckResult,
@@ -219,8 +213,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       if (p.description) setDescription(p.description)
       if (p.merchant) setMerchant(p.merchant)
       if (p.transactionDate) setDate(p.transactionDate.split('T')[0])
-    } catch (err: any) {
-      setError(err.message || 'Failed to parse transaction input')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to parse transaction input'
+      setError(message)
     } finally {
       setIsParsing(false)
     }
@@ -332,8 +328,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
       onSuccess()
       onClose()
-    } catch (err: any) {
-      setError(err.message || 'Failed to save transaction')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to save transaction'
+      setError(message)
     } finally {
       setIsSubmitting(false)
     }

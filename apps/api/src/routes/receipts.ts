@@ -1,6 +1,14 @@
 import { FastifyPluginAsync } from 'fastify'
 import crypto from 'node:crypto'
-import { Prisma } from '@prisma/client'
+import {
+  Prisma,
+  Receipt,
+  ReceiptExtraction,
+  ReceiptItem,
+  Category,
+  Account,
+  TransactionType as PrismaTransactionType,
+} from '@prisma/client'
 import {
   ReceiptResponse,
   ReceiptStatus,
@@ -11,6 +19,7 @@ import {
   ALLOWED_RECEIPT_MIME_TYPES,
   validateImageMagicBytes,
   ConfirmReceiptDraftSchema,
+  FieldConfidences,
 } from '@pocketlens/shared'
 import { createStorageProvider } from '@pocketlens/shared/server'
 import { prisma } from '../db/client.js'
@@ -24,10 +33,14 @@ const storage = createStorageProvider({
 })
 
 export function formatExtractionResponse(
-  extraction: any,
+  extraction: ReceiptExtraction & {
+    items?: ReceiptItem[]
+    category?: Category | null
+    account?: Account | null
+  },
 ): ReceiptExtractionResponse {
   const items: ReceiptItemResponse[] = (extraction.items || []).map(
-    (item: any) => ({
+    (item: ReceiptItem) => ({
       id: item.id,
       extractionId: item.extractionId,
       description: item.description,
@@ -54,14 +67,15 @@ export function formatExtractionResponse(
     }),
   )
 
-  const fieldConfidences = extraction.fieldConfidences || {
-    merchant: 'none',
-    transactionDate: 'none',
-    totalAmount: 'none',
-    currency: 'none',
-    category: 'none',
-    account: 'none',
-  }
+  const fieldConfidences: FieldConfidences =
+    (extraction.fieldConfidences as unknown as FieldConfidences) || {
+      merchant: 'none',
+      transactionDate: 'none',
+      totalAmount: 'none',
+      currency: 'none',
+      category: 'none',
+      account: 'none',
+    }
 
   return {
     id: extraction.id,
@@ -105,7 +119,17 @@ export function formatExtractionResponse(
   }
 }
 
-export function formatReceiptResponse(receipt: any): ReceiptResponse {
+export function formatReceiptResponse(
+  receipt: Receipt & {
+    extraction?:
+      | (ReceiptExtraction & {
+          items?: ReceiptItem[]
+          category?: Category | null
+          account?: Account | null
+        })
+      | null
+  },
+): ReceiptResponse {
   return {
     id: receipt.id,
     userId: receipt.userId,
@@ -174,7 +198,11 @@ export const receiptRoutes: FastifyPluginAsync = async (fastify) => {
     const providedMimeType = data.mimetype
 
     // 1. Validate MIME Type against allowed list
-    if (!ALLOWED_RECEIPT_MIME_TYPES.includes(providedMimeType as any)) {
+    if (
+      !(ALLOWED_RECEIPT_MIME_TYPES as readonly string[]).includes(
+        providedMimeType,
+      )
+    ) {
       return reply.status(400).send({
         statusCode: 400,
         error: 'Bad Request',
@@ -314,13 +342,16 @@ export const receiptRoutes: FastifyPluginAsync = async (fastify) => {
     )
     const skip = (page - 1) * limit
 
-    const where: any = {
+    const where: Prisma.ReceiptWhereInput = {
       userId,
       ...(query.status &&
       ['uploaded', 'queued', 'processing', 'ready', 'failed'].includes(
         query.status,
       )
-        ? { status: query.status.toUpperCase() }
+        ? {
+            status:
+              query.status.toUpperCase() as Prisma.ReceiptWhereInput['status'],
+          }
         : {}),
     }
 
@@ -528,7 +559,7 @@ export const receiptRoutes: FastifyPluginAsync = async (fastify) => {
           const transaction = await tx.transaction.create({
             data: {
               userId,
-              type: type as any,
+              type: type as PrismaTransactionType,
               accountId,
               categoryId: categoryId || null,
               amount: amountDecimal,

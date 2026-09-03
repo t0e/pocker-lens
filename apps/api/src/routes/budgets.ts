@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify'
-import { Prisma } from '@prisma/client'
+import { Prisma, Budget, Category } from '@prisma/client'
 import {
   CreateBudgetSchema,
   UpdateBudgetSchema,
@@ -12,7 +12,10 @@ import {
 } from '@pocketlens/shared'
 import { prisma } from '../db/client.js'
 
-export function formatBudgetResponse(budget: any, spent = 0): BudgetResponse {
+export function formatBudgetResponse(
+  budget: Budget & { category?: Category | null },
+  spent = 0,
+): BudgetResponse {
   const amount = parseFloat(budget.amount.toString())
   const remaining = amount - spent
   const percentage = amount > 0 ? (spent / amount) * 100 : 0

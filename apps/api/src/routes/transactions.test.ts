@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { Prisma, User, Account, Category, Transaction } from '@prisma/client'
+import { CurrencyMonthlySummary } from '@pocketlens/shared'
 import { buildApp } from '../app.js'
 import { prisma } from '../db/client.js'
 import * as authService from '../auth/service.js'
-import { Prisma } from '@prisma/client'
 
 describe('Transactions Endpoints (/transactions)', () => {
   let app: ReturnType<typeof buildApp>
@@ -11,14 +12,6 @@ describe('Transactions Endpoints (/transactions)', () => {
     id: 'user_A_id',
     email: 'userA@example.com',
     displayName: 'User A',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }
-
-  const userB = {
-    id: 'user_B_id',
-    email: 'userB@example.com',
-    displayName: 'User B',
     createdAt: new Date(),
     updatedAt: new Date(),
   }
@@ -92,7 +85,9 @@ describe('Transactions Endpoints (/transactions)', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     app = buildApp()
-    vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any)
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(
+      userA as unknown as User,
+    )
   })
 
   describe('POST /transactions/parse (Phase 4 Natural Language Parsing)', () => {
@@ -100,11 +95,11 @@ describe('Transactions Endpoints (/transactions)', () => {
       vi.spyOn(prisma.account, 'findMany').mockResolvedValue([
         bankAccount,
         cashAccount,
-      ] as any)
+      ] as unknown as Account[])
       vi.spyOn(prisma.category, 'findMany').mockResolvedValue([
         foodCategory,
         salaryCategory,
-      ] as any)
+      ] as unknown as Category[])
       vi.spyOn(prisma.transaction, 'findMany').mockResolvedValue([])
     })
 
@@ -194,29 +189,27 @@ describe('Transactions Endpoints (/transactions)', () => {
   describe('Accounting Lifecycle: Expense', () => {
     it('creates expense and decreases account balance correctly', async () => {
       vi.spyOn(prisma.account, 'findFirst').mockResolvedValue(
-        bankAccount as any,
+        bankAccount as unknown as Account,
       )
-      vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) =>
-        cb(prisma),
-      )
+      vi.spyOn(prisma, '$transaction').mockImplementation(((
+        cb: (tx: unknown) => Promise<unknown>,
+      ) => cb(prisma)) as never)
 
       const accountUpdateSpy = vi
         .spyOn(prisma.account, 'update')
-        .mockResolvedValue(bankAccount as any)
-      const txCreateSpy = vi
-        .spyOn(prisma.transaction, 'create')
-        .mockResolvedValue({
-          id: 'tx_exp_1',
-          userId: userA.id,
-          type: 'EXPENSE',
-          accountId: bankAccount.id,
-          amount: new Prisma.Decimal('200000'),
-          currency: 'VND',
-          transactionDate: new Date(),
-          description: 'Groceries',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        } as any)
+        .mockResolvedValue(bankAccount as unknown as Account)
+      vi.spyOn(prisma.transaction, 'create').mockResolvedValue({
+        id: 'tx_exp_1',
+        userId: userA.id,
+        type: 'EXPENSE',
+        accountId: bankAccount.id,
+        amount: new Prisma.Decimal('200000'),
+        currency: 'VND',
+        transactionDate: new Date(),
+        description: 'Groceries',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as Transaction)
 
       const res = await app.inject({
         method: 'POST',
@@ -254,17 +247,17 @@ describe('Transactions Endpoints (/transactions)', () => {
       }
 
       vi.spyOn(prisma.transaction, 'findFirst').mockResolvedValue(
-        existingTx as any,
+        existingTx as unknown as Transaction,
       )
-      vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) =>
-        cb(prisma),
-      )
+      vi.spyOn(prisma, '$transaction').mockImplementation(((
+        cb: (tx: unknown) => Promise<unknown>,
+      ) => cb(prisma)) as never)
       const accountUpdateSpy = vi
         .spyOn(prisma.account, 'update')
-        .mockResolvedValue(bankAccount as any)
+        .mockResolvedValue(bankAccount as unknown as Account)
       const txDeleteSpy = vi
         .spyOn(prisma.transaction, 'delete')
-        .mockResolvedValue(existingTx as any)
+        .mockResolvedValue(existingTx as unknown as Transaction)
 
       const res = await app.inject({
         method: 'DELETE',
@@ -286,15 +279,15 @@ describe('Transactions Endpoints (/transactions)', () => {
   describe('Accounting Lifecycle: Income', () => {
     it('creates income and increases account balance', async () => {
       vi.spyOn(prisma.account, 'findFirst').mockResolvedValue(
-        bankAccount as any,
+        bankAccount as unknown as Account,
       )
-      vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) =>
-        cb(prisma),
-      )
+      vi.spyOn(prisma, '$transaction').mockImplementation(((
+        cb: (tx: unknown) => Promise<unknown>,
+      ) => cb(prisma)) as never)
 
       const accountUpdateSpy = vi
         .spyOn(prisma.account, 'update')
-        .mockResolvedValue(bankAccount as any)
+        .mockResolvedValue(bankAccount as unknown as Account)
       vi.spyOn(prisma.transaction, 'create').mockResolvedValue({
         id: 'tx_inc_1',
         userId: userA.id,
@@ -306,7 +299,7 @@ describe('Transactions Endpoints (/transactions)', () => {
         description: 'Salary Bonus',
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as any)
+      } as unknown as Transaction)
 
       const res = await app.inject({
         method: 'POST',
@@ -335,15 +328,15 @@ describe('Transactions Endpoints (/transactions)', () => {
   describe('Accounting Lifecycle: Transfers', () => {
     it('creates transfer from Bank to Cash: debits Bank and credits Cash atomically', async () => {
       vi.spyOn(prisma.account, 'findFirst')
-        .mockResolvedValueOnce(bankAccount as any) // Source
-        .mockResolvedValueOnce(cashAccount as any) // Destination
+        .mockResolvedValueOnce(bankAccount as unknown as Account) // Source
+        .mockResolvedValueOnce(cashAccount as unknown as Account) // Destination
 
-      vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) =>
-        cb(prisma),
-      )
+      vi.spyOn(prisma, '$transaction').mockImplementation(((
+        cb: (tx: unknown) => Promise<unknown>,
+      ) => cb(prisma)) as never)
       const accountUpdateSpy = vi
         .spyOn(prisma.account, 'update')
-        .mockResolvedValue(bankAccount as any)
+        .mockResolvedValue(bankAccount as unknown as Account)
       vi.spyOn(prisma.transaction, 'create').mockResolvedValue({
         id: 'tx_transfer_1',
         userId: userA.id,
@@ -356,7 +349,7 @@ describe('Transactions Endpoints (/transactions)', () => {
         description: 'ATM Withdrawal',
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as any)
+      } as unknown as Transaction)
 
       const res = await app.inject({
         method: 'POST',
@@ -396,8 +389,8 @@ describe('Transactions Endpoints (/transactions)', () => {
 
     it('rejects cross-currency transfers (e.g. VND to USD) with 400', async () => {
       vi.spyOn(prisma.account, 'findFirst')
-        .mockResolvedValueOnce(bankAccount as any) // VND
-        .mockResolvedValueOnce(usdAccount as any) // USD
+        .mockResolvedValueOnce(bankAccount as unknown as Account) // VND
+        .mockResolvedValueOnce(usdAccount as unknown as Account) // USD
 
       const res = await app.inject({
         method: 'POST',
@@ -430,16 +423,16 @@ describe('Transactions Endpoints (/transactions)', () => {
       }
 
       vi.spyOn(prisma.transaction, 'findFirst').mockResolvedValue(
-        existingTransfer as any,
+        existingTransfer as unknown as Transaction,
       )
-      vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) =>
-        cb(prisma),
-      )
+      vi.spyOn(prisma, '$transaction').mockImplementation(((
+        cb: (tx: unknown) => Promise<unknown>,
+      ) => cb(prisma)) as never)
       const accountUpdateSpy = vi
         .spyOn(prisma.account, 'update')
-        .mockResolvedValue(bankAccount as any)
+        .mockResolvedValue(bankAccount as unknown as Account)
       vi.spyOn(prisma.transaction, 'delete').mockResolvedValue(
-        existingTransfer as any,
+        existingTransfer as unknown as Transaction,
       )
 
       const res = await app.inject({
@@ -503,7 +496,7 @@ describe('Transactions Endpoints (/transactions)', () => {
 
       const findManySpy = vi
         .spyOn(prisma.transaction, 'findMany')
-        .mockResolvedValue(mockMonthlyTransactions as any)
+        .mockResolvedValue(mockMonthlyTransactions as unknown as Transaction[])
 
       const res = await app.inject({
         method: 'GET',
@@ -525,12 +518,16 @@ describe('Transactions Endpoints (/transactions)', () => {
         }),
       )
 
-      const vndSummary = body.summaries.find((s: any) => s.currency === 'VND')
+      const vndSummary = body.summaries.find(
+        (s: CurrencyMonthlySummary) => s.currency === 'VND',
+      )
       expect(vndSummary.income).toBe('10000000')
       expect(vndSummary.expense).toBe('2000000')
       expect(vndSummary.net).toBe('8000000')
 
-      const usdSummary = body.summaries.find((s: any) => s.currency === 'USD')
+      const usdSummary = body.summaries.find(
+        (s: CurrencyMonthlySummary) => s.currency === 'USD',
+      )
       expect(usdSummary.income).toBe('500')
       expect(usdSummary.expense).toBe('100')
       expect(usdSummary.net).toBe('400')
@@ -574,7 +571,7 @@ describe('Transactions Endpoints (/transactions)', () => {
 
     it('User A cannot transfer from User A to User B’s account (destination not found -> 404)', async () => {
       vi.spyOn(prisma.account, 'findFirst')
-        .mockResolvedValueOnce(bankAccount as any) // Source found for User A
+        .mockResolvedValueOnce(bankAccount as unknown as Account) // Source found for User A
         .mockResolvedValueOnce(null) // Dest belongs to User B, not found for User A
 
       const res = await app.inject({
@@ -599,11 +596,15 @@ describe('Transactions Endpoints (/transactions)', () => {
   describe('Money Precision & Decimals Survival', () => {
     it('accurately computes and stores exact decimal precision without floating-point artifacts', async () => {
       const precisionAmount = '123456789.99'
-      vi.spyOn(prisma.account, 'findFirst').mockResolvedValue(usdAccount as any)
-      vi.spyOn(prisma.account, 'update').mockResolvedValue(usdAccount as any)
-      vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) =>
-        cb(prisma),
+      vi.spyOn(prisma.account, 'findFirst').mockResolvedValue(
+        usdAccount as unknown as Account,
       )
+      vi.spyOn(prisma.account, 'update').mockResolvedValue(
+        usdAccount as unknown as Account,
+      )
+      vi.spyOn(prisma, '$transaction').mockImplementation(((
+        cb: (tx: unknown) => Promise<unknown>,
+      ) => cb(prisma)) as never)
 
       vi.spyOn(prisma.transaction, 'create').mockResolvedValue({
         id: 'tx_prec',
@@ -616,7 +617,7 @@ describe('Transactions Endpoints (/transactions)', () => {
         description: 'Large Precision Income',
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as any)
+      } as unknown as Transaction)
 
       const res = await app.inject({
         method: 'POST',

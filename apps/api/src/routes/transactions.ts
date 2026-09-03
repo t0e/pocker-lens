@@ -2,8 +2,9 @@ import { FastifyPluginAsync } from 'fastify'
 import {
   Prisma,
   Transaction,
+  Account,
+  Category,
   TransactionType as PrismaTransactionType,
-  CategoryType as PrismaCategoryType,
 } from '@prisma/client'
 import {
   createTransactionSchema,
@@ -15,13 +16,18 @@ import {
   CurrencyMonthlySummary,
   RuleBasedParser,
   ParserUserContext,
-  ParseTransactionResult,
 } from '@pocketlens/shared'
 import { prisma } from '../db/client.js'
 import { formatAccountResponse } from './accounts.js'
 import { formatCategoryResponse } from './categories.js'
 
-export function formatTransactionResponse(tx: any): TransactionResponse {
+export function formatTransactionResponse(
+  tx: Transaction & {
+    account?: Account | null
+    transferAccount?: Account | null
+    category?: Category | null
+  },
+): TransactionResponse {
   return {
     id: tx.id,
     userId: tx.userId,
@@ -401,7 +407,7 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
       })
     }
 
-    let destinationAccount: any = null
+    let destinationAccount: Account | null = null
     if (type === 'transfer') {
       if (!transferAccountId) {
         return reply.status(400).send({
@@ -508,14 +514,16 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
           },
         })
 
-        await tx.account.update({
-          where: { id: destinationAccount.id },
-          data: {
-            currentBalance: {
-              increment: amountDecimal,
+        if (destinationAccount) {
+          await tx.account.update({
+            where: { id: destinationAccount.id },
+            data: {
+              currentBalance: {
+                increment: amountDecimal,
+              },
             },
-          },
-        })
+          })
+        }
       }
 
       // 2. Insert transaction record
@@ -608,7 +616,7 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
         })
       }
 
-      let destinationAccount: any = null
+      let destinationAccount: Account | null = null
       if (newType === 'TRANSFER') {
         if (!newTransferAccountId) {
           return reply.status(400).send({

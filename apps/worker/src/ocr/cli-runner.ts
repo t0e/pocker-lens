@@ -9,7 +9,7 @@
  *   node cli-runner.js <imagePath> <languages>
  */
 
-import { createWorker } from 'tesseract.js'
+import { createWorker, PSM } from 'tesseract.js'
 
 async function main() {
   const imagePath = process.argv[2]
@@ -20,12 +20,12 @@ async function main() {
     process.exit(1)
   }
 
-  let worker: any = null
+  let worker: Awaited<ReturnType<typeof createWorker>> | null = null
 
   try {
     worker = await createWorker(languages, 1, {})
     await worker.setParameters({
-      tessedit_pageseg_mode: '6',
+      tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
     })
 
     const ret = await worker.recognize(imagePath)
@@ -41,7 +41,7 @@ async function main() {
     // Write result JSON to stdout for parent process to read
     process.stdout.write(JSON.stringify(result))
     process.exit(0)
-  } catch (err: any) {
+  } catch (err) {
     if (worker) {
       try {
         await worker.terminate()
@@ -49,12 +49,14 @@ async function main() {
         /* ignore */
       }
     }
-    console.error(JSON.stringify({ error: err.message || String(err) }))
+    const message = err instanceof Error ? err.message : String(err)
+    console.error(JSON.stringify({ error: message }))
     process.exit(1)
   }
 }
 
 main().catch((err) => {
-  console.error(JSON.stringify({ error: err.message || String(err) }))
+  const message = err instanceof Error ? err.message : String(err)
+  console.error(JSON.stringify({ error: message }))
   process.exit(1)
 })

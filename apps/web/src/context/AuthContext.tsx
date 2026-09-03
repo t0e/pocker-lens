@@ -8,7 +8,7 @@ import React, {
   useCallback,
 } from 'react'
 import { UserResponse, LoginInput, RegisterInput } from '@pocketlens/shared'
-import { apiClient, ApiError } from '@/lib/api-client'
+import { apiClient } from '@/lib/api-client'
 
 interface AuthContextType {
   user: UserResponse | null

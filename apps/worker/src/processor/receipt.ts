@@ -8,6 +8,7 @@ import {
   OCRProvider,
 } from '@pocketlens/shared'
 import { createStorageProvider } from '@pocketlens/shared/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '../db/client.js'
 import { config } from '../config/env.js'
 import { LocalOCRProvider, EnhancedOCRResult } from '../ocr/local.js'
@@ -220,7 +221,8 @@ export async function processReceiptJob(
           rawText: extracted.rawText,
           detectedLanguage: extracted.detectedLanguage,
           confidence: extracted.confidence,
-          fieldConfidences: fieldConfidencesWithQuality as any,
+          fieldConfidences:
+            fieldConfidencesWithQuality as Prisma.InputJsonValue,
           status: 'PENDING_REVIEW',
           items: {
             create: extracted.items.map((item) => ({
@@ -273,10 +275,11 @@ export async function processReceiptJob(
       success: true,
       processedAt: new Date().toISOString(),
     }
-  } catch (err: any) {
+  } catch (err) {
     const durationMs = Date.now() - startTime
+    const message = err instanceof Error ? err.message : String(err)
     logger.error(
-      { err: err.message, receiptId, durationMs, mem: getMemoryStats() },
+      { err: message, receiptId, durationMs, mem: getMemoryStats() },
       'receipt.failed',
     )
 

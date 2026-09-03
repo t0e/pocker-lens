@@ -96,8 +96,10 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
 
       onSuccess()
       onClose()
-    } catch (err: any) {
-      setError(err.message || 'Failed to save budget')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to save budget'
+      setError(message)
     } finally {
       setIsSubmitting(false)
     }

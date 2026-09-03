@@ -1,5 +1,11 @@
 import { FastifyPluginAsync } from 'fastify'
-import { Prisma } from '@prisma/client'
+import {
+  Prisma,
+  RecurringTransaction,
+  Account,
+  Category,
+  TransactionType as PrismaTransactionType,
+} from '@prisma/client'
 import {
   CreateRecurringTransactionSchema,
   UpdateRecurringTransactionSchema,
@@ -8,13 +14,16 @@ import {
   SubscriptionSummaryResponse,
   calculateEstimatedMonthlyCost,
   getUpcomingOccurrences,
-  calculateNextRunDate,
+  RecurrenceFrequency,
 } from '@pocketlens/shared'
 import { prisma } from '../db/client.js'
 import { processDueRecurringTransactions } from '../services/recurring.js'
 
 export function formatRecurringResponse(
-  recurring: any,
+  recurring: RecurringTransaction & {
+    account?: Account | null
+    category?: Category | null
+  },
 ): RecurringTransactionResponse {
   const amount = parseFloat(recurring.amount.toString())
   const estimatedMonthlyCost = calculateEstimatedMonthlyCost(
@@ -26,7 +35,7 @@ export function formatRecurringResponse(
   return {
     id: recurring.id,
     userId: recurring.userId,
-    type: recurring.type,
+    type: recurring.type as 'EXPENSE' | 'INCOME',
     accountId: recurring.accountId,
     accountName: recurring.account ? recurring.account.name : 'Unknown Account',
     categoryId: recurring.categoryId,
@@ -78,12 +87,12 @@ export const recurringRoutes: FastifyPluginAsync = async (fastify) => {
     }
     const userId = request.user.id
 
-    const where: any = { userId }
+    const where: Prisma.RecurringTransactionWhereInput = { userId }
     if (query.isSubscription !== undefined) {
       where.isSubscription = query.isSubscription === 'true'
     }
     if (query.type && ['EXPENSE', 'INCOME'].includes(query.type)) {
-      where.type = query.type
+      where.type = query.type as PrismaTransactionType
     }
     if (query.isActive !== undefined) {
       where.isActive = query.isActive === 'true'
@@ -133,7 +142,8 @@ export const recurringRoutes: FastifyPluginAsync = async (fastify) => {
           description: rec.description,
           amount: parseFloat(rec.amount.toString()),
           currency: rec.currency,
-          type: rec.type as any,
+          type: (rec.type ? rec.type.toUpperCase() : 'EXPENSE') as
+            'EXPENSE' | 'INCOME',
           accountId: rec.accountId,
           accountName: rec.account ? rec.account.name : 'Unknown Account',
           categoryId: rec.categoryId,
@@ -142,7 +152,7 @@ export const recurringRoutes: FastifyPluginAsync = async (fastify) => {
           startDate: rec.startDate,
           nextRunDate: rec.nextRunDate,
           endDate: rec.endDate,
-          frequency: rec.frequency as any,
+          frequency: rec.frequency as RecurrenceFrequency,
           interval: rec.interval,
           isActive: rec.isActive,
           isSubscription: rec.isSubscription,
@@ -310,13 +320,13 @@ export const recurringRoutes: FastifyPluginAsync = async (fastify) => {
     const created = await prisma.recurringTransaction.create({
       data: {
         userId,
-        type: type as any,
+        type: type as PrismaTransactionType,
         accountId,
         categoryId: categoryId || null,
         amount: new Prisma.Decimal(amount),
         currency,
         description,
-        frequency: frequency as any,
+        frequency: frequency as RecurrenceFrequency,
         interval,
         startDate: start,
         nextRunDate: nextRun,
@@ -366,7 +376,7 @@ export const recurringRoutes: FastifyPluginAsync = async (fastify) => {
         })
       }
 
-      const data: any = {}
+      const data: Prisma.RecurringTransactionUpdateInput = {}
       const payload = parseResult.data
 
       if (payload.accountId) {
@@ -380,7 +390,7 @@ export const recurringRoutes: FastifyPluginAsync = async (fastify) => {
             message: 'Selected account not found',
           })
         }
-        data.accountId = payload.accountId
+        data.account = { connect: { id: payload.accountId } }
       }
 
       if (payload.categoryId !== undefined) {
@@ -399,9 +409,9 @@ export const recurringRoutes: FastifyPluginAsync = async (fastify) => {
               message: 'Selected category not found',
             })
           }
-          data.categoryId = payload.categoryId
+          data.category = { connect: { id: payload.categoryId } }
         } else {
-          data.categoryId = null
+          data.category = { disconnect: true }
         }
       }
 
@@ -411,9 +421,10 @@ export const recurringRoutes: FastifyPluginAsync = async (fastify) => {
       if (payload.description !== undefined)
         data.description = payload.description
       if (payload.frequency !== undefined)
-        data.frequency = payload.frequency as any
+        data.frequency = payload.frequency as RecurrenceFrequency
       if (payload.interval !== undefined) data.interval = payload.interval
-      if (payload.type !== undefined) data.type = payload.type as any
+      if (payload.type !== undefined)
+        data.type = payload.type as PrismaTransactionType
       if (payload.startDate !== undefined)
         data.startDate = new Date(payload.startDate)
       if (payload.nextRunDate !== undefined)

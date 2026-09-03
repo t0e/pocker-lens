@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client'
 import pino from 'pino'
-import { calculateNextRunDate } from '@pocketlens/shared'
+import { calculateNextRunDate, RecurrenceFrequency } from '@pocketlens/shared'
 import { prisma } from '../db/client.js'
 import { config } from '../config/env.js'
 
@@ -67,7 +67,7 @@ export async function runRecurringScheduler(
     const nextRun = calculateNextRunDate(
       recurring.startDate,
       scheduledFor,
-      recurring.frequency as any,
+      recurring.frequency as RecurrenceFrequency,
       recurring.interval,
     )
 
@@ -181,9 +181,10 @@ export async function runRecurringScheduler(
           'Generated recurring transaction successfully',
         )
       }
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
       logger.error(
-        { err: err.message, recurringId: recurring.id },
+        { err: message, recurringId: recurring.id },
         'Failed to process recurring transaction item',
       )
       skippedCount++

@@ -11,7 +11,7 @@ export class LocalStorageProvider implements StorageProvider {
     this.basePath = path.resolve(basePath)
   }
 
-  private getFullPath(key: string): string {
+  public getFullPath(key: string): string {
     // Prevent path traversal
     const safeKey = path.normalize(key).replace(/^(\.\.(\/|\\|$))+/, '')
     const resolvedPath = path.resolve(this.basePath, safeKey)

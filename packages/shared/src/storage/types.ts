@@ -1,4 +1,4 @@
-import { StorageConfig, StorageProviderType } from '../types/index.js'
+import { StorageProviderType } from '../types/index.js'
 
 export interface StorageSaveResult {
   path: string

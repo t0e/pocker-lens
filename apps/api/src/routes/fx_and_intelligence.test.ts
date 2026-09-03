@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { User } from '@prisma/client'
 import { buildApp } from '../app.js'
 import { prisma } from '../db/client.js'
 import * as authService from '../auth/service.js'
@@ -22,7 +23,9 @@ describe('Phase 9: FX & Smart Intelligence Routes', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     app = buildApp()
-    vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any)
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(
+      userA as unknown as User,
+    )
   })
 
   describe('Exchange Rates & FX Service', () => {
@@ -58,7 +61,9 @@ describe('Phase 9: FX & Smart Intelligence Routes', () => {
     })
 
     it('GET /fx/reporting-currency returns current reporting currency', async () => {
-      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue(userA as any)
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue(
+        userA as unknown as User,
+      )
 
       const res = await app.inject({
         method: 'GET',
@@ -74,7 +79,7 @@ describe('Phase 9: FX & Smart Intelligence Routes', () => {
       vi.spyOn(prisma.user, 'update').mockResolvedValue({
         ...userA,
         reportingCurrency: 'USD',
-      } as any)
+      } as unknown as User)
 
       const res = await app.inject({
         method: 'POST',

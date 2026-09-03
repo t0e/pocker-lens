@@ -463,8 +463,6 @@ export function extractLineItems(
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
-    const prevLine = i > 0 ? lines[i - 1] : ''
-    const nextLine = i < lines.length - 1 ? lines[i + 1] : ''
 
     if (
       HEADER_IGNORE_REGEX.test(line) ||

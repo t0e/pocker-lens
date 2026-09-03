@@ -248,7 +248,7 @@ export class RuleBasedParser implements TransactionInputParser {
   // --- Amount & Multipliers Parsing ---
   private extractAmountAndCurrency(
     text: string,
-    context: ParserUserContext,
+    _context: ParserUserContext,
   ): {
     amount: string | null
     currency: string | null
@@ -415,8 +415,16 @@ export class RuleBasedParser implements TransactionInputParser {
     // Alias / Type keyword matching (e.g. "cash", "tien mat", "vcb", "vietcombank", "bank")
     for (const acc of activeAccounts) {
       const accType = acc.type.toLowerCase()
-      const enAliases = (enDictionary.accountTypeKeywords as any)[accType] || []
-      const viAliases = (viDictionary.accountTypeKeywords as any)[accType] || []
+      const enKeywords = enDictionary.accountTypeKeywords as Record<
+        string,
+        string[]
+      >
+      const viKeywords = viDictionary.accountTypeKeywords as Record<
+        string,
+        string[]
+      >
+      const enAliases = enKeywords[accType] || []
+      const viAliases = viKeywords[accType] || []
       const allAliases = [...enAliases, ...viAliases]
 
       for (const alias of allAliases) {
@@ -501,10 +509,16 @@ export class RuleBasedParser implements TransactionInputParser {
     if (!sourceAcc || !destAcc) {
       for (const acc of activeAccounts) {
         const accType = acc.type.toLowerCase()
-        const enAliases =
-          (enDictionary.accountTypeKeywords as any)[accType] || []
-        const viAliases =
-          (viDictionary.accountTypeKeywords as any)[accType] || []
+        const enKeywords = enDictionary.accountTypeKeywords as Record<
+          string,
+          string[]
+        >
+        const viKeywords = viDictionary.accountTypeKeywords as Record<
+          string,
+          string[]
+        >
+        const enAliases = enKeywords[accType] || []
+        const viAliases = viKeywords[accType] || []
         const aliases = [...enAliases, ...viAliases]
 
         for (const alias of aliases) {

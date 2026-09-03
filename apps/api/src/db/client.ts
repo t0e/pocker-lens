@@ -13,7 +13,7 @@ export async function checkDatabaseHealth(): Promise<
   try {
     await prisma.$queryRaw`SELECT 1`
     return 'connected'
-  } catch (error) {
+  } catch {
     return 'error'
   }
 }

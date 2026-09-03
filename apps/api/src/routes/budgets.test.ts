@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { User, Budget, Category, Prisma } from '@prisma/client'
 import { buildApp } from '../app.js'
 import { prisma } from '../db/client.js'
 import * as authService from '../auth/service.js'
@@ -42,7 +43,7 @@ describe('Budgets Endpoints (/budgets - Phase 7)', () => {
     id: 'budget_1',
     userId: userA.id,
     categoryId: 'cat_food',
-    amount: '3000000',
+    amount: new Prisma.Decimal('3000000'),
     currency: 'VND',
     month: '2026-08',
     createdAt: new Date(),
@@ -53,23 +54,34 @@ describe('Budgets Endpoints (/budgets - Phase 7)', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     app = buildApp()
-    vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any)
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(
+      userA as unknown as User,
+    )
   })
 
   describe('GET /budgets', () => {
     it('returns monthly budgets with aggregated spent, remaining, percentage and summary', async () => {
       vi.spyOn(prisma.budget, 'findMany').mockResolvedValue([
         sampleBudget,
-      ] as any)
+      ] as unknown as (Budget & { category: Category })[])
 
       // Mock aggregated expenses of 2,450,000 VND in Food & Drink
-      vi.spyOn(prisma.transaction as any, 'groupBy').mockResolvedValue([
+      vi.spyOn(
+        prisma.transaction as {
+          groupBy: (...args: unknown[]) => Promise<unknown>
+        },
+        'groupBy',
+      ).mockResolvedValue([
         {
           categoryId: 'cat_food',
           currency: 'VND',
-          _sum: { amount: '2450000' },
+          _sum: { amount: new Prisma.Decimal('2450000') },
+          _count: { id: 1 },
+          _avg: { amount: null },
+          _min: { amount: null },
+          _max: { amount: null },
         },
-      ] as any)
+      ] as unknown as ReturnType<typeof prisma.transaction.groupBy>)
 
       const res = await app.inject({
         method: 'GET',
@@ -100,15 +112,24 @@ describe('Budgets Endpoints (/budgets - Phase 7)', () => {
     it('returns OVER_BUDGET status and overBudgetAmount when spending exceeds budget', async () => {
       vi.spyOn(prisma.budget, 'findMany').mockResolvedValue([
         sampleBudget,
-      ] as any)
+      ] as unknown as (Budget & { category: Category })[])
 
-      vi.spyOn(prisma.transaction as any, 'groupBy').mockResolvedValue([
+      vi.spyOn(
+        prisma.transaction as {
+          groupBy: (...args: unknown[]) => Promise<unknown>
+        },
+        'groupBy',
+      ).mockResolvedValue([
         {
           categoryId: 'cat_food',
           currency: 'VND',
-          _sum: { amount: '3250000' },
+          _sum: { amount: new Prisma.Decimal('3250000') },
+          _count: { id: 1 },
+          _avg: { amount: null },
+          _min: { amount: null },
+          _max: { amount: null },
         },
-      ] as any)
+      ] as unknown as ReturnType<typeof prisma.transaction.groupBy>)
 
       const res = await app.inject({
         method: 'GET',
@@ -139,13 +160,24 @@ describe('Budgets Endpoints (/budgets - Phase 7)', () => {
   describe('POST /budgets', () => {
     it('creates a new budget for an expense category', async () => {
       vi.spyOn(prisma.category, 'findFirst').mockResolvedValue(
-        sampleFoodCategory as any,
+        sampleFoodCategory as unknown as Category,
       )
       vi.spyOn(prisma.budget, 'findUnique').mockResolvedValue(null)
-      vi.spyOn(prisma.budget, 'create').mockResolvedValue(sampleBudget as any)
-      vi.spyOn(prisma.transaction, 'aggregate').mockResolvedValue({
-        _sum: { amount: '0' },
-      } as any)
+      vi.spyOn(prisma.budget, 'create').mockResolvedValue(
+        sampleBudget as unknown as Budget,
+      )
+      vi.spyOn(
+        prisma.transaction as {
+          aggregate: (...args: unknown[]) => Promise<unknown>
+        },
+        'aggregate',
+      ).mockResolvedValue({
+        _sum: { amount: new Prisma.Decimal('0') },
+        _count: { id: 0 },
+        _avg: { amount: null },
+        _min: { amount: null },
+        _max: { amount: null },
+      } as unknown as ReturnType<typeof prisma.transaction.aggregate>)
 
       const res = await app.inject({
         method: 'POST',
@@ -167,7 +199,7 @@ describe('Budgets Endpoints (/budgets - Phase 7)', () => {
 
     it('rejects creating budget for INCOME category with 400', async () => {
       vi.spyOn(prisma.category, 'findFirst').mockResolvedValue(
-        sampleSalaryCategory as any,
+        sampleSalaryCategory as unknown as Category,
       )
 
       const res = await app.inject({
@@ -189,10 +221,10 @@ describe('Budgets Endpoints (/budgets - Phase 7)', () => {
 
     it('rejects duplicate budget for same user/category/currency/month with 409 Conflict', async () => {
       vi.spyOn(prisma.category, 'findFirst').mockResolvedValue(
-        sampleFoodCategory as any,
+        sampleFoodCategory as unknown as Category,
       )
       vi.spyOn(prisma.budget, 'findUnique').mockResolvedValue(
-        sampleBudget as any,
+        sampleBudget as unknown as Budget,
       )
 
       const res = await app.inject({
@@ -214,15 +246,24 @@ describe('Budgets Endpoints (/budgets - Phase 7)', () => {
   describe('PATCH /budgets/:id', () => {
     it('updates budget amount and recalculates progress', async () => {
       vi.spyOn(prisma.budget, 'findFirst').mockResolvedValue(
-        sampleBudget as any,
+        sampleBudget as unknown as Budget,
       )
       vi.spyOn(prisma.budget, 'update').mockResolvedValue({
         ...sampleBudget,
-        amount: '4000000',
-      } as any)
-      vi.spyOn(prisma.transaction, 'aggregate').mockResolvedValue({
-        _sum: { amount: '2000000' },
-      } as any)
+        amount: new Prisma.Decimal('4000000'),
+      } as unknown as Budget)
+      vi.spyOn(
+        prisma.transaction as {
+          aggregate: (...args: unknown[]) => Promise<unknown>
+        },
+        'aggregate',
+      ).mockResolvedValue({
+        _sum: { amount: new Prisma.Decimal('2000000') },
+        _count: { id: 1 },
+        _avg: { amount: null },
+        _min: { amount: null },
+        _max: { amount: null },
+      } as unknown as ReturnType<typeof prisma.transaction.aggregate>)
 
       const res = await app.inject({
         method: 'PATCH',
@@ -246,11 +287,11 @@ describe('Budgets Endpoints (/budgets - Phase 7)', () => {
   describe('DELETE /budgets/:id', () => {
     it('deletes budget cleanly', async () => {
       vi.spyOn(prisma.budget, 'findFirst').mockResolvedValue(
-        sampleBudget as any,
+        sampleBudget as unknown as Budget,
       )
       const deleteSpy = vi
         .spyOn(prisma.budget, 'delete')
-        .mockResolvedValue(sampleBudget as any)
+        .mockResolvedValue(sampleBudget as unknown as Budget)
 
       const res = await app.inject({
         method: 'DELETE',
@@ -266,16 +307,20 @@ describe('Budgets Endpoints (/budgets - Phase 7)', () => {
   describe('POST /budgets/copy', () => {
     it('copies budgets from previous month to target month', async () => {
       vi.spyOn(prisma.budget, 'findMany')
-        .mockResolvedValueOnce([sampleBudget] as any) // Source month budgets
-        .mockResolvedValueOnce([] as any) // Target month existing budgets (none)
+        .mockResolvedValueOnce([sampleBudget] as unknown as (Budget & {
+          category: Category
+        })[]) // Source month budgets
+        .mockResolvedValueOnce(
+          [] as unknown as (Budget & { category: Category })[],
+        ) // Target month existing budgets (none)
 
       const mockCreate = vi.fn().mockResolvedValue({
         ...sampleBudget,
         id: 'budget_new_month',
         month: '2026-09',
       })
-      vi.spyOn(prisma, '$transaction').mockImplementation(async (list: any) =>
-        Promise.all(list),
+      vi.spyOn(prisma, '$transaction').mockImplementation(
+        async (list: unknown) => Promise.all(list as Promise<unknown>[]),
       )
       vi.spyOn(prisma.budget, 'create').mockImplementation(mockCreate)
 

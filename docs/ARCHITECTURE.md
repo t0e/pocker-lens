@@ -108,18 +108,18 @@ pocket-lens/
 
 ## 3. Technology Stack
 
-| Layer | Technologies |
-| :--- | :--- |
-| **Runtime & Language** | Node.js 20 LTS, TypeScript 5.4+ (strict mode across all packages) |
-| **Monorepo Manager** | npm workspaces |
-| **Backend API** | Fastify v4 (`@fastify/cors`, `@fastify/cookie`, `@fastify/helmet`, `@fastify/multipart`, `@fastify/sensible`), Pino |
-| **Frontend UI** | Next.js 14 (App Router, React 18), Tailwind CSS, Lucide React |
-| **Database & ORM** | PostgreSQL 16, Prisma ORM v5 |
-| **Task Queue & Caching** | Redis 7, BullMQ v5 |
-| **OCR Engine** | Tesseract.js (local OCR with `eng` and `vie` language packs) |
-| **Validation** | Zod (shared across frontend, API, and worker) |
-| **Testing** | Vitest across all workspaces |
-| **Orchestration** | Docker, Docker Compose |
+| Layer                    | Technologies                                                                                                        |
+| :----------------------- | :------------------------------------------------------------------------------------------------------------------ |
+| **Runtime & Language**   | Node.js 20 LTS, TypeScript 5.4+ (strict mode across all packages)                                                   |
+| **Monorepo Manager**     | npm workspaces                                                                                                      |
+| **Backend API**          | Fastify v4 (`@fastify/cors`, `@fastify/cookie`, `@fastify/helmet`, `@fastify/multipart`, `@fastify/sensible`), Pino |
+| **Frontend UI**          | Next.js 14 (App Router, React 18), Tailwind CSS, Lucide React                                                       |
+| **Database & ORM**       | PostgreSQL 16, Prisma ORM v5                                                                                        |
+| **Task Queue & Caching** | Redis 7, BullMQ v5                                                                                                  |
+| **OCR Engine**           | Tesseract.js (local OCR with `eng` and `vie` language packs)                                                        |
+| **Validation**           | Zod (shared across frontend, API, and worker)                                                                       |
+| **Testing**              | Vitest across all workspaces                                                                                        |
+| **Orchestration**        | Docker, Docker Compose                                                                                              |
 
 ---
 

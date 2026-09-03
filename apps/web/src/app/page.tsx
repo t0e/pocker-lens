@@ -15,7 +15,6 @@ import {
   ReceiptText,
   PieChart,
   Calendar,
-  Loader2,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
@@ -28,13 +27,14 @@ import {
 import { Button } from '@/components/ui/Button'
 import {
   AccountResponse,
-  AccountType,
   TransactionResponse,
   CategoryResponse,
   MonthlyFinancialSummaryResponse,
   PaginatedTransactionsResponse,
   MonthlyBudgetsResponse,
   UpcomingOccurrenceResponse,
+  convertCurrency,
+  formatCurrencyAmount,
 } from '@pocketlens/shared'
 import { TransactionModal } from '@/components/transactions/TransactionModal'
 import { apiClient } from '@/lib/api-client'
@@ -42,7 +42,6 @@ import { formatMoney } from '@/lib/utils'
 
 import { ReportingCurrencySelector } from '@/components/fx/ReportingCurrencySelector'
 import { DataQualityCard } from '@/components/intelligence/DataQualityCard'
-import { convertCurrency, formatCurrencyAmount } from '@pocketlens/shared'
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -51,7 +50,7 @@ export default function DashboardPage() {
   const [recentTransactions, setRecentTransactions] = useState<
     TransactionResponse[]
   >([])
-  const [monthlySummary, setMonthlySummary] =
+  const [_monthlySummary, setMonthlySummary] =
     useState<MonthlyFinancialSummaryResponse | null>(null)
   const [monthlyBudgets, setMonthlyBudgets] =
     useState<MonthlyBudgetsResponse | null>(null)

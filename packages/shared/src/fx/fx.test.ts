@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  convertCurrency,
-  formatCurrencyAmount,
-  FIXTURE_USD_RATES,
-} from './index.js'
+import { convertCurrency, formatCurrencyAmount } from './index.js'
 
 describe('FX & Currency Utilities', () => {
   it('should return same amount for identical source and target currency', () => {

@@ -32,7 +32,6 @@ import {
   AccountType,
   ACCOUNT_TYPES,
   SUPPORTED_CURRENCIES,
-  CreateAccountInput,
 } from '@pocketlens/shared'
 import { apiClient } from '@/lib/api-client'
 import { formatMoney } from '@/lib/utils'
@@ -73,8 +72,10 @@ export default function AccountsPage() {
         `/accounts?includeArchived=${includeArchived}`,
       )
       setAccounts(data)
-    } catch (err: any) {
-      setError(err.message || 'Failed to load accounts')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to load accounts'
+      setError(message)
     } finally {
       setIsLoading(false)
     }
@@ -120,8 +121,10 @@ export default function AccountsPage() {
       })
       setIsCreateOpen(false)
       await fetchAccounts()
-    } catch (err: any) {
-      setError(err.message || 'Failed to create account')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to create account'
+      setError(message)
     } finally {
       setIsSubmitting(false)
     }
@@ -145,8 +148,10 @@ export default function AccountsPage() {
       })
       setEditingAccount(null)
       await fetchAccounts()
-    } catch (err: any) {
-      setError(err.message || 'Failed to update account')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to update account'
+      setError(message)
     } finally {
       setIsSubmitting(false)
     }
@@ -165,8 +170,10 @@ export default function AccountsPage() {
         })
       }
       await fetchAccounts()
-    } catch (err: any) {
-      alert(err.message || 'Failed to update archive status')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to update archive status'
+      alert(message)
     }
   }
 

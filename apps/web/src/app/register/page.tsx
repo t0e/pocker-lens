@@ -45,8 +45,9 @@ export default function RegisterPage() {
     try {
       await register({ displayName, email, password })
       router.push('/')
-    } catch (err: any) {
-      setError(err.message || 'Registration failed')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Registration failed'
+      setError(message)
     } finally {
       setIsSubmitting(false)
     }

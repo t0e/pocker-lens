@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client'
+import { TransactionType as PrismaTransactionType } from '@prisma/client'
 import { prisma } from '../db/client.js'
 import {
   CheckDuplicatesInput,
@@ -17,8 +17,7 @@ export class DuplicateDetectionService {
     input: CheckDuplicatesInput,
   ): Promise<DuplicateCheckResult> {
     const candidateDate = new Date(input.transactionDate)
-    const candidateAmount = new Prisma.Decimal(input.amount)
-    const candidateType = input.type.toUpperCase() as any
+    const candidateType = input.type.toUpperCase() as PrismaTransactionType
     const normMerchant = normalizeMerchant(input.merchant)
     const normDesc = input.description.toLowerCase().trim()
 

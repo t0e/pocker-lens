@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react'
 import {
   X,
-  Calendar,
   FileText,
   Clock,
   CheckCircle2,
@@ -11,19 +10,13 @@ import {
   RotateCcw,
   Trash2,
   Sparkles,
-  ExternalLink,
   ChevronDown,
   ChevronUp,
   Loader2,
   Check,
-  Building2,
-  Tag,
-  Wallet,
-  DollarSign,
 } from 'lucide-react'
 import {
   ReceiptResponse,
-  ReceiptExtractionResponse,
   FieldConfidence,
   AccountResponse,
   CategoryResponse,
@@ -223,8 +216,6 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
 
   if (!isOpen || !receipt) return null
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
-  const imageUrl = `${apiBase}/receipts/${receipt.id}/file`
   const extraction = receipt.extraction
 
   const formatFileSize = (bytes: number) => {
@@ -352,8 +343,10 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
       setTimeout(() => {
         onClose()
       }, 1200)
-    } catch (err: any) {
-      setConfirmError(err.message || 'Failed to create transaction')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to create transaction'
+      setConfirmError(message)
     } finally {
       setIsSubmitting(false)
     }
@@ -368,8 +361,10 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
       })
       if (onConfirmed) onConfirmed()
       onClose()
-    } catch (err: any) {
-      alert(err.message || 'Failed to reprocess receipt')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to reprocess receipt'
+      alert(message)
     } finally {
       setIsReprocessing(false)
     }

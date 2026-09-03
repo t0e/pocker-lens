@@ -8,6 +8,12 @@ import {
   enDictionary,
 } from '@pocketlens/shared'
 
+interface CategorySummary {
+  id: string
+  name: string
+  icon: string | null
+}
+
 export class CategorizationService {
   /**
    * Predicts / suggests the most likely category for a transaction based on user history.
@@ -40,7 +46,8 @@ export class CategorizationService {
       })
 
       if (merchantTxs.length > 0) {
-        const counts: Record<string, { count: number; cat: any }> = {}
+        const counts: Record<string, { count: number; cat: CategorySummary }> =
+          {}
         for (const tx of merchantTxs) {
           if (!tx.categoryId || !tx.category) continue
           if (!counts[tx.categoryId]) {
@@ -97,7 +104,10 @@ export class CategorizationService {
         )
 
         if (matching.length > 0) {
-          const counts: Record<string, { count: number; cat: any }> = {}
+          const counts: Record<
+            string,
+            { count: number; cat: CategorySummary }
+          > = {}
           for (const tx of matching) {
             if (!tx.categoryId || !tx.category) continue
             if (!counts[tx.categoryId]) {
@@ -136,7 +146,8 @@ export class CategorizationService {
       })
 
       if (descTxs.length > 0) {
-        const counts: Record<string, { count: number; cat: any }> = {}
+        const counts: Record<string, { count: number; cat: CategorySummary }> =
+          {}
         for (const tx of descTxs) {
           if (!tx.categoryId || !tx.category) continue
           if (!counts[tx.categoryId]) {

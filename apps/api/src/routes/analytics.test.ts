@@ -1,7 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import {
+  Prisma,
+  User,
+  Category,
+  Budget,
+  RecurringTransaction,
+  Transaction,
+} from '@prisma/client'
+import { MonthlyTrendPoint } from '@pocketlens/shared'
 import { buildApp } from '../app.js'
 import { prisma } from '../db/client.js'
-import { Prisma } from '@prisma/client'
 import * as authService from '../auth/service.js'
 
 describe('Analytics Endpoints (/analytics - Phase 8)', () => {
@@ -21,37 +29,56 @@ describe('Analytics Endpoints (/analytics - Phase 8)', () => {
   })
 
   it('GET /analytics/summary returns monthly summary with MoM comparison and savings rate', async () => {
-    vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any)
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(
+      userA as unknown as User,
+    )
 
-    vi.spyOn(prisma.transaction as any, 'groupBy')
+    vi.spyOn(
+      prisma.transaction as {
+        groupBy: (...args: unknown[]) => Promise<unknown>
+      },
+      'groupBy',
+    )
       .mockResolvedValueOnce([
         {
           type: 'EXPENSE',
           currency: 'VND',
           _sum: { amount: new Prisma.Decimal(18420000) },
           _count: { id: 24 },
+          _avg: { amount: null },
+          _min: { amount: null },
+          _max: { amount: null },
         },
         {
           type: 'INCOME',
           currency: 'VND',
           _sum: { amount: new Prisma.Decimal(32000000) },
           _count: { id: 2 },
+          _avg: { amount: null },
+          _min: { amount: null },
+          _max: { amount: null },
         },
-      ] as any)
+      ] as unknown as ReturnType<typeof prisma.transaction.groupBy>)
       .mockResolvedValueOnce([
         {
           type: 'EXPENSE',
           currency: 'VND',
           _sum: { amount: new Prisma.Decimal(16200000) },
           _count: { id: 20 },
+          _avg: { amount: null },
+          _min: { amount: null },
+          _max: { amount: null },
         },
         {
           type: 'INCOME',
           currency: 'VND',
           _sum: { amount: new Prisma.Decimal(30000000) },
           _count: { id: 2 },
+          _avg: { amount: null },
+          _min: { amount: null },
+          _max: { amount: null },
         },
-      ] as any)
+      ] as unknown as ReturnType<typeof prisma.transaction.groupBy>)
 
     const res = await app.inject({
       method: 'GET',
@@ -59,7 +86,6 @@ describe('Analytics Endpoints (/analytics - Phase 8)', () => {
       headers: { authorization: 'Bearer mock_token_a' },
     })
 
-    if (res.statusCode !== 200) console.log('SUBS ERROR:', res.body)
     expect(res.statusCode).toBe(200)
     const body = JSON.parse(res.body)
     expect(body.period).toBeDefined()
@@ -79,18 +105,30 @@ describe('Analytics Endpoints (/analytics - Phase 8)', () => {
   })
 
   it('GET /analytics/summary handles zero-baseline MoM without Infinity', async () => {
-    vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any)
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(
+      userA as unknown as User,
+    )
 
-    vi.spyOn(prisma.transaction as any, 'groupBy')
+    vi.spyOn(
+      prisma.transaction as {
+        groupBy: (...args: unknown[]) => Promise<unknown>
+      },
+      'groupBy',
+    )
       .mockResolvedValueOnce([
         {
           type: 'EXPENSE',
           currency: 'VND',
           _sum: { amount: new Prisma.Decimal(1000000) },
           _count: { id: 5 },
+          _avg: { amount: null },
+          _min: { amount: null },
+          _max: { amount: null },
         },
-      ] as any)
-      .mockResolvedValueOnce([] as any)
+      ] as unknown as ReturnType<typeof prisma.transaction.groupBy>)
+      .mockResolvedValueOnce(
+        [] as unknown as ReturnType<typeof prisma.transaction.groupBy>,
+      )
 
     const res = await app.inject({
       method: 'GET',
@@ -106,9 +144,11 @@ describe('Analytics Endpoints (/analytics - Phase 8)', () => {
   })
 
   it('GET /analytics/trends returns monthly trend series with strict currency isolation', async () => {
-    vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any)
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(
+      userA as unknown as User,
+    )
 
-    vi.spyOn(prisma.transaction as any, 'findMany').mockResolvedValueOnce([
+    vi.spyOn(prisma.transaction, 'findMany').mockResolvedValueOnce([
       {
         type: 'INCOME',
         amount: new Prisma.Decimal(32000000),
@@ -119,7 +159,7 @@ describe('Analytics Endpoints (/analytics - Phase 8)', () => {
         amount: new Prisma.Decimal(18420000),
         transactionDate: new Date('2026-08-12T00:00:00.000Z'),
       },
-    ] as any)
+    ] as unknown as Transaction[])
 
     const res = await app.inject({
       method: 'GET',
@@ -132,7 +172,9 @@ describe('Analytics Endpoints (/analytics - Phase 8)', () => {
     expect(body.currency).toBe('VND')
     expect(body.months).toHaveLength(6)
 
-    const augMonth = body.months.find((m: any) => m.month === '2026-08')
+    const augMonth = body.months.find(
+      (m: MonthlyTrendPoint) => m.month === '2026-08',
+    )
     expect(augMonth).toBeDefined()
     expect(augMonth.income).toBe(32000000)
     expect(augMonth.expenses).toBe(18420000)
@@ -140,33 +182,51 @@ describe('Analytics Endpoints (/analytics - Phase 8)', () => {
   })
 
   it('GET /analytics/categories returns category breakdown and top categories', async () => {
-    vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any)
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(
+      userA as unknown as User,
+    )
 
-    vi.spyOn(prisma.transaction as any, 'groupBy')
+    vi.spyOn(
+      prisma.transaction as {
+        groupBy: (...args: unknown[]) => Promise<unknown>
+      },
+      'groupBy',
+    )
       .mockResolvedValueOnce([
         {
           categoryId: 'cat_food',
           _sum: { amount: new Prisma.Decimal(5000000) },
           _count: { id: 10 },
+          _avg: { amount: null },
+          _min: { amount: null },
+          _max: { amount: null },
         },
         {
           categoryId: 'cat_transport',
           _sum: { amount: new Prisma.Decimal(3000000) },
           _count: { id: 6 },
+          _avg: { amount: null },
+          _min: { amount: null },
+          _max: { amount: null },
         },
         {
           categoryId: 'cat_shopping',
           _sum: { amount: new Prisma.Decimal(2000000) },
           _count: { id: 4 },
+          _avg: { amount: null },
+          _min: { amount: null },
+          _max: { amount: null },
         },
-      ] as any)
-      .mockResolvedValueOnce([] as any)
+      ] as unknown as ReturnType<typeof prisma.transaction.groupBy>)
+      .mockResolvedValueOnce(
+        [] as unknown as ReturnType<typeof prisma.transaction.groupBy>,
+      )
 
-    vi.spyOn(prisma.category as any, 'findMany').mockResolvedValueOnce([
+    vi.spyOn(prisma.category, 'findMany').mockResolvedValueOnce([
       { id: 'cat_food', name: 'Food & Dining', icon: 'utensils' },
       { id: 'cat_transport', name: 'Transportation', icon: 'car' },
       { id: 'cat_shopping', name: 'Shopping', icon: 'shopping-bag' },
-    ] as any)
+    ] as unknown as Category[])
 
     const res = await app.inject({
       method: 'GET',
@@ -187,20 +247,33 @@ describe('Analytics Endpoints (/analytics - Phase 8)', () => {
   })
 
   it('GET /analytics/merchants aggregates spending by merchant', async () => {
-    vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any)
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(
+      userA as unknown as User,
+    )
 
-    vi.spyOn(prisma.transaction as any, 'groupBy').mockResolvedValueOnce([
+    vi.spyOn(
+      prisma.transaction as {
+        groupBy: (...args: unknown[]) => Promise<unknown>
+      },
+      'groupBy',
+    ).mockResolvedValueOnce([
       {
         merchant: 'Highlands Coffee',
         _sum: { amount: new Prisma.Decimal(1240000) },
         _count: { id: 12 },
+        _avg: { amount: null },
+        _min: { amount: null },
+        _max: { amount: null },
       },
       {
         merchant: 'Grab',
         _sum: { amount: new Prisma.Decimal(1080000) },
         _count: { id: 18 },
+        _avg: { amount: null },
+        _min: { amount: null },
+        _max: { amount: null },
       },
-    ] as any)
+    ] as unknown as ReturnType<typeof prisma.transaction.groupBy>)
 
     const res = await app.inject({
       method: 'GET',
@@ -217,9 +290,11 @@ describe('Analytics Endpoints (/analytics - Phase 8)', () => {
   })
 
   it('GET /analytics/expenses/biggest returns largest individual expenses', async () => {
-    vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any)
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(
+      userA as unknown as User,
+    )
 
-    vi.spyOn(prisma.transaction as any, 'findMany').mockResolvedValueOnce([
+    vi.spyOn(prisma.transaction, 'findMany').mockResolvedValueOnce([
       {
         id: 'tx_rent',
         description: 'Monthly Rent',
@@ -240,7 +315,7 @@ describe('Analytics Endpoints (/analytics - Phase 8)', () => {
         category: { name: 'Shopping', icon: 'laptop' },
         account: { name: 'Bank Account' },
       },
-    ] as any)
+    ] as unknown as Transaction[])
 
     const res = await app.inject({
       method: 'GET',
@@ -256,9 +331,11 @@ describe('Analytics Endpoints (/analytics - Phase 8)', () => {
   })
 
   it('GET /analytics/budgets calculates budget vs actual and deterministic spending pace', async () => {
-    vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any)
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(
+      userA as unknown as User,
+    )
 
-    vi.spyOn(prisma.budget as any, 'findMany').mockResolvedValueOnce([
+    vi.spyOn(prisma.budget, 'findMany').mockResolvedValueOnce([
       {
         id: 'b_food',
         userId: 'user_analytics_A',
@@ -268,14 +345,23 @@ describe('Analytics Endpoints (/analytics - Phase 8)', () => {
         month: '2026-08',
         category: { name: 'Food', icon: 'utensils' },
       },
-    ] as any)
+    ] as unknown as Budget[])
 
-    vi.spyOn(prisma.transaction as any, 'groupBy').mockResolvedValueOnce([
+    vi.spyOn(
+      prisma.transaction as {
+        groupBy: (...args: unknown[]) => Promise<unknown>
+      },
+      'groupBy',
+    ).mockResolvedValueOnce([
       {
         categoryId: 'cat_food',
         _sum: { amount: new Prisma.Decimal(2450000) },
+        _count: { id: 1 },
+        _avg: { amount: null },
+        _min: { amount: null },
+        _max: { amount: null },
       },
-    ] as any)
+    ] as unknown as ReturnType<typeof prisma.transaction.groupBy>)
 
     const res = await app.inject({
       method: 'GET',
@@ -298,12 +384,11 @@ describe('Analytics Endpoints (/analytics - Phase 8)', () => {
   })
 
   it('GET /analytics/subscriptions returns normalized subscription costs and commitments', async () => {
-    vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any)
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(
+      userA as unknown as User,
+    )
 
-    vi.spyOn(
-      prisma.recurringTransaction as any,
-      'findMany',
-    ).mockResolvedValueOnce([
+    vi.spyOn(prisma.recurringTransaction, 'findMany').mockResolvedValueOnce([
       {
         id: 'rec_netflix',
         userId: 'user_analytics_A',
@@ -321,7 +406,7 @@ describe('Analytics Endpoints (/analytics - Phase 8)', () => {
         nextRunDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
         endDate: null,
       },
-    ] as any)
+    ] as unknown as RecurringTransaction[])
 
     const res = await app.inject({
       method: 'GET',
@@ -339,10 +424,12 @@ describe('Analytics Endpoints (/analytics - Phase 8)', () => {
   })
 
   it('GET /transactions search and sorting query extensions work properly', async () => {
-    vi.spyOn(authService, 'validateSession').mockResolvedValue(userA as any)
+    vi.spyOn(authService, 'validateSession').mockResolvedValue(
+      userA as unknown as User,
+    )
 
-    vi.spyOn(prisma.transaction as any, 'count').mockResolvedValueOnce(1)
-    vi.spyOn(prisma.transaction as any, 'findMany').mockResolvedValueOnce([
+    vi.spyOn(prisma.transaction, 'count').mockResolvedValueOnce(1)
+    vi.spyOn(prisma.transaction, 'findMany').mockResolvedValueOnce([
       {
         id: 'tx_coffee',
         userId: 'user_analytics_A',
@@ -385,7 +472,7 @@ describe('Analytics Endpoints (/analytics - Phase 8)', () => {
           updatedAt: new Date(),
         },
       },
-    ] as any)
+    ] as unknown as Transaction[])
 
     const res = await app.inject({
       method: 'GET',

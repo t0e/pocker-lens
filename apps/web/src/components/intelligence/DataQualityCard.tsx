@@ -1,13 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import {
-  ShieldCheck,
-  AlertCircle,
-  FileText,
-  Check,
-  ChevronRight,
-} from 'lucide-react'
+import { ShieldCheck, AlertCircle, Check } from 'lucide-react'
 import {
   DataQualityReportResponse,
   formatCurrencyAmount,

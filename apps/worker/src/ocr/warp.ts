@@ -103,9 +103,6 @@ export async function perspectiveCorrect(
     }
   }
 
-  // Release raw buffer reference
-  ;(raw as any) = null
-
   return sharp(out, { raw: { width: outW, height: outH, channels: 1 } })
     .png({ compressionLevel: 1 })
     .toBuffer()

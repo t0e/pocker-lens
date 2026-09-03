@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { User } from '@prisma/client'
 import { buildApp } from '../app.js'
 import { prisma } from '../db/client.js'
 import * as authService from '../auth/service.js'
@@ -23,7 +24,9 @@ describe('Auth Endpoints (/auth/*)', () => {
       }
 
       vi.spyOn(prisma.user, 'findUnique').mockResolvedValue(null)
-      vi.spyOn(prisma.user, 'create').mockResolvedValue(mockUser as any)
+      vi.spyOn(prisma.user, 'create').mockResolvedValue(
+        mockUser as unknown as User,
+      )
       vi.spyOn(authService, 'createSession').mockResolvedValue({
         token: 'mock_session_token_12345',
         expiresAt: new Date(Date.now() + 3600000),
@@ -51,7 +54,7 @@ describe('Auth Endpoints (/auth/*)', () => {
       vi.spyOn(prisma.user, 'findUnique').mockResolvedValue({
         id: 'usr_existing',
         email: 'alex@example.com',
-      } as any)
+      } as unknown as User)
 
       const res = await app.inject({
         method: 'POST',
@@ -96,7 +99,9 @@ describe('Auth Endpoints (/auth/*)', () => {
         updatedAt: new Date(),
       }
 
-      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockUser as any)
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue(
+        mockUser as unknown as User,
+      )
       vi.spyOn(authService, 'verifyPassword').mockResolvedValue(true)
       vi.spyOn(authService, 'createSession').mockResolvedValue({
         token: 'login_token_abc',
@@ -126,7 +131,9 @@ describe('Auth Endpoints (/auth/*)', () => {
         passwordHash: '$2a$10$hashed',
       }
 
-      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockUser as any)
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue(
+        mockUser as unknown as User,
+      )
       vi.spyOn(authService, 'verifyPassword').mockResolvedValue(false)
 
       const res = await app.inject({
@@ -183,7 +190,7 @@ describe('Auth Endpoints (/auth/*)', () => {
       }
 
       vi.spyOn(authService, 'validateSession').mockResolvedValue(
-        mockUser as any,
+        mockUser as unknown as User,
       )
 
       const res = await app.inject({
