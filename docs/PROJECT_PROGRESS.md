@@ -1,382 +1,47 @@
-# PocketLens — Project Handoff & Progress Reference
+# PocketLens Project Status
 
-> **Purpose of this document**: This document is the single persistent source of truth for the PocketLens codebase. It enables any AI assistant or developer to reconstruct the full context, architectural rules, operational flows, database invariants, completed phases, and upcoming roadmap without relying on prior conversation history.
+## Status
 
----
+PocketLens core development is complete.
 
-## 1. Project Name and Purpose
+All originally planned phases have been implemented.
 
-**PocketLens** is a modern, privacy-respecting personal finance and expense tracking platform tailored for multi-currency management (VND, USD, EUR, JPY, SGD, etc.), receipt scanning with local OCR (English & Vietnamese), category budgeting, subscription tracking, and automated recurring transactions.
+Current focus is code quality, consistency, maintainability, documentation, project structure, and portfolio polish.
 
----
+## Current Focus
 
-## 2. Monorepo & Folder Structure
+- Improve code consistency
+- Apply project coding conventions
+- Improve naming
+- Refactor unnecessarily complex code when useful
+- Improve project structure where appropriate
+- Keep documentation accurate
+- Fix bugs discovered during maintenance
 
-PocketLens is organized as an **npm workspaces** monorepo:
+## Completed Capabilities
 
-```text
-pocket-lens/
-├── apps/
-│   ├── api/                 # Fastify REST API backend (TypeScript, Node.js)
-│   │   ├── prisma/          # Prisma schema, migrations, seed data
-│   │   └── src/
-│   │       ├── auth/        # Session token hashing and validation
-│   │       ├── config/      # Environment configuration (Zod validation)
-│   │       ├── db/          # Prisma client singleton
-│   │       ├── plugins/     # Fastify auth & security plugins
-│   │       ├── routes/      # Endpoints (auth, accounts, categories, transactions, receipts, budgets, recurring)
-│   │       ├── services/    # Business services (recurring generation, accounting)
-│   │       └── app.ts       # Fastify instance builder
-│   ├── web/                 # Next.js 14 App Router frontend (React, Tailwind CSS, Lucide icons)
-│   │   ├── src/
-│   │   │   ├── app/         # Next.js routes (/, /login, /register, /transactions, /accounts, /receipts, /budgets, /settings)
-│   │   │   ├── components/  # Modals, navigation, layout, UI primitives
-│   │   │   ├── context/     # AuthContext (cookie-based session state)
-│   │   │   └── lib/         # API client & currency formatting utilities
-│   └── worker/              # Background BullMQ worker for receipt OCR and recurring scheduler
-│       └── src/
-│           ├── config/      # Worker environment configuration
-│           ├── ocr/         # Tesseract OCR engine wrapper (eng + vie)
-│           ├── processor/   # Receipt extraction pipeline
-│           ├── queue/       # Redis / BullMQ connection
-│           └── scheduler/   # Periodic recurring transaction runner
-├── packages/
-│   └── shared/              # Shared types, Zod schemas, date math, receipt parsers, storage contracts
-│       └── src/
-│           ├── account/     # Account validation schemas
-│           ├── auth/        # Auth DTOs & password requirements
-│           ├── budget/      # Budget DTOs, schemas, and month bound helpers
-│           ├── category/    # Category types & default category list
-│           ├── currency/    # Currency codes, decimal places, formatting
-│           ├── ocr/         # OCR result interfaces
-│           ├── parser/      # Deterministic bilingual (EN/VI) receipt parser & dictionary
-│           ├── queue/       # BullMQ queue names and job payload interfaces
-│           ├── receipt/     # Receipt DTOs and MIME validations
-│           ├── recurring/   # Recurrence frequency, clamping date math, projection calculators
-│           ├── storage/     # Storage abstraction (Local disk / S3-ready)
-│           └── transaction/ # Transaction schemas & cashflow calculation
-├── docker/                  # Dockerfiles for api, worker, and web
-├── docker-compose.yml       # Production/local multi-service orchestration
-└── docs/                    # Architecture and documentation handoff
-```
+- **User Authentication & Session Management**: Secure cookie-based sessions with SHA-256 token hashing, bcrypt password hashing, and full session revocation.
+- **Multi-Currency Account Management**: Checking, savings, credit cards, cash, and investment accounts tracked independently with high-precision decimal arithmetic.
+- **Core Financial Transactions**: Income, expense, and transfer tracking with atomic account balance updates and strict transfer isolation (transfers never distort income/expenses).
+- **Multilingual Receipt Scanning & Local OCR**: Image and PDF upload handling, background asynchronous processing via BullMQ, local bilingual English and Vietnamese OCR (Tesseract.js), and deterministic parsing for totals, tax, dates, merchants, and line items.
+- **Human-in-the-Loop Receipt Review**: Interactive side-by-side verification editor requiring explicit user confirmation before creating financial ledger entries.
+- **Monthly Category Budgeting**: Dynamic real-time derived spending calculations (O(1) aggregation queries), month-to-month budget cloning, and calendar-aware progress alerts.
+- **Recurring Transactions & Subscriptions**: Recurrence scheduler with anchor-preserving date math (handling month-end dates and leap years), subscription cost normalization, and database-level idempotent execution.
+- **Deterministic Analytics & Spending Insights**: Multi-period cashflow trends, category/merchant breakdowns, calendar spending pace math, and rule-based financial insights without external AI dependencies.
+- **Multi-Currency Reporting & Historical FX**: High-precision historical exchange rates, user-selected reporting currency, dynamic cross-currency net worth calculation, and fallback resilience.
+- **Financial Intelligence & Data Quality**: Conservative merchant normalization, user-isolated category learning with confidence scoring, duplicate transaction detection with 3-way user resolution, and data quality audits.
+- **Production Infrastructure & CI/CD**: Multi-container Docker orchestration with a dedicated one-shot database migration container, health/readiness probes (`/health`, `/ready`), CORS configuration, and automated CI pipeline.
 
----
+## Active Work
 
-## 3. Technology Stack
+None.
 
-- **Runtime**: Node.js 20 LTS
-- **Languages**: TypeScript (Strict mode across all packages)
-- **Monorepo Manager**: npm workspaces
-- **API Framework**: Fastify v4 (with `@fastify/cors`, `@fastify/cookie`, `@fastify/helmet`, `@fastify/multipart`, `@fastify/sensible`)
-- **Frontend Framework**: Next.js 14 (App Router, React 18, Tailwind CSS, Lucide React)
-- **Database & ORM**: PostgreSQL 16 + Prisma ORM v5
-- **Task Queue & Caching**: Redis 7 + BullMQ v5
-- **OCR Engine**: Tesseract.js (local OCR with `eng` and `vie` training data)
-- **Validation**: Zod (shared across frontend and backend)
-- **Testing**: Vitest across all workspaces
+## Future
 
----
+No major features are currently planned.
 
-## 4. Docker Services and Topology
+New features may be added as the project evolves.
 
-The `docker-compose.yml` orchestrates five containers on the `pocketlens_network` bridge:
+## Last Updated
 
-1. **`postgres`** (`postgres:16-alpine`): Port `5432:5432`. Stores relational data with persistent volume `postgres_data`.
-2. **`redis`** (`redis:7-alpine`): Port `6379:6379`. Queue backend for BullMQ with volume `redis_data`.
-3. **`api`** (`apps/api` via `docker/api.Dockerfile`): Port `4000:4000`. Authenticated REST endpoints. Mounts `receipt_data` volume at `/data/receipts`.
-4. **`worker`** (`apps/worker` via `docker/worker.Dockerfile`): Background consumer for receipt OCR extraction and recurring transaction cron execution. Mounts `receipt_data` volume at `/data/receipts`.
-5. **`web`** (`apps/web` via `docker/web.Dockerfile`): Port `3000:3000`. Next.js web application.
-
----
-
-## 5. Database Architecture & Important Constraints
-
-### Key Models (`apps/api/prisma/schema.prisma`)
-
-- **`User`**: Account holder (`id`, `email`, `passwordHash`, `displayName`).
-- **`Session`**: State-backed auth tokens with SHA-256 token hash and expiry (`tokenHash`, `userId`, `expiresAt`).
-- **`Account`**: Wallets, banks, credit cards (`userId`, `currency`, `openingBalance`, `currentBalance`, `isArchived`, `isDefault`).
-  - Constraint: `currentBalance` is a high-precision `Decimal(19,4)` updated atomically upon transaction creation/edit/deletion.
-- **`Category`**: System defaults or user custom categories (`name`, `type` [`EXPENSE`/`INCOME`], `icon`, `isSystem`, `isArchived`).
-- **`Transaction`**: Immutable historical entries (`userId`, `type` [`EXPENSE`/`INCOME`/`TRANSFER`], `accountId`, `transferAccountId`, `categoryId`, `amount`, `currency`, `transactionDate`, `receiptId`, `recurringTransactionId`).
-- **`Receipt`**: Raw image metadata (`userId`, `storagePath`, `fileName`, `fileSize`, `mimeType`, `status` [`UPLOADED`/`PROCESSING`/`READY_FOR_REVIEW`/`CONFIRMED`/`FAILED`]).
-- **`ReceiptExtraction`**: Structured OCR extraction draft (`merchantName`, `totalAmount`, `taxAmount`, `receiptDate`, `language`, `confidenceScore`).
-  - **`ReceiptItem`**: Extracted line items (`description`, `quantity`, `unitPrice`, `totalPrice`).
-- **`Budget`**: Category spending limit for a specific month (`userId`, `categoryId`, `amount`, `currency`, `month` [Format: `YYYY-MM`]).
-  - **Unique Constraint**: `@@unique([userId, categoryId, currency, month])` prevents duplicate active budgets.
-- **`RecurringTransaction`**: Recurring templates and subscriptions (`userId`, `type`, `accountId`, `categoryId`, `amount`, `currency`, `frequency` [`DAILY`/`WEEKLY`/`MONTHLY`/`YEARLY`], `interval`, `startDate`, `nextRunDate`, `endDate`, `isActive`, `isSubscription`, `merchant`).
-- **`RecurringOccurrence`**: Durable record of executed recurring events.
-  - **Unique Constraint**: `@@unique([recurringTransactionId, scheduledFor])` enforces database-level idempotency against duplicate scheduler execution.
-
----
-
-## 6. Accounting & Transaction Invariants
-
-1. **Balance Precision**: All monetary values are represented as `Decimal(19, 4)` in database and rounded appropriately per currency for display.
-2. **Transfer Isolation**:
-   - `TRANSFER` transactions require matching currencies between source and destination accounts.
-   - Transfers update source account (`-amount`) and destination account (`+amount`).
-   - Transfers are **never counted** as income or expense and **never affect category budgets**.
-3. **Multi-Currency Strictness**: Balances, budgets, and subscriptions are tracked independently per ISO currency code. No arbitrary FX mixing occurs without explicit conversion.
-4. **Historical Immutability of Recurring Templates**:
-   - Modifying a `RecurringTransaction` template alters future occurrences only.
-   - Deleting a `RecurringTransaction` template preserves already generated historical transactions (`recurringTransactionId` set to `null`).
-
----
-
-## 7. OCR & Receipt Processing Pipeline
-
-```text
-Upload Image (JPEG/PNG/WebP/HEIC)
-       ↓
-API validates MIME & magic bytes (< 10MB)
-       ↓
-Local Storage Provider saves to /data/receipts/<userId>/<uuid>.<ext>
-       ↓
-BullMQ Job queued on 'receipt-processing'
-       ↓
-Worker picks up job
-       ↓
-Local Tesseract OCR (eng + vie)
-       ↓
-Deterministic Parser (Rule-based regex & dictionary for EN/VI)
-       ↓
-ReceiptExtraction & ReceiptItems saved (Status: READY_FOR_REVIEW)
-       ↓
-User reviews in UI (Side-by-side verification)
-       ↓
-User confirms → Creates Transaction via Phase 3 service (Status: CONFIRMED)
-```
-
-**CRITICAL INVARIANT**: Never automatically create a real transaction directly from OCR output. It must always produce a review draft first.
-
----
-
-## 8. Budgeting & Spending Engine
-
-- **Dynamic Derived Calculation**: Budget spending is never stored as an editable column. It is derived in real-time from `Transaction` table (`Transaction.type === 'EXPENSE' && categoryId === budget.categoryId && currency === budget.currency && transactionDate within UTC month bounds`).
-- **O(1) Single Aggregation Query**: Budgets for a month are computed via `prisma.transaction.groupBy({ by: ['categoryId', 'currency'] })`, completely avoiding N+1 loops.
-- **Budget Statuses**:
-  - `0% - 79%`: **`NORMAL`** (Emerald)
-  - `80% - 99%`: **`WARNING`** (Amber)
-  - `100%+`: **`OVER_BUDGET`** (Rose) with exact overage amount.
-- **Expense-Only Rule**: Budgets can only be created for `EXPENSE` categories. Income categories are rejected by the API with `400 Bad Request`.
-- **Month Copying**: `POST /budgets/copy` clones previous month category budgets to target month while omitting existing ones.
-
----
-
-## 9. Recurring Transactions & Subscriptions Engine
-
-- **Anchor-Preserving Date Math**:
-  - `calculateNextRunDate` handles monthly 31st edge cases: `Jan 31` → `Feb 28` (or `Feb 29` in leap year) → `Mar 31` (restores original anchor day) → `Apr 30` → `May 31`.
-  - Yearly leap year edge cases: `Feb 29 2024` → `Feb 28 2025` → `Feb 29 2028`.
-- **Subscriptions**:
-  - Items with `isSubscription: true` calculate estimated monthly costs (`calculateEstimatedMonthlyCost`) for weekly, monthly, and yearly intervals.
-- **Upcoming Projections**:
-  - `GET /recurring/upcoming?days=30` projects occurrences over the next 30 days without creating database records or affecting account balances.
-- **Worker Scheduler Execution**:
-  - Worker runs recurring check periodically every 60 seconds and on startup.
-  - Queries `nextRunDate <= now && isActive == true`.
-  - Executes inside a transaction with `RecurringOccurrence` unique constraint checking (`[recurringTransactionId, scheduledFor]`).
-  - Advances `nextRunDate` and auto-deactivates if past `endDate` or if account is archived.
-
----
-
-## 10. Analytics, Trends & Spending Insights Engine (Phase 8)
-
-- **SQL Aggregation & Indexes**:
-  - Derived directly from `Transaction` table via `groupBy({ by: ['type', 'currency'] })` and indexed by `[userId, type, transactionDate]`, `[userId, currency, transactionDate]`, `[userId, categoryId, transactionDate]`, and `[userId, merchant]`.
-- **Transfers Rule**: Transfers (`type: 'TRANSFER'`) are strictly excluded from spending, income, categories, merchant breakdowns, and biggest expense lists. Transfers appear only under account cashflow movements (`transfersIn` and `transfersOut`).
-- **Deterministic Rule Engine (No AI / LLM Dependencies)**:
-  - Generates actionable, purely factual insights:
-    - Significant category increases (>15% MoM, >50k VND / $5).
-    - Significant category reductions (>15% MoM).
-    - New category expenditures (zero baseline in previous period).
-    - Budget pace alerts (ahead of pace by >15% at day N of month).
-    - Budget limit exceeded alerts.
-    - Dominant single expense share (>40% of period expenses).
-    - High savings rate milestones (>50% savings rate).
-    - Subscription spending share (>15% of monthly expenses).
-- **Calendar Spending Pace Math**:
-  - `expectedPaceAmount = budgetAmount * (daysElapsed / daysInMonth)`.
-  - Calculates real calendar days (leap years, 28/29/30/31 days) and compares actual expense pace vs time elapsed.
-- **Analytics Endpoints**:
-  - `GET /analytics/summary`: Period income, expenses, net, savings rate, MoM comparison.
-  - `GET /analytics/trends`: Monthly cash flow trends across 3–24 months.
-  - `GET /analytics/categories`: Category breakdown with percentages and top categories.
-  - `GET /analytics/merchants`: Normalized merchant spending and transaction counts.
-  - `GET /analytics/expenses/biggest`: Largest individual non-transfer expenses.
-  - `GET /analytics/accounts`: Account balance, income, expenses, transfers in/out.
-  - `GET /analytics/budgets`: Budget performance and calendar spending pace.
-  - `GET /analytics/subscriptions`: Normalized subscription costs and 7/30 days projections.
-  - `GET /analytics/insights`: Deterministic rule-based spending insights.
-- **Transaction Search & Filter Extensions**:
-  - Case-insensitive search on description, merchant, and notes.
-  - Sorting: `date_desc`, `date_asc`, `amount_desc`, `amount_asc`.
-  - Filtering by type, currency, account, category, and amount range.
-
----
-
-## 11. Completed Phases 1–8 Summary
-
-| Phase       | Description                             | Key Deliverables                                                                                                               |
-| ----------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Phase 1** | Project Setup & Monorepo Foundation     | Fastify API, Next.js Web, Shared package, Tailwind CSS, Docker Compose, Vitest                                                 |
-| **Phase 2** | Authentication & User Management        | Cookie session auth, password hashing with salt, session revocation, auth middleware                                           |
-| **Phase 3** | Accounts & Transaction Core             | Multi-currency accounts, income/expenses/transfers, balance calculation, categories                                            |
-| **Phase 4** | Receipt Storage & Processing Foundation | File validation, storage abstraction, BullMQ queue, receipt database models                                                    |
-| **Phase 5** | Multilingual Receipt OCR Engine         | Local Tesseract OCR (EN/VI), dictionary token matching, deterministic field extraction                                         |
-| **Phase 6** | Receipt Review & Confirmation Flow      | Interactive side-by-side review modal, item editing, confirmation into transaction service                                     |
-| **Phase 7** | Budgets, Recurring & Subscriptions      | Monthly category budgets, progress alerts, recurring date math, subscriptions, idempotent scheduler                            |
-| **Phase 8** | Analytics, Trends & Spending Insights   | Cashflow trends, category & merchant breakdown, spending pace, subscriptions summary, deterministic insights, search & sorting |
-
----
-
-## 12. Current Verification Status (Phase 8 Complete)
-
-- **Test Suite**: **164 / 164 tests passing** across 21 test files.
-  - `@pocketlens/shared`: 67 tests (9 files)
-  - `@pocketlens/api`: 89 tests (9 files)
-  - `@pocketlens/worker`: 8 tests (3 files)
-- **TypeScript**: `npm run type-check` passes with **0 errors** across all 4 workspaces.
-- **Lint**: `npm run lint` passes with **0 warnings / 0 errors**.
-- **Build**: `npm run build` succeeds completely (Next.js static optimization with `/analytics` route).
-- **Docker Compose**: All 5 containers (`postgres`, `redis`, `api`, `worker`, `web`) healthy and operational.
-- **Remote Git Status**: Pushed to `origin/main`.
-- **Known Operational Limitations**:
-  - _Worker Migration Race on Fresh Database_: On a completely fresh database, the worker may execute its initial recurring-scheduler check before Prisma migrations complete. The failure is handled gracefully and processing resumes on the next 60-second scheduler tick. Consider introducing a dedicated migration/init service during Phase 10 production hardening.
-
----
-
-## 13. Environment Variables Reference
-
-Create a `.env` in the repository root:
-
-```env
-NODE_ENV=development
-API_PORT=4000
-WEB_PORT=3000
-HOST=0.0.0.0
-
-# Database
-POSTGRES_DB=pocketlens
-POSTGRES_USER=pocketlens
-POSTGRES_PASSWORD=pocketlens_dev_password
-DATABASE_URL=postgresql://pocketlens:pocketlens_dev_password@localhost:5432/pocketlens?schema=public
-
-# Redis & Queue
-REDIS_URL=redis://localhost:6379
-
-# Authentication
-COOKIE_SECRET=super_secret_cookie_signing_key_must_be_at_least_32_characters_long_123456
-
-# Storage
-STORAGE_PROVIDER=local
-RECEIPT_STORAGE_PATH=/tmp/pocketlens-receipts
-```
-
----
-
-## 14. How to Run & Develop
-
-### Prerequisites
-
-- Node.js 20+
-- Docker & Docker Compose
-
-### Local Development
-
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Start PostgreSQL and Redis via Docker
-docker compose up -d postgres redis
-
-# 3. Generate Prisma client & run migrations
-npx prisma generate --schema=./apps/api/prisma/schema.prisma
-npx prisma migrate dev --schema=./apps/api/prisma/schema.prisma
-
-# 4. Build shared package
-npm run build --workspace=@pocketlens/shared
-
-# 5. Run tests
-npm test
-
-# 6. Type check
-npm run type-check
-
-# 7. Start services locally
-npm run dev --workspace=@pocketlens/api
-npm run dev --workspace=@pocketlens/worker
-npm run dev --workspace=@pocketlens/web
-```
-
-### Full Docker Orchestration
-
-```bash
-docker compose up --build -d
-```
-
-Access UI at `http://localhost:3000` and API at `http://localhost:4000`.
-
----
-
-### Phase 9: Multi-Currency, FX & Smart Financial Intelligence (COMPLETED)
-
-- **Preserve Original Money Invariant**: Transactions permanently retain original `amount` and `currency` in the database. All conversions are derived reporting views only.
-- **Exchange Rate Infrastructure**: Database table `exchange_rates` with `Decimal(18, 8)` precision, unique constraint on `[baseCurrency, quoteCurrency, rateDate, provider]`, and provider abstraction (`IFXProvider`, fixture and historical rates).
-- **Multi-Currency Reporting**: User preferred reporting currency (`reportingCurrency` on `User`), switcher dropdown in UI header, and converted period totals (`convertedSummary`).
-- **Cross-Currency Net Worth**: Converts all active account balances into user's reporting currency (`totalNetWorth` with breakdown by original currencies).
-- **Conservative Merchant Normalization**: `normalizeMerchant` cleans punctuation, excessive whitespace, and casing without merging distinct brands.
-- **Smarter Categorization Service**: Deterministic frequency scoring based on user-confirmed transaction history (`user_id + normalized_merchant`), description keywords, and dictionary fallback with confidence classification (`HIGH`, `MEDIUM`, `LOW`, `NONE`).
-- **Duplicate Transaction Protection**: Conservative candidate search window (same user, same currency, exact/near amount, ±1 day). Categorizes confidence (`EXACT`, `LIKELY`, `POSSIBLE`) and provides user choices: `Keep Both`, `Use Existing`, `Cancel`.
-- **Deterministic Data Quality Intelligence**: `GET /analytics/data-quality` reporting uncategorized transactions with 1-click suggested actions, potential duplicate clusters, and pending receipts.
-
----
-
-### Phase 10: Production Hardening, CI/CD & Portfolio Readiness (COMPLETED)
-
-- **Dedicated Migration Container**: Introduced `pocketlens-migrate` service in `docker-compose.yml` executing `prisma migrate deploy` after `postgres` becomes healthy and before `api` and `worker` launch (`service_completed_successfully` condition). This permanently resolves the first-boot worker migration race.
-- **Health vs Readiness Probes**: Added `/ready` endpoint checking database, Redis, and storage connectivity while preserving `/health` for fast process liveness.
-- **Configurable CORS Security**: Configurable `ALLOWED_ORIGINS` environment variable prevents unrestricted origin access with credentialed requests.
-- **Categorized Environment Template**: `.env.example` organized into logical sections (`Application`, `Database`, `Redis`, `Authentication`, `Receipt Storage`, `Worker & OCR`, `Recurring Scheduler`, `Multi-Currency & FX`, `Frontend`).
-- **Comprehensive CI/CD Pipeline**: `.github/workflows/ci.yml` running linting, type-checking, `@pocketlens/shared` unit tests, `@pocketlens/api` integration tests (with PostgreSQL 16 & Redis 7 services), and full Next.js/Fastify production builds.
-- **Portfolio-Grade Documentation**: Full rewrite of `README.md` with Mermaid architecture diagrams, detailed financial workflows, invariant explanations, local setup, and honest technical limitations.
-
----
-
-## 15. Final Verification & Test Matrix
-
-- **Test Suite**: **173 / 173 automated tests passing** across 21 test files.
-  - `@pocketlens/shared`: 76 tests (11 files)
-  - `@pocketlens/api`: 97 tests (10 files)
-- **TypeScript**: `npm run type-check` passes with **0 errors** across all 4 workspaces (`@pocketlens/shared`, `@pocketlens/api`, `@pocketlens/web`, `@pocketlens/worker`).
-- **Lint**: `npm run lint` passes with **0 warnings / 0 errors** across all workspaces.
-- **Build**: `npm run build` succeeds completely (standalone Next.js output and compiled Fastify/worker outputs).
-- **Docker Compose Topology**:
-  - `postgres` (PostgreSQL 16 Alpine, persistent volume)
-  - `redis` (Redis 7 Alpine, persistent volume)
-  - `migrate` (One-shot migration deploy container)
-  - `api` (Fastify REST backend on port 4000)
-  - `worker` (BullMQ OCR and recurring scheduler background worker)
-  - `web` (Next.js 14 frontend on port 3000)
-- **Overall Project Status**: **COMPLETE & PRODUCTION-READY (PHASES 1–10 100% COMPLETE)**.
-
----
-
-## 16. Instructions for Future AI Sessions & Maintainers
-
-> **REFERENCE INSTRUCTIONS FOR MAINTAINING THE POCKETLENS CODEBASE**:
->
-> 1. **Core Accounting Invariants**:
->    - Original transaction amounts and currencies must remain permanently unmodified (converted values are derived reporting views only).
->    - Exact decimal precision (`DECIMAL(19, 4)` and `DECIMAL(18, 8)`) must be preserved for all monetary and exchange rate calculations.
->    - Transfers (`TRANSFER`) must never be counted as income or expense and never affect category budgets.
->    - Receipt OCR extractions must always produce a review draft first and require user confirmation before updating financial ledgers.
->    - Recurring transactions must enforce database-level idempotency via the `RecurringOccurrence` unique constraint.
->    - All financial records, category learning, duplicate detection, and data quality metrics must remain strictly user-isolated.
-> 2. **Docker Orchestration**:
->    - Always use `pocketlens-migrate` for deploying schema changes in containerized environments.
-> 3. **Testing Standards**:
->    - Ensure `npm test`, `npm run type-check`, and `npm run lint` pass with 0 errors before committing changes.
+September 2026
