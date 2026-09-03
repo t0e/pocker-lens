@@ -19,7 +19,8 @@
     "build": "tsc -b",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "echo \"@pocketlens/shared lint ok\"",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
     "clean": "rm -rf dist tsconfig.tsbuildinfo"
   },
   "dependencies": {

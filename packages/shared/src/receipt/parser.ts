@@ -87,7 +87,7 @@ const ITEM_BREAKDOWN_REGEX =
 const DATE_LINE_REGEX =
   /(?:ngày|ngay|date|giờ|time|hóa\s*đơn|hoa\s*don|đ\/c|địa\s*chỉ|dia\s*chi|thu\s*ngân|cashier|stt|no\.)/i
 const DATE_FORMAT_REGEX =
-  /(?:\b\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}\b|\b\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2}\b|\b\d{1,2}:\d{2}\b)/i
+  /(?:\b\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}\b|\b\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2}\b|\b\d{1,2}:\d{2}\b)/i
 
 const HEADER_IGNORE_REGEX =
   /^(RECEIPT|INVOICE|HOÁ\s*ĐƠN|HÓA\s*ĐƠN|PHIẾU\s*THANH\s*TOÁN|PHIẾU\s*TÍNH\s*TIỀN|BIÊN\s*LAI|BIÊN\s*NHẬN|CỬA\s*HÀNG|STORE|SHOP|WELCOME|THANK\s*YOU|CẢM\s*ƠN|TEL|HOTLINE|ĐT|ĐIỆN\s*THOẠI|FAX|MST|MÃ\s*SỐ\s*THUẾ|TAX\s*ID|ĐỊA\s*CHỈ|Đ\/C|ADDRESS|DATE|NGÀY|TIME|GIỜ|STT|NO\.|QUẦY|THU\s*NGÂN|CASHIER)/i
@@ -293,7 +293,7 @@ export function extractDate(lines: string[]): {
 
     // 1. DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
     const dmyMatch = line.match(
-      /\b([0-3]?[0-9])[\/\-.]([0-1]?[0-9])[\/\-.](20\d{2})\b/,
+      /\b([0-3]?[0-9])[/\-.]([0-1]?[0-9])[/\-.](20\d{2})\b/,
     )
     if (dmyMatch) {
       const day = parseInt(dmyMatch[1], 10)
@@ -307,7 +307,7 @@ export function extractDate(lines: string[]): {
 
     // 2. YYYY-MM-DD or YYYY/MM/DD
     const ymdMatch = line.match(
-      /\b(20\d{2})[\/\-.]([0-1]?[0-9])[\/\-.]([0-3]?[0-9])\b/,
+      /\b(20\d{2})[/\-.]([0-1]?[0-9])[/\-.]([0-3]?[0-9])\b/,
     )
     if (ymdMatch) {
       const year = parseInt(ymdMatch[1], 10)
@@ -374,7 +374,7 @@ export function extractDate(lines: string[]): {
 
     // 5. DD-MM-YY (short year)
     const dmyShort = line.match(
-      /\b([0-3]?[0-9])[\/\-.]([0-1]?[0-9])[\/\-.](\d{2})\b/,
+      /\b([0-3]?[0-9])[/\-.]([0-1]?[0-9])[/\-.](\d{2})\b/,
     )
     if (dmyShort && !dmyMatch) {
       const day = parseInt(dmyShort[1], 10)

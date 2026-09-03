@@ -10,7 +10,8 @@
     "start": "node dist/server.js",
     "dev": "node --loader ts-node/esm src/server.ts",
     "test": "vitest run",
-    "lint": "echo \"@pocketlens/api lint ok\"",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
     "db:migrate": "prisma migrate deploy",
     "db:generate": "prisma generate",
     "db:status": "prisma migrate status"

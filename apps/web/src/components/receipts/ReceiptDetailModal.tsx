@@ -894,7 +894,9 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
                   method: 'POST',
                   body: JSON.stringify({ transactionId: existingId }),
                 })
-              } catch {}
+              } catch {
+                // Ignore link errors if endpoint fails
+              }
               if (onConfirmed) onConfirmed()
               onClose()
             }}

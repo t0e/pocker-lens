@@ -9,11 +9,16 @@
   "scripts": {
     "build": "npm run build --workspaces",
     "type-check": "npm run type-check --workspaces",
-    "lint": "npm run lint --workspaces",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "test": "npm run test --workspaces --if-present",
     "dev": "echo \"Use 'docker compose up' for local development\""
   },
   "devDependencies": {
-    "typescript": "^5.4.5"
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.12.0",
+    "typescript": "^5.4.5",
+    "typescript-eslint": "^8.69.0"
   }
 }

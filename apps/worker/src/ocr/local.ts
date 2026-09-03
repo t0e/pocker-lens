@@ -185,7 +185,7 @@ async function runIsolatedOCR(
   return new Promise((resolve, reject) => {
     // Determine path to cli-runner.js or cli-runner.ts
     const runnerDir = path.dirname(new URL(import.meta.url).pathname)
-    let runnerScript = path.join(runnerDir, 'cli-runner.js')
+    const runnerScript = path.join(runnerDir, 'cli-runner.js')
 
     // In development / ts-node / tsx environments, use ts file if js not found
     const runnerArgs = [runnerScript, imagePath, languages]
