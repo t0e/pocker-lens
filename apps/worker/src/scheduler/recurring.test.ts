@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { runRecurringScheduler } from './recurring.js';
-import { prisma } from '../db/client.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { runRecurringScheduler } from './recurring.js'
+import { prisma } from '../db/client.js'
 
 describe('Worker Recurring Scheduler (Phase 7)', () => {
   const sampleRecurring = {
@@ -21,20 +21,22 @@ describe('Worker Recurring Scheduler (Phase 7)', () => {
     isSubscription: true,
     account: { id: 'acc_1', isArchived: false },
     category: { id: 'cat_1', name: 'Health' },
-  };
+  }
 
   beforeEach(() => {
-    vi.restoreAllMocks();
-  });
+    vi.restoreAllMocks()
+  })
 
   it('processes due recurring items and creates financial transaction and occurrence', async () => {
-    vi.spyOn(prisma.recurringTransaction, 'findMany').mockResolvedValue([sampleRecurring] as any);
+    vi.spyOn(prisma.recurringTransaction, 'findMany').mockResolvedValue([
+      sampleRecurring,
+    ] as any)
 
-    const mockCreateTx = vi.fn().mockResolvedValue({ id: 'tx_sched_1' });
-    const mockUpdateAccount = vi.fn().mockResolvedValue({});
-    const mockCreateOcc = vi.fn().mockResolvedValue({ id: 'occ_1' });
-    const mockUpdateOcc = vi.fn().mockResolvedValue({});
-    const mockUpdateRec = vi.fn().mockResolvedValue({});
+    const mockCreateTx = vi.fn().mockResolvedValue({ id: 'tx_sched_1' })
+    const mockUpdateAccount = vi.fn().mockResolvedValue({})
+    const mockCreateOcc = vi.fn().mockResolvedValue({ id: 'occ_1' })
+    const mockUpdateOcc = vi.fn().mockResolvedValue({})
+    const mockUpdateRec = vi.fn().mockResolvedValue({})
 
     const mockTx = {
       recurringOccurrence: {
@@ -45,35 +47,45 @@ describe('Worker Recurring Scheduler (Phase 7)', () => {
       account: { update: mockUpdateAccount },
       transaction: { create: mockCreateTx },
       recurringTransaction: { update: mockUpdateRec },
-    };
+    }
 
-    vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) => cb(mockTx));
+    vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) =>
+      cb(mockTx),
+    )
 
-    const result = await runRecurringScheduler(new Date('2026-08-02T00:00:00.000Z'));
+    const result = await runRecurringScheduler(
+      new Date('2026-08-02T00:00:00.000Z'),
+    )
 
-    expect(result.processedCount).toBe(1);
-    expect(result.generatedCount).toBe(1);
-    expect(mockCreateTx).toHaveBeenCalled();
-    expect(mockUpdateAccount).toHaveBeenCalled();
-    expect(mockCreateOcc).toHaveBeenCalled();
-  });
+    expect(result.processedCount).toBe(1)
+    expect(result.generatedCount).toBe(1)
+    expect(mockCreateTx).toHaveBeenCalled()
+    expect(mockUpdateAccount).toHaveBeenCalled()
+    expect(mockCreateOcc).toHaveBeenCalled()
+  })
 
   it('auto-pauses recurring item if the linked account is archived', async () => {
     const archivedRecurring = {
       ...sampleRecurring,
       account: { id: 'acc_1', isArchived: true },
-    };
-    vi.spyOn(prisma.recurringTransaction, 'findMany').mockResolvedValue([archivedRecurring] as any);
-    const updateSpy = vi.spyOn(prisma.recurringTransaction, 'update').mockResolvedValue({} as any);
+    }
+    vi.spyOn(prisma.recurringTransaction, 'findMany').mockResolvedValue([
+      archivedRecurring,
+    ] as any)
+    const updateSpy = vi
+      .spyOn(prisma.recurringTransaction, 'update')
+      .mockResolvedValue({} as any)
 
-    const result = await runRecurringScheduler(new Date('2026-08-02T00:00:00.000Z'));
+    const result = await runRecurringScheduler(
+      new Date('2026-08-02T00:00:00.000Z'),
+    )
 
-    expect(result.processedCount).toBe(1);
-    expect(result.generatedCount).toBe(0);
-    expect(result.skippedCount).toBe(1);
+    expect(result.processedCount).toBe(1)
+    expect(result.generatedCount).toBe(0)
+    expect(result.skippedCount).toBe(1)
     expect(updateSpy).toHaveBeenCalledWith({
       where: { id: archivedRecurring.id },
       data: { isActive: false },
-    });
-  });
-});
+    })
+  })
+})

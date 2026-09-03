@@ -1,14 +1,14 @@
-'use client';
+'use client'
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Sparkles, LogOut } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
-import { Button } from '../ui/Button';
-import { TransactionModal } from '../transactions/TransactionModal';
-import { AccountResponse, CategoryResponse } from '@pocketlens/shared';
-import { apiClient } from '@/lib/api-client';
+import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { Sparkles, LogOut } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
+import { Button } from '../ui/Button'
+import { TransactionModal } from '../transactions/TransactionModal'
+import { AccountResponse, CategoryResponse } from '@pocketlens/shared'
+import { apiClient } from '@/lib/api-client'
 
 const PAGE_TITLES: Record<string, string> = {
   '/': 'Financial Overview',
@@ -17,16 +17,16 @@ const PAGE_TITLES: Record<string, string> = {
   '/receipts': 'Receipt Scanner & Vault',
   '/budgets': 'Budgets & Recurring',
   '/settings': 'Settings & Profile',
-};
+}
 
 export const Header: React.FC = () => {
-  const pathname = usePathname();
-  const { user, logout } = useAuth();
-  const title = PAGE_TITLES[pathname] || 'PocketLens';
+  const pathname = usePathname()
+  const { user, logout } = useAuth()
+  const title = PAGE_TITLES[pathname] || 'PocketLens'
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [accounts, setAccounts] = useState<AccountResponse[]>([]);
-  const [categories, setCategories] = useState<CategoryResponse[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [accounts, setAccounts] = useState<AccountResponse[]>([])
+  const [categories, setCategories] = useState<CategoryResponse[]>([])
 
   useEffect(() => {
     if (user) {
@@ -35,12 +35,12 @@ export const Header: React.FC = () => {
         apiClient<CategoryResponse[]>('/categories'),
       ])
         .then(([accs, cats]) => {
-          setAccounts(accs);
-          setCategories(cats);
+          setAccounts(accs)
+          setCategories(cats)
         })
-        .catch(() => {});
+        .catch(() => {})
     }
-  }, [user]);
+  }, [user])
 
   return (
     <header className="sticky top-0 z-40 bg-zinc-50/90 dark:bg-zinc-950/90 backdrop-blur-md border-b border-zinc-200/60 dark:border-zinc-800/60 px-4 sm:px-8 py-3.5 flex items-center justify-between">
@@ -69,7 +69,9 @@ export const Header: React.FC = () => {
               <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 leading-tight">
                 {user.displayName}
               </span>
-              <span className="text-[10px] text-zinc-400 leading-tight">{user.email}</span>
+              <span className="text-[10px] text-zinc-400 leading-tight">
+                {user.email}
+              </span>
             </div>
             <button
               onClick={() => logout()}
@@ -89,7 +91,7 @@ export const Header: React.FC = () => {
           onClose={() => setIsModalOpen(false)}
           onSuccess={() => {
             if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('transaction-updated'));
+              window.dispatchEvent(new CustomEvent('transaction-updated'))
             }
           }}
           accounts={accounts}
@@ -97,5 +99,5 @@ export const Header: React.FC = () => {
         />
       )}
     </header>
-  );
-};
+  )
+}

@@ -92,6 +92,7 @@ The `docker-compose.yml` orchestrates five containers on the `pocketlens_network
 ## 5. Database Architecture & Important Constraints
 
 ### Key Models (`apps/api/prisma/schema.prisma`)
+
 - **`User`**: Account holder (`id`, `email`, `passwordHash`, `displayName`).
 - **`Session`**: State-backed auth tokens with SHA-256 token hash and expiry (`tokenHash`, `userId`, `expiresAt`).
 - **`Account`**: Wallets, banks, credit cards (`userId`, `currency`, `openingBalance`, `currentBalance`, `isArchived`, `isDefault`).
@@ -218,16 +219,16 @@ User confirms → Creates Transaction via Phase 3 service (Status: CONFIRMED)
 
 ## 11. Completed Phases 1–8 Summary
 
-| Phase | Description | Key Deliverables |
-|---|---|---|
-| **Phase 1** | Project Setup & Monorepo Foundation | Fastify API, Next.js Web, Shared package, Tailwind CSS, Docker Compose, Vitest |
-| **Phase 2** | Authentication & User Management | Cookie session auth, password hashing with salt, session revocation, auth middleware |
-| **Phase 3** | Accounts & Transaction Core | Multi-currency accounts, income/expenses/transfers, balance calculation, categories |
-| **Phase 4** | Receipt Storage & Processing Foundation | File validation, storage abstraction, BullMQ queue, receipt database models |
-| **Phase 5** | Multilingual Receipt OCR Engine | Local Tesseract OCR (EN/VI), dictionary token matching, deterministic field extraction |
-| **Phase 6** | Receipt Review & Confirmation Flow | Interactive side-by-side review modal, item editing, confirmation into transaction service |
-| **Phase 7** | Budgets, Recurring & Subscriptions | Monthly category budgets, progress alerts, recurring date math, subscriptions, idempotent scheduler |
-| **Phase 8** | Analytics, Trends & Spending Insights | Cashflow trends, category & merchant breakdown, spending pace, subscriptions summary, deterministic insights, search & sorting |
+| Phase       | Description                             | Key Deliverables                                                                                                               |
+| ----------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Phase 1** | Project Setup & Monorepo Foundation     | Fastify API, Next.js Web, Shared package, Tailwind CSS, Docker Compose, Vitest                                                 |
+| **Phase 2** | Authentication & User Management        | Cookie session auth, password hashing with salt, session revocation, auth middleware                                           |
+| **Phase 3** | Accounts & Transaction Core             | Multi-currency accounts, income/expenses/transfers, balance calculation, categories                                            |
+| **Phase 4** | Receipt Storage & Processing Foundation | File validation, storage abstraction, BullMQ queue, receipt database models                                                    |
+| **Phase 5** | Multilingual Receipt OCR Engine         | Local Tesseract OCR (EN/VI), dictionary token matching, deterministic field extraction                                         |
+| **Phase 6** | Receipt Review & Confirmation Flow      | Interactive side-by-side review modal, item editing, confirmation into transaction service                                     |
+| **Phase 7** | Budgets, Recurring & Subscriptions      | Monthly category budgets, progress alerts, recurring date math, subscriptions, idempotent scheduler                            |
+| **Phase 8** | Analytics, Trends & Spending Insights   | Cashflow trends, category & merchant breakdown, spending pace, subscriptions summary, deterministic insights, search & sorting |
 
 ---
 
@@ -243,7 +244,7 @@ User confirms → Creates Transaction via Phase 3 service (Status: CONFIRMED)
 - **Docker Compose**: All 5 containers (`postgres`, `redis`, `api`, `worker`, `web`) healthy and operational.
 - **Remote Git Status**: Pushed to `origin/main`.
 - **Known Operational Limitations**:
-  - *Worker Migration Race on Fresh Database*: On a completely fresh database, the worker may execute its initial recurring-scheduler check before Prisma migrations complete. The failure is handled gracefully and processing resumes on the next 60-second scheduler tick. Consider introducing a dedicated migration/init service during Phase 10 production hardening.
+  - _Worker Migration Race on Fresh Database_: On a completely fresh database, the worker may execute its initial recurring-scheduler check before Prisma migrations complete. The failure is handled gracefully and processing resumes on the next 60-second scheduler tick. Consider introducing a dedicated migration/init service during Phase 10 production hardening.
 
 ---
 
@@ -279,10 +280,12 @@ RECEIPT_STORAGE_PATH=/tmp/pocketlens-receipts
 ## 14. How to Run & Develop
 
 ### Prerequisites
+
 - Node.js 20+
 - Docker & Docker Compose
 
 ### Local Development
+
 ```bash
 # 1. Install dependencies
 npm install
@@ -310,14 +313,17 @@ npm run dev --workspace=@pocketlens/web
 ```
 
 ### Full Docker Orchestration
+
 ```bash
 docker compose up --build -d
 ```
+
 Access UI at `http://localhost:3000` and API at `http://localhost:4000`.
 
 ---
 
 ### Phase 9: Multi-Currency, FX & Smart Financial Intelligence (COMPLETED)
+
 - **Preserve Original Money Invariant**: Transactions permanently retain original `amount` and `currency` in the database. All conversions are derived reporting views only.
 - **Exchange Rate Infrastructure**: Database table `exchange_rates` with `Decimal(18, 8)` precision, unique constraint on `[baseCurrency, quoteCurrency, rateDate, provider]`, and provider abstraction (`IFXProvider`, fixture and historical rates).
 - **Multi-Currency Reporting**: User preferred reporting currency (`reportingCurrency` on `User`), switcher dropdown in UI header, and converted period totals (`convertedSummary`).
@@ -330,6 +336,7 @@ Access UI at `http://localhost:3000` and API at `http://localhost:4000`.
 ---
 
 ### Phase 10: Production Hardening, CI/CD & Portfolio Readiness (COMPLETED)
+
 - **Dedicated Migration Container**: Introduced `pocketlens-migrate` service in `docker-compose.yml` executing `prisma migrate deploy` after `postgres` becomes healthy and before `api` and `worker` launch (`service_completed_successfully` condition). This permanently resolves the first-boot worker migration race.
 - **Health vs Readiness Probes**: Added `/ready` endpoint checking database, Redis, and storage connectivity while preserving `/health` for fast process liveness.
 - **Configurable CORS Security**: Configurable `ALLOWED_ORIGINS` environment variable prevents unrestricted origin access with credentialed requests.

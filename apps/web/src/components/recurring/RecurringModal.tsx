@@ -1,24 +1,24 @@
-'use client';
+'use client'
 
-import React, { useState, useEffect } from 'react';
-import { X, RotateCcw, Sparkles, Loader2, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react'
+import { X, RotateCcw, Sparkles, Loader2, AlertCircle } from 'lucide-react'
 import {
   AccountResponse,
   CategoryResponse,
   RecurringTransactionResponse,
   RecurrenceFrequency,
-} from '@pocketlens/shared';
-import { Button } from '../ui/Button';
-import { apiClient } from '@/lib/api-client';
+} from '@pocketlens/shared'
+import { Button } from '../ui/Button'
+import { apiClient } from '@/lib/api-client'
 
 interface RecurringModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
-  accounts: AccountResponse[];
-  categories: CategoryResponse[];
-  itemToEdit?: RecurringTransactionResponse | null;
-  defaultIsSubscription?: boolean;
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+  accounts: AccountResponse[]
+  categories: CategoryResponse[]
+  itemToEdit?: RecurringTransactionResponse | null
+  defaultIsSubscription?: boolean
 }
 
 export const RecurringModal: React.FC<RecurringModalProps> = ({
@@ -30,86 +30,90 @@ export const RecurringModal: React.FC<RecurringModalProps> = ({
   itemToEdit,
   defaultIsSubscription = false,
 }) => {
-  const [type, setType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
-  const [description, setDescription] = useState('');
-  const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('VND');
-  const [accountId, setAccountId] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [frequency, setFrequency] = useState<RecurrenceFrequency>('MONTHLY');
-  const [interval, setInterval] = useState(1);
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState('');
-  const [isSubscription, setIsSubscription] = useState(defaultIsSubscription);
-  const [merchant, setMerchant] = useState('');
-  const [notes, setNotes] = useState('');
+  const [type, setType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE')
+  const [description, setDescription] = useState('')
+  const [amount, setAmount] = useState('')
+  const [currency, setCurrency] = useState('VND')
+  const [accountId, setAccountId] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [frequency, setFrequency] = useState<RecurrenceFrequency>('MONTHLY')
+  const [interval, setInterval] = useState(1)
+  const [startDate, setStartDate] = useState(
+    new Date().toISOString().split('T')[0],
+  )
+  const [endDate, setEndDate] = useState('')
+  const [isSubscription, setIsSubscription] = useState(defaultIsSubscription)
+  const [merchant, setMerchant] = useState('')
+  const [notes, setNotes] = useState('')
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const activeAccounts = accounts.filter((a) => !a.isArchived);
+  const activeAccounts = accounts.filter((a) => !a.isArchived)
   const filteredCategories = categories.filter(
-    (c) => c.type.toLowerCase() === type.toLowerCase() && !c.isArchived
-  );
+    (c) => c.type.toLowerCase() === type.toLowerCase() && !c.isArchived,
+  )
 
   useEffect(() => {
     if (itemToEdit) {
-      setType(itemToEdit.type);
-      setDescription(itemToEdit.description);
-      setAmount(itemToEdit.amount.toString());
-      setCurrency(itemToEdit.currency);
-      setAccountId(itemToEdit.accountId);
-      setCategoryId(itemToEdit.categoryId || '');
-      setFrequency(itemToEdit.frequency);
-      setInterval(itemToEdit.interval);
-      setStartDate(new Date(itemToEdit.startDate).toISOString().split('T')[0]);
+      setType(itemToEdit.type)
+      setDescription(itemToEdit.description)
+      setAmount(itemToEdit.amount.toString())
+      setCurrency(itemToEdit.currency)
+      setAccountId(itemToEdit.accountId)
+      setCategoryId(itemToEdit.categoryId || '')
+      setFrequency(itemToEdit.frequency)
+      setInterval(itemToEdit.interval)
+      setStartDate(new Date(itemToEdit.startDate).toISOString().split('T')[0])
       setEndDate(
-        itemToEdit.endDate ? new Date(itemToEdit.endDate).toISOString().split('T')[0] : ''
-      );
-      setIsSubscription(itemToEdit.isSubscription);
-      setMerchant(itemToEdit.merchant || '');
-      setNotes(itemToEdit.notes || '');
+        itemToEdit.endDate
+          ? new Date(itemToEdit.endDate).toISOString().split('T')[0]
+          : '',
+      )
+      setIsSubscription(itemToEdit.isSubscription)
+      setMerchant(itemToEdit.merchant || '')
+      setNotes(itemToEdit.notes || '')
     } else {
-      setType('EXPENSE');
-      setDescription('');
-      setAmount('');
-      const firstAcc = accounts.find((a) => !a.isArchived);
-      setAccountId(firstAcc?.id || '');
-      setCategoryId('');
-      setFrequency('MONTHLY');
-      setInterval(1);
-      setStartDate(new Date().toISOString().split('T')[0]);
-      setEndDate('');
-      setIsSubscription(defaultIsSubscription);
-      setMerchant('');
-      setNotes('');
+      setType('EXPENSE')
+      setDescription('')
+      setAmount('')
+      const firstAcc = accounts.find((a) => !a.isArchived)
+      setAccountId(firstAcc?.id || '')
+      setCategoryId('')
+      setFrequency('MONTHLY')
+      setInterval(1)
+      setStartDate(new Date().toISOString().split('T')[0])
+      setEndDate('')
+      setIsSubscription(defaultIsSubscription)
+      setMerchant('')
+      setNotes('')
     }
-    setError(null);
-  }, [itemToEdit, defaultIsSubscription, isOpen, accounts]);
+    setError(null)
+  }, [itemToEdit, defaultIsSubscription, isOpen, accounts])
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSubmitting) return;
+    e.preventDefault()
+    if (isSubmitting) return
 
     if (!description.trim()) {
-      setError('Description is required');
-      return;
+      setError('Description is required')
+      return
     }
 
     if (!amount || parseFloat(amount) <= 0) {
-      setError('Please enter a valid amount greater than zero');
-      return;
+      setError('Please enter a valid amount greater than zero')
+      return
     }
 
     if (!accountId) {
-      setError('Please select an account');
-      return;
+      setError('Please select an account')
+      return
     }
 
-    setIsSubmitting(true);
-    setError(null);
+    setIsSubmitting(true)
+    setError(null)
 
     try {
       const payload = {
@@ -126,28 +130,28 @@ export const RecurringModal: React.FC<RecurringModalProps> = ({
         isSubscription,
         merchant: merchant.trim() || undefined,
         notes: notes.trim() || undefined,
-      };
+      }
 
       if (itemToEdit) {
         await apiClient(`/recurring/${itemToEdit.id}`, {
           method: 'PATCH',
           body: JSON.stringify(payload),
-        });
+        })
       } else {
         await apiClient('/recurring', {
           method: 'POST',
           body: JSON.stringify(payload),
-        });
+        })
       }
 
-      onSuccess();
-      onClose();
+      onSuccess()
+      onClose()
     } catch (err: any) {
-      setError(err.message || 'Failed to save recurring transaction');
+      setError(err.message || 'Failed to save recurring transaction')
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/70 backdrop-blur-sm animate-fadeIn">
@@ -164,8 +168,8 @@ export const RecurringModal: React.FC<RecurringModalProps> = ({
                   ? 'Edit Subscription'
                   : 'Edit Recurring Transaction'
                 : isSubscription
-                ? 'New Subscription'
-                : 'New Recurring Transaction'}
+                  ? 'New Subscription'
+                  : 'New Recurring Transaction'}
             </h3>
           </div>
           <button
@@ -220,7 +224,11 @@ export const RecurringModal: React.FC<RecurringModalProps> = ({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
-              placeholder={isSubscription ? 'e.g. Netflix, Spotify, iCloud' : 'e.g. Rent, Gym, Salary'}
+              placeholder={
+                isSubscription
+                  ? 'e.g. Netflix, Spotify, iCloud'
+                  : 'e.g. Rent, Gym, Salary'
+              }
               className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             />
           </div>
@@ -307,7 +315,9 @@ export const RecurringModal: React.FC<RecurringModalProps> = ({
               </label>
               <select
                 value={frequency}
-                onChange={(e) => setFrequency(e.target.value as RecurrenceFrequency)}
+                onChange={(e) =>
+                  setFrequency(e.target.value as RecurrenceFrequency)
+                }
                 className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               >
                 <option value="MONTHLY">Monthly</option>
@@ -362,11 +372,15 @@ export const RecurringModal: React.FC<RecurringModalProps> = ({
           {/* Checkbox: Mark as Subscription */}
           <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between">
             <div className="space-y-0.5">
-              <label htmlFor="isSubscriptionCheck" className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 cursor-pointer">
+              <label
+                htmlFor="isSubscriptionCheck"
+                className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 cursor-pointer"
+              >
                 Mark as Subscription
               </label>
               <p className="text-[11px] text-zinc-400">
-                Track in the Subscriptions dashboard and calculate estimated monthly costs.
+                Track in the Subscriptions dashboard and calculate estimated
+                monthly costs.
               </p>
             </div>
             <input
@@ -404,7 +418,9 @@ export const RecurringModal: React.FC<RecurringModalProps> = ({
               ) : (
                 <>
                   <Sparkles className="h-3.5 w-3.5" />
-                  <span>{itemToEdit ? 'Update Template' : 'Save Recurring Item'}</span>
+                  <span>
+                    {itemToEdit ? 'Update Template' : 'Save Recurring Item'}
+                  </span>
                 </>
               )}
             </Button>
@@ -412,5 +428,5 @@ export const RecurringModal: React.FC<RecurringModalProps> = ({
         </form>
       </div>
     </div>
-  );
-};
+  )
+}

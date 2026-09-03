@@ -1,16 +1,16 @@
-import { Prisma } from '@prisma/client';
-import pino from 'pino';
-import { calculateNextRunDate } from '@pocketlens/shared';
-import { prisma } from '../db/client.js';
+import { Prisma } from '@prisma/client'
+import pino from 'pino'
+import { calculateNextRunDate } from '@pocketlens/shared'
+import { prisma } from '../db/client.js'
 
 const logger = pino({
   level: process.env.NODE_ENV === 'test' ? 'silent' : 'info',
-});
+})
 
 export interface ProcessDueResult {
-  processedCount: number;
-  generatedCount: number;
-  skippedCount: number;
+  processedCount: number
+  generatedCount: number
+  skippedCount: number
 }
 
 /**
@@ -19,17 +19,17 @@ export interface ProcessDueResult {
  */
 export async function processDueRecurringTransactions(
   now = new Date(),
-  targetUserId?: string
+  targetUserId?: string,
 ): Promise<ProcessDueResult> {
   const where: any = {
     isActive: true,
     nextRunDate: {
       lte: now,
     },
-  };
+  }
 
   if (targetUserId) {
-    where.userId = targetUserId;
+    where.userId = targetUserId
   }
 
   const dueItems = await prisma.recurringTransaction.findMany({
@@ -39,24 +39,24 @@ export async function processDueRecurringTransactions(
       category: true,
     },
     orderBy: { nextRunDate: 'asc' },
-  });
+  })
 
-  let generatedCount = 0;
-  let skippedCount = 0;
+  let generatedCount = 0
+  let skippedCount = 0
 
   for (const recurring of dueItems) {
     // 1. Safety check: If account is archived, auto-pause recurring transaction
     if (recurring.account.isArchived) {
       logger.warn(
         { recurringId: recurring.id, accountId: recurring.accountId },
-        'Account is archived. Auto-pausing recurring transaction.'
-      );
+        'Account is archived. Auto-pausing recurring transaction.',
+      )
       await prisma.recurringTransaction.update({
         where: { id: recurring.id },
         data: { isActive: false },
-      });
-      skippedCount++;
-      continue;
+      })
+      skippedCount++
+      continue
     }
 
     // 2. Safety check: If past end date, deactivate
@@ -64,20 +64,22 @@ export async function processDueRecurringTransactions(
       await prisma.recurringTransaction.update({
         where: { id: recurring.id },
         data: { isActive: false },
-      });
-      skippedCount++;
-      continue;
+      })
+      skippedCount++
+      continue
     }
 
-    const scheduledFor = new Date(recurring.nextRunDate);
+    const scheduledFor = new Date(recurring.nextRunDate)
     const nextRun = calculateNextRunDate(
       recurring.startDate,
       scheduledFor,
       recurring.frequency as any,
-      recurring.interval
-    );
+      recurring.interval,
+    )
 
-    const willDeactivate = recurring.endDate ? nextRun > recurring.endDate : false;
+    const willDeactivate = recurring.endDate
+      ? nextRun > recurring.endDate
+      : false
 
     try {
       // 3. Database-level Idempotency Check & Transaction Execution
@@ -90,21 +92,24 @@ export async function processDueRecurringTransactions(
               scheduledFor,
             },
           },
-        });
+        })
 
         if (existingOccurrence) {
           logger.info(
-            { recurringId: recurring.id, scheduledFor: scheduledFor.toISOString() },
-            'Occurrence already generated for this date. Advancing nextRunDate without duplicate transaction.'
-          );
+            {
+              recurringId: recurring.id,
+              scheduledFor: scheduledFor.toISOString(),
+            },
+            'Occurrence already generated for this date. Advancing nextRunDate without duplicate transaction.',
+          )
           await tx.recurringTransaction.update({
             where: { id: recurring.id },
             data: {
               nextRunDate: nextRun,
               isActive: willDeactivate ? false : recurring.isActive,
             },
-          });
-          return { skipped: true };
+          })
+          return { skipped: true }
         }
 
         // Create occurrence record
@@ -114,15 +119,15 @@ export async function processDueRecurringTransactions(
             scheduledFor,
             status: 'GENERATED',
           },
-        });
+        })
 
         // Balance adjustment
-        const amountDecimal = new Prisma.Decimal(recurring.amount.toString());
-        let balanceChange = new Prisma.Decimal(0);
+        const amountDecimal = new Prisma.Decimal(recurring.amount.toString())
+        let balanceChange = new Prisma.Decimal(0)
         if (recurring.type === 'EXPENSE') {
-          balanceChange = amountDecimal.negated();
+          balanceChange = amountDecimal.negated()
         } else if (recurring.type === 'INCOME') {
-          balanceChange = amountDecimal;
+          balanceChange = amountDecimal
         }
 
         await tx.account.update({
@@ -132,7 +137,7 @@ export async function processDueRecurringTransactions(
               increment: balanceChange,
             },
           },
-        });
+        })
 
         // Create financial transaction using existing Phase 3 accounting model
         const transaction = await tx.transaction.create({
@@ -149,13 +154,13 @@ export async function processDueRecurringTransactions(
             notes: recurring.notes,
             recurringTransactionId: recurring.id,
           },
-        });
+        })
 
         // Link occurrence to transaction
         await tx.recurringOccurrence.update({
           where: { id: occurrence.id },
           data: { transactionId: transaction.id },
-        });
+        })
 
         // Advance nextRunDate
         await tx.recurringTransaction.update({
@@ -164,15 +169,15 @@ export async function processDueRecurringTransactions(
             nextRunDate: nextRun,
             isActive: willDeactivate ? false : recurring.isActive,
           },
-        });
+        })
 
-        return { skipped: false, transactionId: transaction.id };
-      });
+        return { skipped: false, transactionId: transaction.id }
+      })
 
       if (result.skipped) {
-        skippedCount++;
+        skippedCount++
       } else {
-        generatedCount++;
+        generatedCount++
         logger.info(
           {
             recurringId: recurring.id,
@@ -180,15 +185,15 @@ export async function processDueRecurringTransactions(
             amount: recurring.amount.toString(),
             currency: recurring.currency,
           },
-          'Generated recurring transaction successfully'
-        );
+          'Generated recurring transaction successfully',
+        )
       }
     } catch (err: any) {
       logger.error(
         { err: err.message, recurringId: recurring.id },
-        'Failed to process recurring transaction item'
-      );
-      skippedCount++;
+        'Failed to process recurring transaction item',
+      )
+      skippedCount++
     }
   }
 
@@ -196,5 +201,5 @@ export async function processDueRecurringTransactions(
     processedCount: dueItems.length,
     generatedCount,
     skippedCount,
-  };
+  }
 }

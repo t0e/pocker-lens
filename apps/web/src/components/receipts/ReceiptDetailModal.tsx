@@ -1,6 +1,6 @@
-'use client';
+'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'
 import {
   X,
   Calendar,
@@ -20,7 +20,7 @@ import {
   Tag,
   Wallet,
   DollarSign,
-} from 'lucide-react';
+} from 'lucide-react'
 import {
   ReceiptResponse,
   ReceiptExtractionResponse,
@@ -30,20 +30,20 @@ import {
   CategorySuggestionResponse,
   DuplicateMatch,
   DuplicateCheckResult,
-} from '@pocketlens/shared';
-import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
-import { apiClient } from '@/lib/api-client';
-import { CategorySuggestionBadge } from '../intelligence/CategorySuggestionBadge';
-import { DuplicateWarningModal } from '../intelligence/DuplicateWarningModal';
+} from '@pocketlens/shared'
+import { Button } from '../ui/Button'
+import { Badge } from '../ui/Badge'
+import { apiClient } from '@/lib/api-client'
+import { CategorySuggestionBadge } from '../intelligence/CategorySuggestionBadge'
+import { DuplicateWarningModal } from '../intelligence/DuplicateWarningModal'
 
 interface ReceiptDetailModalProps {
-  receipt: ReceiptResponse | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onDelete: (id: string) => void;
-  onRetry: (id: string) => void;
-  onConfirmed?: () => void;
+  receipt: ReceiptResponse | null
+  isOpen: boolean
+  onClose: () => void
+  onDelete: (id: string) => void
+  onRetry: (id: string) => void
+  onConfirmed?: () => void
 }
 
 export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
@@ -54,200 +54,209 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
   onRetry,
   onConfirmed,
 }) => {
-  const [accounts, setAccounts] = useState<AccountResponse[]>([]);
-  const [categories, setCategories] = useState<CategoryResponse[]>([]);
-  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
-  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
-  const [accountsError, setAccountsError] = useState<string | null>(null);
-  const [categoriesError, setCategoriesError] = useState<string | null>(null);
-  const [showRawText, setShowRawText] = useState(false);
+  const [accounts, setAccounts] = useState<AccountResponse[]>([])
+  const [categories, setCategories] = useState<CategoryResponse[]>([])
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false)
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false)
+  const [accountsError, setAccountsError] = useState<string | null>(null)
+  const [categoriesError, setCategoriesError] = useState<string | null>(null)
+  const [showRawText, setShowRawText] = useState(false)
 
   // Form draft state
-  const [merchant, setMerchant] = useState('');
-  const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('VND');
-  const [transactionDate, setTransactionDate] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [accountId, setAccountId] = useState('');
-  const [description, setDescription] = useState('');
-  const [notes, setNotes] = useState('');
+  const [merchant, setMerchant] = useState('')
+  const [amount, setAmount] = useState('')
+  const [currency, setCurrency] = useState('VND')
+  const [transactionDate, setTransactionDate] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [accountId, setAccountId] = useState('')
+  const [description, setDescription] = useState('')
+  const [notes, setNotes] = useState('')
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isReprocessing, setIsReprocessing] = useState(false);
-  const [confirmError, setConfirmError] = useState<string | null>(null);
-  const [confirmSuccess, setConfirmSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isReprocessing, setIsReprocessing] = useState(false)
+  const [confirmError, setConfirmError] = useState<string | null>(null)
+  const [confirmSuccess, setConfirmSuccess] = useState(false)
 
   // Authenticated Image Loading State
-  const [imageBlobUrl, setImageBlobUrl] = useState<string | null>(null);
-  const [isImageLoading, setIsImageLoading] = useState(false);
-  const [imageLoadError, setImageLoadError] = useState<string | null>(null);
+  const [imageBlobUrl, setImageBlobUrl] = useState<string | null>(null)
+  const [isImageLoading, setIsImageLoading] = useState(false)
+  const [imageLoadError, setImageLoadError] = useState<string | null>(null)
 
   // Intelligence States
-  const [suggestedCategory, setSuggestedCategory] = useState<CategorySuggestionResponse | null>(null);
-  const [duplicateMatch, setDuplicateMatch] = useState<DuplicateMatch | null>(null);
-  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+  const [suggestedCategory, setSuggestedCategory] =
+    useState<CategorySuggestionResponse | null>(null)
+  const [duplicateMatch, setDuplicateMatch] = useState<DuplicateMatch | null>(
+    null,
+  )
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false)
 
   // Fetch authenticated image blob with credentials
   useEffect(() => {
-    const receiptId = receipt?.id;
+    const receiptId = receipt?.id
     if (!receiptId || !isOpen) {
       setImageBlobUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
-      return;
+        if (prev) URL.revokeObjectURL(prev)
+        return null
+      })
+      return
     }
 
-    let isMounted = true;
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    const targetUrl = `${apiBase}/receipts/${receiptId}/file`;
+    let isMounted = true
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+    const targetUrl = `${apiBase}/receipts/${receiptId}/file`
 
-    setIsImageLoading(true);
-    setImageLoadError(null);
+    setIsImageLoading(true)
+    setImageLoadError(null)
 
     fetch(targetUrl, {
       credentials: 'include',
     })
       .then(async (res) => {
         if (!res.ok) {
-          throw new Error(`Failed to load receipt image (${res.status})`);
+          throw new Error(`Failed to load receipt image (${res.status})`)
         }
-        return res.blob();
+        return res.blob()
       })
       .then((blob) => {
         if (isMounted) {
-          const url = URL.createObjectURL(blob);
+          const url = URL.createObjectURL(blob)
           setImageBlobUrl((prev) => {
-            if (prev) URL.revokeObjectURL(prev);
-            return url;
-          });
-          setIsImageLoading(false);
+            if (prev) URL.revokeObjectURL(prev)
+            return url
+          })
+          setIsImageLoading(false)
         }
       })
       .catch((err) => {
         if (isMounted) {
-          setImageLoadError(err.message || 'Failed to load receipt image');
-          setIsImageLoading(false);
+          setImageLoadError(err.message || 'Failed to load receipt image')
+          setIsImageLoading(false)
         }
-      });
+      })
 
     return () => {
-      isMounted = false;
-    };
-  }, [receipt?.id, isOpen]);
+      isMounted = false
+    }
+  }, [receipt?.id, isOpen])
 
   useEffect(() => {
     if (categoryId || (!merchant.trim() && !description.trim())) {
-      setSuggestedCategory(null);
-      return;
+      setSuggestedCategory(null)
+      return
     }
 
     const timer = setTimeout(async () => {
       try {
-        const res = await apiClient<CategorySuggestionResponse>('/categories/suggest', {
-          method: 'POST',
-          body: JSON.stringify({
-            merchant: merchant.trim() || undefined,
-            description: description.trim() || undefined,
-            amount: parseFloat(amount) || undefined,
-          }),
-        });
+        const res = await apiClient<CategorySuggestionResponse>(
+          '/categories/suggest',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              merchant: merchant.trim() || undefined,
+              description: description.trim() || undefined,
+              amount: parseFloat(amount) || undefined,
+            }),
+          },
+        )
         if (res && res.categoryId && res.confidence !== 'NONE') {
-          setSuggestedCategory(res);
+          setSuggestedCategory(res)
         } else {
-          setSuggestedCategory(null);
+          setSuggestedCategory(null)
         }
       } catch {
-        setSuggestedCategory(null);
+        setSuggestedCategory(null)
       }
-    }, 300);
+    }, 300)
 
-    return () => clearTimeout(timer);
-  }, [merchant, description, amount, categoryId]);
+    return () => clearTimeout(timer)
+  }, [merchant, description, amount, categoryId])
 
   // Load user accounts and categories
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) return
 
-    setIsLoadingAccounts(true);
-    setAccountsError(null);
+    setIsLoadingAccounts(true)
+    setAccountsError(null)
     apiClient<AccountResponse[]>('/accounts')
       .then((res) => setAccounts(Array.isArray(res) ? res : []))
       .catch(() => setAccountsError('Unable to load accounts.'))
-      .finally(() => setIsLoadingAccounts(false));
+      .finally(() => setIsLoadingAccounts(false))
 
-    setIsLoadingCategories(true);
-    setCategoriesError(null);
+    setIsLoadingCategories(true)
+    setCategoriesError(null)
     apiClient<CategoryResponse[]>('/categories?type=expense')
       .then((res) => setCategories(Array.isArray(res) ? res : []))
       .catch(() => setCategoriesError('Unable to load categories.'))
-      .finally(() => setIsLoadingCategories(false));
-  }, [isOpen]);
+      .finally(() => setIsLoadingCategories(false))
+  }, [isOpen])
 
   // Pre-fill form from extraction whenever receipt changes
   useEffect(() => {
-    if (!receipt) return;
+    if (!receipt) return
 
-    const ext = receipt.extraction;
+    const ext = receipt.extraction
     if (ext) {
-      setMerchant(ext.merchant || '');
-      setAmount(ext.totalAmount !== null ? ext.totalAmount.toString() : '');
-      setCurrency(ext.currency || 'VND');
+      setMerchant(ext.merchant || '')
+      setAmount(ext.totalAmount !== null ? ext.totalAmount.toString() : '')
+      setCurrency(ext.currency || 'VND')
 
-      let dateStr = new Date().toISOString().split('T')[0];
+      let dateStr = new Date().toISOString().split('T')[0]
       if (ext.transactionDate) {
-        dateStr = new Date(ext.transactionDate).toISOString().split('T')[0];
+        dateStr = new Date(ext.transactionDate).toISOString().split('T')[0]
       }
-      setTransactionDate(dateStr);
+      setTransactionDate(dateStr)
 
-      setCategoryId(ext.categoryId || '');
-      setAccountId(ext.accountId || '');
-      setDescription(ext.merchant || receipt.originalFilename || 'Expense');
-      setNotes('');
+      setCategoryId(ext.categoryId || '')
+      setAccountId(ext.accountId || '')
+      setDescription(ext.merchant || receipt.originalFilename || 'Expense')
+      setNotes('')
     } else {
-      setMerchant('');
-      setAmount('');
-      setCurrency('VND');
-      setTransactionDate(new Date().toISOString().split('T')[0]);
-      setDescription(receipt.originalFilename);
+      setMerchant('')
+      setAmount('')
+      setCurrency('VND')
+      setTransactionDate(new Date().toISOString().split('T')[0])
+      setDescription(receipt.originalFilename)
     }
-    setConfirmError(null);
-    setConfirmSuccess(false);
-  }, [receipt]);
+    setConfirmError(null)
+    setConfirmSuccess(false)
+  }, [receipt])
 
-  if (!isOpen || !receipt) return null;
+  if (!isOpen || !receipt) return null
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-  const imageUrl = `${apiBase}/receipts/${receipt.id}/file`;
-  const extraction = receipt.extraction;
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+  const imageUrl = `${apiBase}/receipts/${receipt.id}/file`
+  const extraction = receipt.extraction
 
   const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
 
   const getStatusBadge = () => {
     if (receipt.transactionId) {
-      return <Badge variant="success">Confirmed & Linked</Badge>;
+      return <Badge variant="success">Confirmed & Linked</Badge>
     }
     switch (receipt.status) {
       case 'ready':
-        return <Badge variant="success">Ready for Review</Badge>;
+        return <Badge variant="success">Ready for Review</Badge>
       case 'processing':
-        return <Badge variant="info">Processing OCR...</Badge>;
+        return <Badge variant="info">Processing OCR...</Badge>
       case 'queued':
-        return <Badge variant="info">Queued</Badge>;
+        return <Badge variant="info">Queued</Badge>
       case 'failed':
         return (
-          <Badge variant="default" className="bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+          <Badge
+            variant="default"
+            className="bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+          >
             Failed
           </Badge>
-        );
+        )
       default:
-        return <Badge variant="default">Uploaded</Badge>;
+        return <Badge variant="default">Uploaded</Badge>
     }
-  };
+  }
 
   const getConfidenceBadge = (confidence?: FieldConfidence) => {
     switch (confidence) {
@@ -256,65 +265,71 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 font-semibold">
             High confidence
           </span>
-        );
+        )
       case 'medium':
         return (
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 font-semibold">
             Medium confidence
           </span>
-        );
+        )
       case 'low':
         return (
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium">
             Review needed
           </span>
-        );
+        )
       default:
-        return null;
+        return null
     }
-  };
+  }
 
-  const handleConfirmTransaction = async (e?: React.FormEvent, forceConfirm = false) => {
-    if (e) e.preventDefault();
-    if (isSubmitting || receipt.transactionId) return;
+  const handleConfirmTransaction = async (
+    e?: React.FormEvent,
+    forceConfirm = false,
+  ) => {
+    if (e) e.preventDefault()
+    if (isSubmitting || receipt.transactionId) return
 
     if (!amount || parseFloat(amount) <= 0) {
-      setConfirmError('Please provide a valid amount');
-      return;
+      setConfirmError('Please provide a valid amount')
+      return
     }
 
     if (!accountId) {
-      setConfirmError('Please select a payment account');
-      return;
+      setConfirmError('Please select a payment account')
+      return
     }
 
     if (!forceConfirm) {
       try {
-        const dupRes = await apiClient<DuplicateCheckResult>('/transactions/check-duplicates', {
-          method: 'POST',
-          body: JSON.stringify({
-            accountId,
-            amount: parseFloat(amount),
-            currency,
-            transactionDate: new Date(transactionDate).toISOString(),
-            description: description || merchant || 'Receipt expense',
-            merchant: merchant || undefined,
-            type: 'EXPENSE',
-          }),
-        });
+        const dupRes = await apiClient<DuplicateCheckResult>(
+          '/transactions/check-duplicates',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              accountId,
+              amount: parseFloat(amount),
+              currency,
+              transactionDate: new Date(transactionDate).toISOString(),
+              description: description || merchant || 'Receipt expense',
+              merchant: merchant || undefined,
+              type: 'EXPENSE',
+            }),
+          },
+        )
 
         if (dupRes && dupRes.hasDuplicate && dupRes.matches.length > 0) {
-          setDuplicateMatch(dupRes.matches[0]);
-          setIsDuplicateModalOpen(true);
-          return;
+          setDuplicateMatch(dupRes.matches[0])
+          setIsDuplicateModalOpen(true)
+          return
         }
       } catch {
         // Continue
       }
     }
 
-    setIsSubmitting(true);
-    setConfirmError(null);
+    setIsSubmitting(true)
+    setConfirmError(null)
 
     try {
       await apiClient(`/receipts/${receipt.id}/confirm`, {
@@ -330,35 +345,35 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
           merchant: merchant || undefined,
           notes: notes || undefined,
         }),
-      });
+      })
 
-      setConfirmSuccess(true);
-      if (onConfirmed) onConfirmed();
+      setConfirmSuccess(true)
+      if (onConfirmed) onConfirmed()
       setTimeout(() => {
-        onClose();
-      }, 1200);
+        onClose()
+      }, 1200)
     } catch (err: any) {
-      setConfirmError(err.message || 'Failed to create transaction');
+      setConfirmError(err.message || 'Failed to create transaction')
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
   const handleReprocess = async () => {
-    if (isReprocessing || receipt.transactionId) return;
-    setIsReprocessing(true);
+    if (isReprocessing || receipt.transactionId) return
+    setIsReprocessing(true)
     try {
       await apiClient(`/receipts/${receipt.id}/reprocess`, {
         method: 'POST',
-      });
-      if (onConfirmed) onConfirmed();
-      onClose();
+      })
+      if (onConfirmed) onConfirmed()
+      onClose()
     } catch (err: any) {
-      alert(err.message || 'Failed to reprocess receipt');
+      alert(err.message || 'Failed to reprocess receipt')
     } finally {
-      setIsReprocessing(false);
+      setIsReprocessing(false)
     }
-  };
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-zinc-950/75 backdrop-blur-sm animate-fadeIn">
@@ -408,32 +423,40 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
               ) : imageLoadError ? (
                 <div className="flex flex-col items-center justify-center space-y-2 text-center p-4 text-zinc-400">
                   <AlertTriangle className="h-6 w-6 text-rose-500 mb-1" />
-                  <span className="text-xs text-rose-600 dark:text-rose-400 font-medium">{imageLoadError}</span>
+                  <span className="text-xs text-rose-600 dark:text-rose-400 font-medium">
+                    {imageLoadError}
+                  </span>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      setIsImageLoading(true);
-                      setImageLoadError(null);
-                      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-                      fetch(`${apiBase}/receipts/${receipt.id}/file`, { credentials: 'include' })
+                      setIsImageLoading(true)
+                      setImageLoadError(null)
+                      const apiBase =
+                        process.env.NEXT_PUBLIC_API_URL ||
+                        'http://localhost:4000'
+                      fetch(`${apiBase}/receipts/${receipt.id}/file`, {
+                        credentials: 'include',
+                      })
                         .then((res) => {
-                          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                          return res.blob();
+                          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+                          return res.blob()
                         })
                         .then((blob) => {
-                          const url = URL.createObjectURL(blob);
+                          const url = URL.createObjectURL(blob)
                           setImageBlobUrl((prev) => {
-                            if (prev) URL.revokeObjectURL(prev);
-                            return url;
-                          });
-                          setIsImageLoading(false);
+                            if (prev) URL.revokeObjectURL(prev)
+                            return url
+                          })
+                          setIsImageLoading(false)
                         })
                         .catch((err) => {
-                          setImageLoadError(err.message || 'Failed to load receipt image');
-                          setIsImageLoading(false);
-                        });
+                          setImageLoadError(
+                            err.message || 'Failed to load receipt image',
+                          )
+                          setIsImageLoading(false)
+                        })
                     }}
                     className="text-[11px] mt-1"
                   >
@@ -468,7 +491,11 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
                     <FileText className="h-3.5 w-3.5 text-zinc-400" />
                     <span>View Raw OCR Text</span>
                   </span>
-                  {showRawText ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  {showRawText ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
                 </button>
                 {showRawText && (
                   <pre className="p-3 bg-zinc-950 text-zinc-300 text-[11px] font-mono whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed border-t border-zinc-200 dark:border-zinc-800">
@@ -486,7 +513,10 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
                 <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 text-xs">
                   <span className="flex items-center space-x-1.5 font-semibold text-emerald-800 dark:text-emerald-200">
                     <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                    <span>Extracted Draft ({extraction.detectedLanguage?.toUpperCase() || 'EN'})</span>
+                    <span>
+                      Extracted Draft (
+                      {extraction.detectedLanguage?.toUpperCase() || 'EN'})
+                    </span>
                   </span>
                   {extraction.confidence && (
                     <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
@@ -510,7 +540,9 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
                       <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                         Merchant
                       </label>
-                      {getConfidenceBadge(extraction.fieldConfidences?.merchant)}
+                      {getConfidenceBadge(
+                        extraction.fieldConfidences?.merchant,
+                      )}
                     </div>
                     <input
                       type="text"
@@ -529,7 +561,9 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
                         <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                           Total Amount *
                         </label>
-                        {getConfidenceBadge(extraction.fieldConfidences?.totalAmount)}
+                        {getConfidenceBadge(
+                          extraction.fieldConfidences?.totalAmount,
+                        )}
                       </div>
                       <input
                         type="number"
@@ -541,10 +575,13 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
                         className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:opacity-60"
                         placeholder="80000"
                       />
-                      {extraction?.fieldConfidences?.amountUncertaintyWarning && (
+                      {extraction?.fieldConfidences
+                        ?.amountUncertaintyWarning && (
                         <div className="mt-1 flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400">
                           <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                          <span>Amount detected with uncertainty — please verify.</span>
+                          <span>
+                            Amount detected with uncertainty — please verify.
+                          </span>
                         </div>
                       )}
                     </div>
@@ -577,7 +614,9 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
                         <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                           Date *
                         </label>
-                        {getConfidenceBadge(extraction.fieldConfidences?.transactionDate)}
+                        {getConfidenceBadge(
+                          extraction.fieldConfidences?.transactionDate,
+                        )}
                       </div>
                       <input
                         type="date"
@@ -594,7 +633,9 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
                         <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                           Category
                         </label>
-                        {getConfidenceBadge(extraction.fieldConfidences?.category)}
+                        {getConfidenceBadge(
+                          extraction.fieldConfidences?.category,
+                        )}
                       </div>
                       {isLoadingCategories ? (
                         <div className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 text-zinc-400 flex items-center space-x-2">
@@ -624,14 +665,16 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
                           ))}
                         </select>
                       )}
-                      {suggestedCategory && !categoryId && !receipt.transactionId && (
-                        <div className="mt-1.5">
-                          <CategorySuggestionBadge
-                            suggestion={suggestedCategory}
-                            onApply={(catId) => setCategoryId(catId)}
-                          />
-                        </div>
-                      )}
+                      {suggestedCategory &&
+                        !categoryId &&
+                        !receipt.transactionId && (
+                          <div className="mt-1.5">
+                            <CategorySuggestionBadge
+                              suggestion={suggestedCategory}
+                              onApply={(catId) => setCategoryId(catId)}
+                            />
+                          </div>
+                        )}
                     </div>
                   </div>
 
@@ -698,7 +741,10 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
                     </div>
                     <div className="rounded-xl border border-zinc-200/80 dark:border-zinc-800 divide-y divide-zinc-100 dark:divide-zinc-800 text-xs overflow-hidden">
                       {extraction.items.map((item, idx) => (
-                        <div key={idx} className="p-2 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-950/40">
+                        <div
+                          key={idx}
+                          className="p-2 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-950/40"
+                        >
                           <span className="font-medium text-zinc-800 dark:text-zinc-200 truncate max-w-[200px]">
                             {item.description}
                           </span>
@@ -723,7 +769,9 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
                         disabled={isReprocessing || isSubmitting}
                         className="text-xs space-x-1.5"
                       >
-                        <RotateCcw className={`h-3.5 w-3.5 ${isReprocessing ? 'animate-spin' : ''}`} />
+                        <RotateCcw
+                          className={`h-3.5 w-3.5 ${isReprocessing ? 'animate-spin' : ''}`}
+                        />
                         <span>Reprocess</span>
                       </Button>
                     )}
@@ -742,7 +790,13 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
 
                   <div className="flex items-center space-x-2">
                     {receipt.transactionId ? (
-                      <Button type="button" variant="outline" size="sm" disabled className="text-xs space-x-1 text-emerald-600 font-bold">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled
+                        className="text-xs space-x-1 text-emerald-600 font-bold"
+                      >
                         <Check className="h-4 w-4" />
                         <span>Transaction Confirmed</span>
                       </Button>
@@ -829,27 +883,27 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
               transactionDate: transactionDate || new Date().toISOString(),
             }}
             onKeepBoth={() => {
-              setIsDuplicateModalOpen(false);
-              handleConfirmTransaction(undefined, true);
+              setIsDuplicateModalOpen(false)
+              handleConfirmTransaction(undefined, true)
             }}
             onUseExisting={async (existingId) => {
-              setIsDuplicateModalOpen(false);
+              setIsDuplicateModalOpen(false)
               // Link receipt to existing transaction
               try {
                 await apiClient(`/receipts/${receipt.id}/link`, {
                   method: 'POST',
                   body: JSON.stringify({ transactionId: existingId }),
-                });
+                })
               } catch {}
-              if (onConfirmed) onConfirmed();
-              onClose();
+              if (onConfirmed) onConfirmed()
+              onClose()
             }}
             onCancel={() => {
-              setIsDuplicateModalOpen(false);
+              setIsDuplicateModalOpen(false)
             }}
           />
         )}
       </div>
     </div>
-  );
-};
+  )
+}

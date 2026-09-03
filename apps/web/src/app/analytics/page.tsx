@@ -1,6 +1,6 @@
-"use client";
+'use client'
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   FinancialSummaryResponse,
   CashFlowTrendsResponse,
@@ -11,14 +11,20 @@ import {
   CommitmentsSummaryResponse,
   SpendingInsightsResponse,
   TimeRangeType,
-} from "@pocketlens/shared";
-import { apiClient } from "@/lib/api-client";
-import { formatMoney } from "@/lib/utils";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
-import { CashFlowChart } from "@/components/analytics/CashFlowChart";
-import { CategoryBreakdownChart } from "@/components/analytics/CategoryBreakdownChart";
-import { SpendingPaceIndicator } from "@/components/analytics/SpendingPaceIndicator";
-import { DeterministicInsightsCard } from "@/components/analytics/DeterministicInsightsCard";
+} from '@pocketlens/shared'
+import { apiClient } from '@/lib/api-client'
+import { formatMoney } from '@/lib/utils'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/Card'
+import { CashFlowChart } from '@/components/analytics/CashFlowChart'
+import { CategoryBreakdownChart } from '@/components/analytics/CategoryBreakdownChart'
+import { SpendingPaceIndicator } from '@/components/analytics/SpendingPaceIndicator'
+import { DeterministicInsightsCard } from '@/components/analytics/DeterministicInsightsCard'
 import {
   TrendingUp,
   TrendingDown,
@@ -34,43 +40,51 @@ import {
   Sparkles,
   Loader2,
   RefreshCw,
-} from "lucide-react";
+} from 'lucide-react'
 
-import { ReportingCurrencySelector } from "@/components/fx/ReportingCurrencySelector";
-import { formatCurrencyAmount } from "@pocketlens/shared";
+import { ReportingCurrencySelector } from '@/components/fx/ReportingCurrencySelector'
+import { formatCurrencyAmount } from '@pocketlens/shared'
 
 const TIME_RANGES: { value: TimeRangeType; label: string }[] = [
-  { value: "current_month", label: "This Month" },
-  { value: "previous_month", label: "Last Month" },
-  { value: "last_3_months", label: "Last 3 Months" },
-  { value: "last_6_months", label: "Last 6 Months" },
-  { value: "current_year", label: "This Year" },
-];
+  { value: 'current_month', label: 'This Month' },
+  { value: 'previous_month', label: 'Last Month' },
+  { value: 'last_3_months', label: 'Last 3 Months' },
+  { value: 'last_6_months', label: 'Last 6 Months' },
+  { value: 'current_year', label: 'This Year' },
+]
 
 export default function AnalyticsPage() {
-  const [timeRange, setTimeRange] = useState<TimeRangeType>("current_month");
-  const [selectedCurrency, setSelectedCurrency] = useState<string>("VND");
-  const [reportingCurrency, setReportingCurrency] = useState<string>("VND");
-  const [isLoading, setIsLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState<TimeRangeType>('current_month')
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('VND')
+  const [reportingCurrency, setReportingCurrency] = useState<string>('VND')
+  const [isLoading, setIsLoading] = useState(true)
 
   // Analytics Datasets
-  const [summary, setSummary] = useState<FinancialSummaryResponse | null>(null);
-  const [trends, setTrends] = useState<CashFlowTrendsResponse | null>(null);
-  const [categories, setCategories] = useState<CategoryBreakdownResponse | null>(null);
-  const [merchants, setMerchants] = useState<MerchantBreakdownResponse | null>(null);
-  const [biggestExpenses, setBiggestExpenses] = useState<BiggestExpensesResponse | null>(null);
-  const [budgetPerf, setBudgetPerf] = useState<BudgetPerformanceResponse | null>(null);
-  const [commitments, setCommitments] = useState<CommitmentsSummaryResponse | null>(null);
-  const [insights, setInsights] = useState<SpendingInsightsResponse | null>(null);
+  const [summary, setSummary] = useState<FinancialSummaryResponse | null>(null)
+  const [trends, setTrends] = useState<CashFlowTrendsResponse | null>(null)
+  const [categories, setCategories] =
+    useState<CategoryBreakdownResponse | null>(null)
+  const [merchants, setMerchants] = useState<MerchantBreakdownResponse | null>(
+    null,
+  )
+  const [biggestExpenses, setBiggestExpenses] =
+    useState<BiggestExpensesResponse | null>(null)
+  const [budgetPerf, setBudgetPerf] =
+    useState<BudgetPerformanceResponse | null>(null)
+  const [commitments, setCommitments] =
+    useState<CommitmentsSummaryResponse | null>(null)
+  const [insights, setInsights] = useState<SpendingInsightsResponse | null>(
+    null,
+  )
 
   const fetchAnalytics = useCallback(async () => {
     try {
-      setIsLoading(true);
+      setIsLoading(true)
       const queryParams = new URLSearchParams({
         timeRange,
         currency: selectedCurrency,
         reportingCurrency,
-      }).toString();
+      }).toString()
 
       const [
         summaryData,
@@ -82,42 +96,62 @@ export default function AnalyticsPage() {
         commitmentsData,
         insightsData,
       ] = await Promise.all([
-        apiClient<FinancialSummaryResponse>(`/analytics/summary?${queryParams}`),
-        apiClient<CashFlowTrendsResponse>(`/analytics/trends?currency=${selectedCurrency}&months=6`),
-        apiClient<CategoryBreakdownResponse>(`/analytics/categories?${queryParams}`),
-        apiClient<MerchantBreakdownResponse>(`/analytics/merchants?${queryParams}&limit=6`),
-        apiClient<BiggestExpensesResponse>(`/analytics/expenses/biggest?${queryParams}&limit=5`),
-        apiClient<BudgetPerformanceResponse>(`/analytics/budgets?currency=${selectedCurrency}`),
-        apiClient<CommitmentsSummaryResponse>(`/analytics/subscriptions?currency=${selectedCurrency}`),
-        apiClient<SpendingInsightsResponse>(`/analytics/insights?currency=${selectedCurrency}`),
-      ]);
+        apiClient<FinancialSummaryResponse>(
+          `/analytics/summary?${queryParams}`,
+        ),
+        apiClient<CashFlowTrendsResponse>(
+          `/analytics/trends?currency=${selectedCurrency}&months=6`,
+        ),
+        apiClient<CategoryBreakdownResponse>(
+          `/analytics/categories?${queryParams}`,
+        ),
+        apiClient<MerchantBreakdownResponse>(
+          `/analytics/merchants?${queryParams}&limit=6`,
+        ),
+        apiClient<BiggestExpensesResponse>(
+          `/analytics/expenses/biggest?${queryParams}&limit=5`,
+        ),
+        apiClient<BudgetPerformanceResponse>(
+          `/analytics/budgets?currency=${selectedCurrency}`,
+        ),
+        apiClient<CommitmentsSummaryResponse>(
+          `/analytics/subscriptions?currency=${selectedCurrency}`,
+        ),
+        apiClient<SpendingInsightsResponse>(
+          `/analytics/insights?currency=${selectedCurrency}`,
+        ),
+      ])
 
-      setSummary(summaryData);
-      setTrends(trendsData);
-      setCategories(categoriesData);
-      setMerchants(merchantsData);
-      setBiggestExpenses(biggestData);
-      setBudgetPerf(budgetData);
-      setCommitments(commitmentsData);
-      setInsights(insightsData);
+      setSummary(summaryData)
+      setTrends(trendsData)
+      setCategories(categoriesData)
+      setMerchants(merchantsData)
+      setBiggestExpenses(biggestData)
+      setBudgetPerf(budgetData)
+      setCommitments(commitmentsData)
+      setInsights(insightsData)
 
       // Auto-select currency if current selection has no data and another has data
-      if (summaryData.summaries.length > 0 && !summaryData.summaries.find((s) => s.currency === selectedCurrency)) {
-        setSelectedCurrency(summaryData.summaries[0].currency);
+      if (
+        summaryData.summaries.length > 0 &&
+        !summaryData.summaries.find((s) => s.currency === selectedCurrency)
+      ) {
+        setSelectedCurrency(summaryData.summaries[0].currency)
       }
     } catch (err) {
-      console.error("Failed to load analytics:", err);
+      console.error('Failed to load analytics:', err)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  }, [timeRange, selectedCurrency, reportingCurrency]);
+  }, [timeRange, selectedCurrency, reportingCurrency])
 
   useEffect(() => {
-    fetchAnalytics();
-  }, [fetchAnalytics]);
+    fetchAnalytics()
+  }, [fetchAnalytics])
 
   const activeSummary =
-    summary?.summaries.find((s) => s.currency === selectedCurrency) || summary?.summaries[0];
+    summary?.summaries.find((s) => s.currency === selectedCurrency) ||
+    summary?.summaries[0]
 
   return (
     <div className="space-y-8 pb-16 max-w-7xl mx-auto">
@@ -125,10 +159,11 @@ export default function AnalyticsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-              Financial Analytics
-            </h1>
+            Financial Analytics
+          </h1>
           <p className="text-xs sm:text-sm text-zinc-500 mt-1">
-            Multi-currency cashflow trends, spending pace, category breakdowns, and cross-currency converted insights.
+            Multi-currency cashflow trends, spending pace, category breakdowns,
+            and cross-currency converted insights.
           </p>
         </div>
 
@@ -148,8 +183,8 @@ export default function AnalyticsPage() {
                 onClick={() => setTimeRange(tr.value)}
                 className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
                   timeRange === tr.value
-                    ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+                    ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                    : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
                 }`}
               >
                 {tr.label}
@@ -178,7 +213,9 @@ export default function AnalyticsPage() {
             className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors"
             title="Refresh Analytics"
           >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
+            />
           </button>
         </div>
       </div>
@@ -186,7 +223,9 @@ export default function AnalyticsPage() {
       {isLoading && !summary ? (
         <div className="flex flex-col items-center justify-center py-24 space-y-3">
           <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-          <p className="text-sm text-zinc-400 font-medium">Aggregating financial analytics...</p>
+          <p className="text-sm text-zinc-400 font-medium">
+            Aggregating financial analytics...
+          </p>
         </div>
       ) : (
         <>
@@ -195,19 +234,36 @@ export default function AnalyticsPage() {
             <Card className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-br from-zinc-900 to-zinc-800 dark:from-zinc-900 dark:to-zinc-950 border-l-4 border-l-emerald-500">
               <div className="space-y-0.5">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
-                  Cross-Currency Converted Period Total ({summary.convertedSummary.reportingCurrency})
+                  Cross-Currency Converted Period Total (
+                  {summary.convertedSummary.reportingCurrency})
                 </span>
                 <div className="flex items-baseline gap-3">
                   <span className="text-xl sm:text-2xl font-black text-white">
-                    Net: ≈ {formatCurrencyAmount(summary.convertedSummary.totalNet, summary.convertedSummary.reportingCurrency)}
+                    Net: ≈{' '}
+                    {formatCurrencyAmount(
+                      summary.convertedSummary.totalNet,
+                      summary.convertedSummary.reportingCurrency,
+                    )}
                   </span>
                   <span className="text-xs text-zinc-400">
-                    (Income: {formatCurrencyAmount(summary.convertedSummary.totalIncome, summary.convertedSummary.reportingCurrency)} • Expense: {formatCurrencyAmount(summary.convertedSummary.totalExpenses, summary.convertedSummary.reportingCurrency)})
+                    (Income:{' '}
+                    {formatCurrencyAmount(
+                      summary.convertedSummary.totalIncome,
+                      summary.convertedSummary.reportingCurrency,
+                    )}{' '}
+                    • Expense:{' '}
+                    {formatCurrencyAmount(
+                      summary.convertedSummary.totalExpenses,
+                      summary.convertedSummary.reportingCurrency,
+                    )}
+                    )
                   </span>
                 </div>
               </div>
               <div className="text-[11px] text-zinc-400">
-                Converted from: {summary.convertedSummary.convertedFromCurrencies.join(", ") || selectedCurrency}
+                Converted from:{' '}
+                {summary.convertedSummary.convertedFromCurrencies.join(', ') ||
+                  selectedCurrency}
               </div>
             </Card>
           )}
@@ -227,25 +283,33 @@ export default function AnalyticsPage() {
                   {formatMoney(activeSummary?.income || 0, selectedCurrency)}
                 </div>
                 <div className="text-[11px] flex items-center space-x-1 text-zinc-400">
-                  {activeSummary?.momComparison?.incomeChangePercentage !== null &&
-                  activeSummary?.momComparison?.incomeChangePercentage !== undefined ? (
+                  {activeSummary?.momComparison?.incomeChangePercentage !==
+                    null &&
+                  activeSummary?.momComparison?.incomeChangePercentage !==
+                    undefined ? (
                     <span
                       className={`flex items-center font-medium ${
                         activeSummary.momComparison.incomeChangePercentage >= 0
-                          ? "text-emerald-500"
-                          : "text-rose-500"
+                          ? 'text-emerald-500'
+                          : 'text-rose-500'
                       }`}
                     >
-                      {activeSummary.momComparison.incomeChangePercentage >= 0 ? (
+                      {activeSummary.momComparison.incomeChangePercentage >=
+                      0 ? (
                         <ArrowUpRight className="h-3 w-3 inline" />
                       ) : (
                         <ArrowDownRight className="h-3 w-3 inline" />
                       )}
-                      {activeSummary.momComparison.incomeChangePercentage >= 0 ? "+" : ""}
-                      {activeSummary.momComparison.incomeChangePercentage}% vs last period
+                      {activeSummary.momComparison.incomeChangePercentage >= 0
+                        ? '+'
+                        : ''}
+                      {activeSummary.momComparison.incomeChangePercentage}% vs
+                      last period
                     </span>
                   ) : (
-                    <span>{activeSummary?.incomeCount || 0} income entries</span>
+                    <span>
+                      {activeSummary?.incomeCount || 0} income entries
+                    </span>
                   )}
                 </div>
               </CardContent>
@@ -264,25 +328,33 @@ export default function AnalyticsPage() {
                   {formatMoney(activeSummary?.expenses || 0, selectedCurrency)}
                 </div>
                 <div className="text-[11px] flex items-center space-x-1 text-zinc-400">
-                  {activeSummary?.momComparison?.expenseChangePercentage !== null &&
-                  activeSummary?.momComparison?.expenseChangePercentage !== undefined ? (
+                  {activeSummary?.momComparison?.expenseChangePercentage !==
+                    null &&
+                  activeSummary?.momComparison?.expenseChangePercentage !==
+                    undefined ? (
                     <span
                       className={`flex items-center font-medium ${
                         activeSummary.momComparison.expenseChangePercentage > 0
-                          ? "text-rose-500"
-                          : "text-emerald-500"
+                          ? 'text-rose-500'
+                          : 'text-emerald-500'
                       }`}
                     >
-                      {activeSummary.momComparison.expenseChangePercentage > 0 ? (
+                      {activeSummary.momComparison.expenseChangePercentage >
+                      0 ? (
                         <ArrowUpRight className="h-3 w-3 inline" />
                       ) : (
                         <ArrowDownRight className="h-3 w-3 inline" />
                       )}
-                      {activeSummary.momComparison.expenseChangePercentage > 0 ? "+" : ""}
-                      {activeSummary.momComparison.expenseChangePercentage}% vs last period
+                      {activeSummary.momComparison.expenseChangePercentage > 0
+                        ? '+'
+                        : ''}
+                      {activeSummary.momComparison.expenseChangePercentage}% vs
+                      last period
                     </span>
                   ) : (
-                    <span>{activeSummary?.expenseCount || 0} expense entries</span>
+                    <span>
+                      {activeSummary?.expenseCount || 0} expense entries
+                    </span>
                   )}
                 </div>
               </CardContent>
@@ -298,12 +370,13 @@ export default function AnalyticsPage() {
                   </span>
                 </div>
                 <div className="text-xl font-bold font-mono text-zinc-900 dark:text-zinc-100">
-                  {(activeSummary?.net || 0) >= 0 ? "+" : ""}
+                  {(activeSummary?.net || 0) >= 0 ? '+' : ''}
                   {formatMoney(activeSummary?.net || 0, selectedCurrency)}
                 </div>
                 <div className="text-[11px] text-zinc-400">
                   <span>
-                    {(activeSummary?.net || 0) >= 0 ? "Surplus" : "Deficit"} for {summary?.period.label}
+                    {(activeSummary?.net || 0) >= 0 ? 'Surplus' : 'Deficit'} for{' '}
+                    {summary?.period.label}
                   </span>
                 </div>
               </CardContent>
@@ -319,13 +392,15 @@ export default function AnalyticsPage() {
                   </span>
                 </div>
                 <div className="text-xl font-bold font-mono text-zinc-900 dark:text-zinc-100">
-                  {activeSummary?.savingsRate !== null ? `${activeSummary?.savingsRate}%` : "N/A"}
+                  {activeSummary?.savingsRate !== null
+                    ? `${activeSummary?.savingsRate}%`
+                    : 'N/A'}
                 </div>
                 <div className="text-[11px] text-zinc-400">
                   <span>
                     {activeSummary?.income && activeSummary.income > 0
-                      ? "Calculated as Net / Total Income"
-                      : "No income recorded in period"}
+                      ? 'Calculated as Net / Total Income'
+                      : 'No income recorded in period'}
                   </span>
                 </div>
               </CardContent>
@@ -354,10 +429,15 @@ export default function AnalyticsPage() {
                   <TrendingUp className="h-4 w-4 text-emerald-500" />
                   <span>Cash Flow Trend ({selectedCurrency})</span>
                 </CardTitle>
-                <CardDescription>Monthly income vs. expense progression over time</CardDescription>
+                <CardDescription>
+                  Monthly income vs. expense progression over time
+                </CardDescription>
               </CardHeader>
               <CardContent className="pt-2">
-                <CashFlowChart months={trends?.months || []} currency={selectedCurrency} />
+                <CashFlowChart
+                  months={trends?.months || []}
+                  currency={selectedCurrency}
+                />
               </CardContent>
             </Card>
 
@@ -368,7 +448,9 @@ export default function AnalyticsPage() {
                   <Layers className="h-4 w-4 text-blue-500" />
                   <span>Category Breakdown</span>
                 </CardTitle>
-                <CardDescription>Expense allocation for {summary?.period.label}</CardDescription>
+                <CardDescription>
+                  Expense allocation for {summary?.period.label}
+                </CardDescription>
               </CardHeader>
               <CardContent className="pt-2">
                 <CategoryBreakdownChart
@@ -409,20 +491,32 @@ export default function AnalyticsPage() {
                   <CreditCard className="h-4 w-4 text-purple-500" />
                   <span>Subscriptions & Commitments</span>
                 </CardTitle>
-                <CardDescription>Normalized recurring payment commitments</CardDescription>
+                <CardDescription>
+                  Normalized recurring payment commitments
+                </CardDescription>
               </CardHeader>
               <CardContent className="pt-2 space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-1">
-                    <span className="text-[11px] text-zinc-500 font-medium">Estimated Monthly</span>
+                    <span className="text-[11px] text-zinc-500 font-medium">
+                      Estimated Monthly
+                    </span>
                     <div className="text-base font-bold font-mono text-zinc-900 dark:text-zinc-100">
-                      {formatMoney(commitments?.estimatedMonthlyCost || 0, selectedCurrency)}
+                      {formatMoney(
+                        commitments?.estimatedMonthlyCost || 0,
+                        selectedCurrency,
+                      )}
                     </div>
                   </div>
                   <div className="p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-1">
-                    <span className="text-[11px] text-zinc-500 font-medium">Next 30 Days Due</span>
+                    <span className="text-[11px] text-zinc-500 font-medium">
+                      Next 30 Days Due
+                    </span>
                     <div className="text-base font-bold font-mono text-zinc-900 dark:text-zinc-100">
-                      {formatMoney(commitments?.next30DaysCommitment || 0, selectedCurrency)}
+                      {formatMoney(
+                        commitments?.next30DaysCommitment || 0,
+                        selectedCurrency,
+                      )}
                     </div>
                   </div>
                 </div>
@@ -430,7 +524,8 @@ export default function AnalyticsPage() {
                 {/* Subscriptions List */}
                 <div className="space-y-2">
                   <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                    Active Subscriptions ({commitments?.activeSubscriptionsCount || 0})
+                    Active Subscriptions (
+                    {commitments?.activeSubscriptionsCount || 0})
                   </span>
                   {commitments && commitments.topSubscriptions.length > 0 ? (
                     <div className="space-y-2">
@@ -448,13 +543,19 @@ export default function AnalyticsPage() {
                             </span>
                           </div>
                           <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">
-                            {formatMoney(sub.estimatedMonthlyCost, selectedCurrency)}/mo
+                            {formatMoney(
+                              sub.estimatedMonthlyCost,
+                              selectedCurrency,
+                            )}
+                            /mo
                           </span>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs text-zinc-400">No active subscriptions configured.</p>
+                    <p className="text-xs text-zinc-400">
+                      No active subscriptions configured.
+                    </p>
                   )}
                 </div>
               </CardContent>
@@ -470,26 +571,38 @@ export default function AnalyticsPage() {
                   <ShoppingBag className="h-4 w-4 text-teal-500" />
                   <span>Top Merchants</span>
                 </CardTitle>
-                <CardDescription>Highest spending destinations for {summary?.period.label}</CardDescription>
+                <CardDescription>
+                  Highest spending destinations for {summary?.period.label}
+                </CardDescription>
               </CardHeader>
               <CardContent className="pt-2">
                 {merchants && merchants.merchants.length > 0 ? (
                   <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                     {merchants.merchants.map((m) => (
-                      <div key={m.merchant} className="py-2.5 flex items-center justify-between text-xs">
+                      <div
+                        key={m.merchant}
+                        className="py-2.5 flex items-center justify-between text-xs"
+                      >
                         <div className="min-w-0">
                           <span className="font-semibold text-zinc-900 dark:text-zinc-100 block truncate">
                             {m.merchant}
                           </span>
                           <span className="text-[11px] text-zinc-400">
-                            {m.transactionCount} transactions (avg. {formatMoney(m.averagePerTransaction, selectedCurrency)})
+                            {m.transactionCount} transactions (avg.{' '}
+                            {formatMoney(
+                              m.averagePerTransaction,
+                              selectedCurrency,
+                            )}
+                            )
                           </span>
                         </div>
                         <div className="text-right font-mono shrink-0">
                           <span className="font-bold text-zinc-900 dark:text-zinc-100 block">
                             {formatMoney(m.amount, selectedCurrency)}
                           </span>
-                          <span className="text-[10px] text-zinc-400">{m.percentage}% of merchant spend</span>
+                          <span className="text-[10px] text-zinc-400">
+                            {m.percentage}% of merchant spend
+                          </span>
                         </div>
                       </div>
                     ))}
@@ -509,13 +622,18 @@ export default function AnalyticsPage() {
                   <Receipt className="h-4 w-4 text-rose-500" />
                   <span>Largest Single Expenses</span>
                 </CardTitle>
-                <CardDescription>Top individual purchases in {summary?.period.label}</CardDescription>
+                <CardDescription>
+                  Top individual purchases in {summary?.period.label}
+                </CardDescription>
               </CardHeader>
               <CardContent className="pt-2">
                 {biggestExpenses && biggestExpenses.expenses.length > 0 ? (
                   <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                     {biggestExpenses.expenses.map((exp) => (
-                      <div key={exp.id} className="py-2.5 flex items-center justify-between text-xs">
+                      <div
+                        key={exp.id}
+                        className="py-2.5 flex items-center justify-between text-xs"
+                      >
                         <div className="min-w-0">
                           <span className="font-semibold text-zinc-900 dark:text-zinc-100 block truncate">
                             {exp.description}
@@ -546,5 +664,5 @@ export default function AnalyticsPage() {
         </>
       )}
     </div>
-  );
+  )
 }

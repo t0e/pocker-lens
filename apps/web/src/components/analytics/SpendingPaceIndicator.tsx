@@ -1,13 +1,13 @@
-import React from "react";
-import { BudgetPerformanceItem } from "@pocketlens/shared";
-import { formatMoney } from "@/lib/utils";
-import { AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import React from 'react'
+import { BudgetPerformanceItem } from '@pocketlens/shared'
+import { formatMoney } from '@/lib/utils'
+import { AlertTriangle, CheckCircle, Clock } from 'lucide-react'
 
 interface SpendingPaceIndicatorProps {
-  items: BudgetPerformanceItem[];
-  daysInMonth: number;
-  daysElapsed: number;
-  currency: string;
+  items: BudgetPerformanceItem[]
+  daysInMonth: number
+  daysElapsed: number
+  currency: string
 }
 
 export const SpendingPaceIndicator: React.FC<SpendingPaceIndicatorProps> = ({
@@ -21,11 +21,11 @@ export const SpendingPaceIndicator: React.FC<SpendingPaceIndicatorProps> = ({
       <div className="p-6 text-center text-zinc-400 dark:text-zinc-500 text-sm">
         No active budgets set for this month.
       </div>
-    );
+    )
   }
 
-  const daysRemaining = daysInMonth - daysElapsed;
-  const monthProgressPct = Math.round((daysElapsed / daysInMonth) * 100);
+  const daysRemaining = daysInMonth - daysElapsed
+  const monthProgressPct = Math.round((daysElapsed / daysInMonth) * 100)
 
   return (
     <div className="space-y-4">
@@ -56,22 +56,22 @@ export const SpendingPaceIndicator: React.FC<SpendingPaceIndicatorProps> = ({
               <CheckCircle className="h-3 w-3" />
               <span>On Track</span>
             </span>
-          );
+          )
 
-          if (b.status === "OVER_BUDGET") {
+          if (b.status === 'OVER_BUDGET') {
             statusBadge = (
               <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-rose-600 dark:text-rose-400">
                 <AlertTriangle className="h-3 w-3" />
                 <span>Over Budget</span>
               </span>
-            );
-          } else if (b.paceStatus === "AHEAD_OF_PACE") {
+            )
+          } else if (b.paceStatus === 'AHEAD_OF_PACE') {
             statusBadge = (
               <span className="inline-flex items-center space-x-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
                 <AlertTriangle className="h-3 w-3" />
                 <span>Ahead of Pace</span>
               </span>
-            );
+            )
           }
 
           return (
@@ -88,10 +88,16 @@ export const SpendingPaceIndicator: React.FC<SpendingPaceIndicatorProps> = ({
 
               <div className="flex items-center justify-between text-xs font-mono">
                 <span className="text-zinc-500">
-                  Spent: <strong className="text-zinc-900 dark:text-zinc-100">{formatMoney(b.actualSpent, currency)}</strong>
+                  Spent:{' '}
+                  <strong className="text-zinc-900 dark:text-zinc-100">
+                    {formatMoney(b.actualSpent, currency)}
+                  </strong>
                 </span>
                 <span className="text-zinc-500">
-                  Budget: <strong className="text-zinc-900 dark:text-zinc-100">{formatMoney(b.budgetAmount, currency)}</strong>
+                  Budget:{' '}
+                  <strong className="text-zinc-900 dark:text-zinc-100">
+                    {formatMoney(b.budgetAmount, currency)}
+                  </strong>
                 </span>
               </div>
 
@@ -100,23 +106,25 @@ export const SpendingPaceIndicator: React.FC<SpendingPaceIndicatorProps> = ({
                 <div
                   style={{ width: `${Math.min(b.percentageUsed, 100)}%` }}
                   className={`h-full rounded-full transition-all duration-300 ${
-                    b.status === "OVER_BUDGET"
-                      ? "bg-rose-500"
+                    b.status === 'OVER_BUDGET'
+                      ? 'bg-rose-500'
                       : b.percentageUsed >= 80
-                      ? "bg-amber-500"
-                      : "bg-emerald-500"
+                        ? 'bg-amber-500'
+                        : 'bg-emerald-500'
                   }`}
                 />
               </div>
 
               <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-0.5">
                 <span>{b.percentageUsed}% used</span>
-                <span className="font-medium text-zinc-600 dark:text-zinc-400">{b.paceMessage}</span>
+                <span className="font-medium text-zinc-600 dark:text-zinc-400">
+                  {b.paceMessage}
+                </span>
               </div>
             </div>
-          );
+          )
         })}
       </div>
     </div>
-  );
-};
+  )
+}

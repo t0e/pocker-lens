@@ -1,6 +1,9 @@
-import { prisma } from "../db/client.js";
-import { DataQualityReportResponse, UncategorizedTransactionItem } from "@pocketlens/shared";
-import { categorizationService } from "./categorization.js";
+import { prisma } from '../db/client.js'
+import {
+  DataQualityReportResponse,
+  UncategorizedTransactionItem,
+} from '@pocketlens/shared'
+import { categorizationService } from './categorization.js'
 
 export class DataQualityService {
   public async getReport(userId: string): Promise<DataQualityReportResponse> {
@@ -9,22 +12,22 @@ export class DataQualityService {
       where: {
         userId,
         categoryId: null,
-        type: { not: "TRANSFER" },
+        type: { not: 'TRANSFER' },
       },
       include: {
         account: { select: { id: true, name: true } },
       },
-      orderBy: { transactionDate: "desc" },
+      orderBy: { transactionDate: 'desc' },
       take: 50,
-    });
+    })
 
-    const uncategorizedItems: UncategorizedTransactionItem[] = [];
+    const uncategorizedItems: UncategorizedTransactionItem[] = []
     for (const tx of uncategorized.slice(0, 20)) {
       const suggestion = await categorizationService.suggestCategory(userId, {
         merchant: tx.merchant,
         description: tx.description,
         amount: tx.amount.toNumber(),
-      });
+      })
 
       uncategorizedItems.push({
         id: tx.id,
@@ -35,18 +38,18 @@ export class DataQualityService {
         transactionDate: tx.transactionDate.toISOString(),
         accountId: tx.account.id,
         accountName: tx.account.name,
-        suggestedCategory: suggestion.confidence !== "NONE" ? suggestion : null,
-      });
+        suggestedCategory: suggestion.confidence !== 'NONE' ? suggestion : null,
+      })
     }
 
     // 2. Pending receipts awaiting review
     const pendingReceiptsCount = await prisma.receipt.count({
       where: {
         userId,
-        status: { in: ["READY", "UPLOADED"] },
+        status: { in: ['READY', 'UPLOADED'] },
         transactionId: null,
       },
-    });
+    })
 
     // 3. Potential duplicate clusters (transactions with identical currency, amount, type, date)
     const duplicateGroups = await prisma.$queryRaw<Array<{ count: bigint }>>`
@@ -58,17 +61,18 @@ export class DataQualityService {
         GROUP BY user_id, currency, type, amount, DATE(transaction_date)
         HAVING COUNT(*) > 1
       ) as dupes
-    `;
+    `
 
-    const potentialDuplicatesCount = duplicateGroups.length > 0 ? Number(duplicateGroups[0].count) : 0;
+    const potentialDuplicatesCount =
+      duplicateGroups.length > 0 ? Number(duplicateGroups[0].count) : 0
 
     return {
       uncategorizedCount: uncategorized.length,
       potentialDuplicatesCount,
       pendingReceiptsCount,
       uncategorizedTransactions: uncategorizedItems,
-    };
+    }
   }
 }
 
-export const dataQualityService = new DataQualityService();
+export const dataQualityService = new DataQualityService()

@@ -1,6 +1,6 @@
-'use client';
+'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'
 import {
   X,
   Sparkles,
@@ -17,7 +17,7 @@ import {
   FileText,
   CornerDownLeft,
   HelpCircle,
-} from 'lucide-react';
+} from 'lucide-react'
 import {
   TransactionResponse,
   TransactionType,
@@ -29,22 +29,22 @@ import {
   CategorySuggestionResponse,
   DuplicateMatch,
   DuplicateCheckResult,
-} from '@pocketlens/shared';
-import { apiClient } from '@/lib/api-client';
-import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
-import { formatMoney } from '@/lib/utils';
-import { CategorySuggestionBadge } from '../intelligence/CategorySuggestionBadge';
-import { DuplicateWarningModal } from '../intelligence/DuplicateWarningModal';
+} from '@pocketlens/shared'
+import { apiClient } from '@/lib/api-client'
+import { Button } from '../ui/Button'
+import { Badge } from '../ui/Badge'
+import { formatMoney } from '@/lib/utils'
+import { CategorySuggestionBadge } from '../intelligence/CategorySuggestionBadge'
+import { DuplicateWarningModal } from '../intelligence/DuplicateWarningModal'
 
 interface TransactionModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
-  editingTransaction?: TransactionResponse | null;
-  repeatTransaction?: TransactionResponse | null;
-  accounts: AccountResponse[];
-  categories: CategoryResponse[];
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+  editingTransaction?: TransactionResponse | null
+  repeatTransaction?: TransactionResponse | null
+  accounts: AccountResponse[]
+  categories: CategoryResponse[]
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({
@@ -57,211 +57,247 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   categories,
 }) => {
   // Mode: 'quick' (Natural Language) vs 'manual'
-  const [entryMode, setEntryMode] = useState<'quick' | 'manual'>('quick');
+  const [entryMode, setEntryMode] = useState<'quick' | 'manual'>('quick')
 
   // Quick Input State
-  const [naturalText, setNaturalText] = useState('');
-  const [isParsing, setIsParsing] = useState(false);
-  const [parseResult, setParseResult] = useState<ParseTransactionResult | null>(null);
+  const [naturalText, setNaturalText] = useState('')
+  const [isParsing, setIsParsing] = useState(false)
+  const [parseResult, setParseResult] = useState<ParseTransactionResult | null>(
+    null,
+  )
 
   // Manual / Draft Form State
-  const [type, setType] = useState<TransactionType>('expense');
-  const [accountId, setAccountId] = useState('');
-  const [transferAccountId, setTransferAccountId] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
-  const [merchant, setMerchant] = useState('');
-  const [notes, setNotes] = useState('');
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [type, setType] = useState<TransactionType>('expense')
+  const [accountId, setAccountId] = useState('')
+  const [transferAccountId, setTransferAccountId] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [amount, setAmount] = useState('')
+  const [description, setDescription] = useState('')
+  const [merchant, setMerchant] = useState('')
+  const [notes, setNotes] = useState('')
+  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0])
 
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Intelligence States
-  const [suggestedCategory, setSuggestedCategory] = useState<CategorySuggestionResponse | null>(null);
-  const [duplicateMatch, setDuplicateMatch] = useState<DuplicateMatch | null>(null);
-  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+  const [suggestedCategory, setSuggestedCategory] =
+    useState<CategorySuggestionResponse | null>(null)
+  const [duplicateMatch, setDuplicateMatch] = useState<DuplicateMatch | null>(
+    null,
+  )
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false)
 
   // Fetch category suggestion on merchant/description typing
   useEffect(() => {
-    if (type === 'transfer' || categoryId || (!merchant.trim() && !description.trim())) {
-      setSuggestedCategory(null);
-      return;
+    if (
+      type === 'transfer' ||
+      categoryId ||
+      (!merchant.trim() && !description.trim())
+    ) {
+      setSuggestedCategory(null)
+      return
     }
 
     const timer = setTimeout(async () => {
       try {
-        const res = await apiClient<CategorySuggestionResponse>('/categories/suggest', {
-          method: 'POST',
-          body: JSON.stringify({
-            merchant: merchant.trim() || undefined,
-            description: description.trim() || undefined,
-            amount: parseFloat(amount) || undefined,
-          }),
-        });
+        const res = await apiClient<CategorySuggestionResponse>(
+          '/categories/suggest',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              merchant: merchant.trim() || undefined,
+              description: description.trim() || undefined,
+              amount: parseFloat(amount) || undefined,
+            }),
+          },
+        )
         if (res && res.categoryId && res.confidence !== 'NONE') {
-          setSuggestedCategory(res);
+          setSuggestedCategory(res)
         } else {
-          setSuggestedCategory(null);
+          setSuggestedCategory(null)
         }
       } catch {
-        setSuggestedCategory(null);
+        setSuggestedCategory(null)
       }
-    }, 300);
+    }, 300)
 
-    return () => clearTimeout(timer);
-  }, [merchant, description, amount, type, categoryId]);
+    return () => clearTimeout(timer)
+  }, [merchant, description, amount, type, categoryId])
 
   // Initialize or reset form state
   useEffect(() => {
     if (editingTransaction) {
-      setEntryMode('manual');
-      setType(editingTransaction.type);
-      setAccountId(editingTransaction.accountId);
-      setTransferAccountId(editingTransaction.transferAccountId || '');
-      setCategoryId(editingTransaction.categoryId || '');
-      setAmount(editingTransaction.amount);
-      setDescription(editingTransaction.description);
-      setMerchant(editingTransaction.merchant || '');
-      setNotes(editingTransaction.notes || '');
-      const txDate = editingTransaction.transactionDate.split('T')[0];
-      setDate(txDate);
-      setParseResult(null);
+      setEntryMode('manual')
+      setType(editingTransaction.type)
+      setAccountId(editingTransaction.accountId)
+      setTransferAccountId(editingTransaction.transferAccountId || '')
+      setCategoryId(editingTransaction.categoryId || '')
+      setAmount(editingTransaction.amount)
+      setDescription(editingTransaction.description)
+      setMerchant(editingTransaction.merchant || '')
+      setNotes(editingTransaction.notes || '')
+      const txDate = editingTransaction.transactionDate.split('T')[0]
+      setDate(txDate)
+      setParseResult(null)
     } else if (repeatTransaction) {
-      setEntryMode('manual');
-      setType(repeatTransaction.type);
-      setAccountId(repeatTransaction.accountId);
-      setTransferAccountId(repeatTransaction.transferAccountId || '');
-      setCategoryId(repeatTransaction.categoryId || '');
-      setAmount(repeatTransaction.amount);
-      setDescription(repeatTransaction.description);
-      setMerchant(repeatTransaction.merchant || '');
-      setNotes(repeatTransaction.notes || '');
-      setDate(new Date().toISOString().split('T')[0]);
-      setParseResult(null);
+      setEntryMode('manual')
+      setType(repeatTransaction.type)
+      setAccountId(repeatTransaction.accountId)
+      setTransferAccountId(repeatTransaction.transferAccountId || '')
+      setCategoryId(repeatTransaction.categoryId || '')
+      setAmount(repeatTransaction.amount)
+      setDescription(repeatTransaction.description)
+      setMerchant(repeatTransaction.merchant || '')
+      setNotes(repeatTransaction.notes || '')
+      setDate(new Date().toISOString().split('T')[0])
+      setParseResult(null)
     } else {
-      setEntryMode('quick');
-      setNaturalText('');
-      setParseResult(null);
-      setType('expense');
-      const defaultAcc = accounts.find((a) => a.isDefault && !a.isArchived) || accounts.find((a) => !a.isArchived);
-      setAccountId(defaultAcc ? defaultAcc.id : '');
-      setTransferAccountId('');
-      setCategoryId('');
-      setAmount('');
-      setDescription('');
-      setMerchant('');
-      setNotes('');
-      setDate(new Date().toISOString().split('T')[0]);
+      setEntryMode('quick')
+      setNaturalText('')
+      setParseResult(null)
+      setType('expense')
+      const defaultAcc =
+        accounts.find((a) => a.isDefault && !a.isArchived) ||
+        accounts.find((a) => !a.isArchived)
+      setAccountId(defaultAcc ? defaultAcc.id : '')
+      setTransferAccountId('')
+      setCategoryId('')
+      setAmount('')
+      setDescription('')
+      setMerchant('')
+      setNotes('')
+      setDate(new Date().toISOString().split('T')[0])
     }
-    setError(null);
-  }, [editingTransaction, repeatTransaction, isOpen, accounts]);
+    setError(null)
+  }, [editingTransaction, repeatTransaction, isOpen, accounts])
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
-  const activeAccounts = accounts.filter((a) => !a.isArchived);
-  const selectedSourceAccount = accounts.find((a) => a.id === accountId);
-  const selectedDestAccount = accounts.find((a) => a.id === transferAccountId);
+  const activeAccounts = accounts.filter((a) => !a.isArchived)
+  const selectedSourceAccount = accounts.find((a) => a.id === accountId)
+  const selectedDestAccount = accounts.find((a) => a.id === transferAccountId)
 
   // Available categories for selected type
-  const typeCategories = categories.filter((c) => c.type === type && !c.isArchived);
+  const typeCategories = categories.filter(
+    (c) => c.type === type && !c.isArchived,
+  )
 
   // For transfers: filter destination accounts to same currency and not source
   const validTransferDestAccounts = activeAccounts.filter(
-    (a) => a.id !== accountId && (!selectedSourceAccount || a.currency === selectedSourceAccount.currency)
-  );
+    (a) =>
+      a.id !== accountId &&
+      (!selectedSourceAccount || a.currency === selectedSourceAccount.currency),
+  )
 
   // Parse natural language text
   const handleParse = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!naturalText.trim()) return;
+    if (e) e.preventDefault()
+    if (!naturalText.trim()) return
 
-    setIsParsing(true);
-    setError(null);
+    setIsParsing(true)
+    setError(null)
 
     try {
-      const result = await apiClient<ParseTransactionResult>('/transactions/parse', {
-        method: 'POST',
-        body: JSON.stringify({ text: naturalText.trim() }),
-      });
+      const result = await apiClient<ParseTransactionResult>(
+        '/transactions/parse',
+        {
+          method: 'POST',
+          body: JSON.stringify({ text: naturalText.trim() }),
+        },
+      )
 
-      setParseResult(result);
+      setParseResult(result)
 
       // Populate draft fields
-      const p = result.parsed;
-      setType(p.type);
-      if (p.accountId) setAccountId(p.accountId);
-      if (p.transferAccountId) setTransferAccountId(p.transferAccountId);
-      if (p.categoryId) setCategoryId(p.categoryId);
-      if (p.amount) setAmount(p.amount);
-      if (p.description) setDescription(p.description);
-      if (p.merchant) setMerchant(p.merchant);
-      if (p.transactionDate) setDate(p.transactionDate.split('T')[0]);
+      const p = result.parsed
+      setType(p.type)
+      if (p.accountId) setAccountId(p.accountId)
+      if (p.transferAccountId) setTransferAccountId(p.transferAccountId)
+      if (p.categoryId) setCategoryId(p.categoryId)
+      if (p.amount) setAmount(p.amount)
+      if (p.description) setDescription(p.description)
+      if (p.merchant) setMerchant(p.merchant)
+      if (p.transactionDate) setDate(p.transactionDate.split('T')[0])
     } catch (err: any) {
-      setError(err.message || 'Failed to parse transaction input');
+      setError(err.message || 'Failed to parse transaction input')
     } finally {
-      setIsParsing(false);
+      setIsParsing(false)
     }
-  };
+  }
 
   // Submit confirmed transaction
   const handleConfirmAndSave = async (forceSave = false) => {
-    setError(null);
+    setError(null)
 
-    const num = parseFloat(amount);
+    const num = parseFloat(amount)
     if (isNaN(num) || num <= 0) {
-      setError('Please enter a valid amount greater than 0');
-      return;
+      setError('Please enter a valid amount greater than 0')
+      return
     }
 
     if (!accountId) {
-      setError('Please select an account');
-      return;
+      setError('Please select an account')
+      return
     }
 
     if (type === 'transfer') {
       if (!transferAccountId) {
-        setError('Please select a destination account for the transfer');
-        return;
+        setError('Please select a destination account for the transfer')
+        return
       }
       if (accountId === transferAccountId) {
-        setError('Source and destination accounts cannot be the same');
-        return;
+        setError('Source and destination accounts cannot be the same')
+        return
       }
-      if (selectedSourceAccount && selectedDestAccount && selectedSourceAccount.currency !== selectedDestAccount.currency) {
-        setError(`Cross-currency transfers are not supported. Both accounts must use ${selectedSourceAccount.currency}.`);
-        return;
+      if (
+        selectedSourceAccount &&
+        selectedDestAccount &&
+        selectedSourceAccount.currency !== selectedDestAccount.currency
+      ) {
+        setError(
+          `Cross-currency transfers are not supported. Both accounts must use ${selectedSourceAccount.currency}.`,
+        )
+        return
       }
     }
 
     // Check for duplicates before creation (if not editing and modal not already dismissed)
     if (!editingTransaction && !forceSave) {
       try {
-        const dupRes = await apiClient<DuplicateCheckResult>('/transactions/check-duplicates', {
-          method: 'POST',
-          body: JSON.stringify({
-            accountId,
-            amount: num,
-            currency: selectedSourceAccount?.currency || 'VND',
-            transactionDate: new Date(date).toISOString(),
-            description: description.trim() || (type === 'transfer' ? 'Transfer' : type === 'income' ? 'Income' : 'Expense'),
-            merchant: merchant.trim() || null,
-            type,
-          }),
-        });
+        const dupRes = await apiClient<DuplicateCheckResult>(
+          '/transactions/check-duplicates',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              accountId,
+              amount: num,
+              currency: selectedSourceAccount?.currency || 'VND',
+              transactionDate: new Date(date).toISOString(),
+              description:
+                description.trim() ||
+                (type === 'transfer'
+                  ? 'Transfer'
+                  : type === 'income'
+                    ? 'Income'
+                    : 'Expense'),
+              merchant: merchant.trim() || null,
+              type,
+            }),
+          },
+        )
 
         if (dupRes && dupRes.hasDuplicate && dupRes.matches.length > 0) {
-          setDuplicateMatch(dupRes.matches[0]);
-          setIsDuplicateModalOpen(true);
-          return;
+          setDuplicateMatch(dupRes.matches[0])
+          setIsDuplicateModalOpen(true)
+          return
         }
       } catch {
         // If check fails gracefully continue
       }
     }
 
-    setIsSubmitting(true);
+    setIsSubmitting(true)
 
     try {
       const payload: CreateTransactionInput = {
@@ -271,31 +307,37 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         categoryId: type !== 'transfer' && categoryId ? categoryId : null,
         amount,
         transactionDate: new Date(date).toISOString(),
-        description: description.trim() || (type === 'transfer' ? 'Transfer' : type === 'income' ? 'Income' : 'Expense'),
+        description:
+          description.trim() ||
+          (type === 'transfer'
+            ? 'Transfer'
+            : type === 'income'
+              ? 'Income'
+              : 'Expense'),
         merchant: merchant.trim() || null,
         notes: notes.trim() || null,
-      };
+      }
 
       if (editingTransaction) {
         await apiClient(`/transactions/${editingTransaction.id}`, {
           method: 'PATCH',
           body: JSON.stringify(payload),
-        });
+        })
       } else {
         await apiClient('/transactions', {
           method: 'POST',
           body: JSON.stringify(payload),
-        });
+        })
       }
 
-      onSuccess();
-      onClose();
+      onSuccess()
+      onClose()
     } catch (err: any) {
-      setError(err.message || 'Failed to save transaction');
+      setError(err.message || 'Failed to save transaction')
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-fadeIn">
@@ -304,7 +346,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
-              {editingTransaction ? 'Edit Transaction' : repeatTransaction ? 'Repeat Transaction' : 'Add Transaction'}
+              {editingTransaction
+                ? 'Edit Transaction'
+                : repeatTransaction
+                  ? 'Repeat Transaction'
+                  : 'Add Transaction'}
             </h3>
           </div>
           <button
@@ -405,7 +451,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 <span>•</span>
                 <button
                   type="button"
-                  onClick={() => setNaturalText('nhận lương 32tr vào Vietcombank')}
+                  onClick={() =>
+                    setNaturalText('nhận lương 32tr vào Vietcombank')
+                  }
                   className="underline hover:text-emerald-600 dark:hover:text-emerald-400"
                 >
                   lương 32tr
@@ -424,7 +472,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     </span>
                   </div>
                   <Badge
-                    variant={type === 'expense' ? 'default' : type === 'income' ? 'success' : 'info'}
+                    variant={
+                      type === 'expense'
+                        ? 'default'
+                        : type === 'income'
+                          ? 'success'
+                          : 'info'
+                    }
                     className="capitalize text-[11px]"
                   >
                     {type}
@@ -435,12 +489,26 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-zinc-50 tracking-tight">
-                      {type === 'expense' ? '-' : type === 'income' ? '+' : '⇄ '}
-                      {amount ? formatMoney(amount, selectedSourceAccount?.currency || 'VND') : 'Amount missing'}
+                      {type === 'expense'
+                        ? '-'
+                        : type === 'income'
+                          ? '+'
+                          : '⇄ '}
+                      {amount
+                        ? formatMoney(
+                            amount,
+                            selectedSourceAccount?.currency || 'VND',
+                          )
+                        : 'Amount missing'}
                     </div>
                     <div className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 mt-0.5">
                       {description || 'No description'}
-                      {merchant && <span className="text-zinc-400 font-normal"> ({merchant})</span>}
+                      {merchant && (
+                        <span className="text-zinc-400 font-normal">
+                          {' '}
+                          ({merchant})
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="text-right text-[11px] text-zinc-400">
@@ -452,7 +520,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 <div className="flex flex-wrap items-center gap-1.5 text-xs">
                   {type === 'transfer' ? (
                     <span className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-medium">
-                      {selectedSourceAccount?.name || 'Select Source'} → {selectedDestAccount?.name || 'Select Dest'}
+                      {selectedSourceAccount?.name || 'Select Source'} →{' '}
+                      {selectedDestAccount?.name || 'Select Dest'}
                     </span>
                   ) : (
                     <>
@@ -461,7 +530,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                       </span>
                       {categoryId && (
                         <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-medium">
-                          Category: {categories.find((c) => c.id === categoryId)?.name || 'Category'}
+                          Category:{' '}
+                          {categories.find((c) => c.id === categoryId)?.name ||
+                            'Category'}
                         </span>
                       )}
                     </>
@@ -504,14 +575,20 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
         {/* 2. MANUAL ENTRY / DRAFT EDIT MODE */}
         {entryMode === 'manual' && (
-          <form onSubmit={(e) => { e.preventDefault(); handleConfirmAndSave(false); }} className="space-y-4">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleConfirmAndSave(false)
+            }}
+            className="space-y-4"
+          >
             {/* Type Selector Tabs */}
             <div className="grid grid-cols-3 gap-1.5 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
               <button
                 type="button"
                 onClick={() => {
-                  setType('expense');
-                  setCategoryId('');
+                  setType('expense')
+                  setCategoryId('')
                 }}
                 className={`flex items-center justify-center space-x-1.5 py-2 text-xs font-semibold rounded-lg transition-all ${
                   type === 'expense'
@@ -526,8 +603,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  setType('income');
-                  setCategoryId('');
+                  setType('income')
+                  setCategoryId('')
                 }}
                 className={`flex items-center justify-center space-x-1.5 py-2 text-xs font-semibold rounded-lg transition-all ${
                   type === 'income'
@@ -542,8 +619,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  setType('transfer');
-                  setCategoryId('');
+                  setType('transfer')
+                  setCategoryId('')
                 }}
                 className={`flex items-center justify-center space-x-1.5 py-2 text-xs font-semibold rounded-lg transition-all ${
                   type === 'transfer'
@@ -587,12 +664,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     required
                     value={accountId}
                     onChange={(e) => {
-                      setAccountId(e.target.value);
-                      setTransferAccountId('');
+                      setAccountId(e.target.value)
+                      setTransferAccountId('')
                     }}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
-                    <option value="" disabled>Select source...</option>
+                    <option value="" disabled>
+                      Select source...
+                    </option>
                     {activeAccounts.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.name} ({a.currency})
@@ -611,7 +690,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     onChange={(e) => setTransferAccountId(e.target.value)}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
-                    <option value="" disabled>Select destination...</option>
+                    <option value="" disabled>
+                      Select destination...
+                    </option>
                     {validTransferDestAccounts.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.name} ({a.currency})
@@ -632,7 +713,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     onChange={(e) => setAccountId(e.target.value)}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
-                    <option value="" disabled>Select account...</option>
+                    <option value="" disabled>
+                      Select account...
+                    </option>
                     {activeAccounts.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.name} ({a.currency})
@@ -767,25 +850,31 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             isOpen={isDuplicateModalOpen}
             match={duplicateMatch}
             newTransactionData={{
-              description: description.trim() || (type === 'transfer' ? 'Transfer' : type === 'income' ? 'Income' : 'Expense'),
+              description:
+                description.trim() ||
+                (type === 'transfer'
+                  ? 'Transfer'
+                  : type === 'income'
+                    ? 'Income'
+                    : 'Expense'),
               amount: parseFloat(amount) || 0,
               currency: selectedSourceAccount?.currency || 'VND',
               transactionDate: date,
             }}
             onKeepBoth={() => {
-              setIsDuplicateModalOpen(false);
-              handleConfirmAndSave(true);
+              setIsDuplicateModalOpen(false)
+              handleConfirmAndSave(true)
             }}
             onUseExisting={(_existingId) => {
-              setIsDuplicateModalOpen(false);
-              onClose();
+              setIsDuplicateModalOpen(false)
+              onClose()
             }}
             onCancel={() => {
-              setIsDuplicateModalOpen(false);
+              setIsDuplicateModalOpen(false)
             }}
           />
         )}
       </div>
     </div>
-  );
-};
+  )
+}

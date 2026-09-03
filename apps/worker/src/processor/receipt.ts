@@ -1,59 +1,64 @@
-import { Job } from 'bullmq';
-import pino from 'pino';
+import { Job } from 'bullmq'
+import pino from 'pino'
 import {
   ReceiptJobData,
   ReceiptJobResult,
   validateImageMagicBytes,
   extractReceiptData,
   OCRProvider,
-} from '@pocketlens/shared';
-import { createStorageProvider } from '@pocketlens/shared/server';
-import { prisma } from '../db/client.js';
-import { config } from '../config/env.js';
-import { LocalOCRProvider, EnhancedOCRResult } from '../ocr/local.js';
+} from '@pocketlens/shared'
+import { createStorageProvider } from '@pocketlens/shared/server'
+import { prisma } from '../db/client.js'
+import { config } from '../config/env.js'
+import { LocalOCRProvider, EnhancedOCRResult } from '../ocr/local.js'
 
 const logger = pino({
   level: config.NODE_ENV === 'test' ? 'silent' : 'info',
-});
+})
 
 const storage = createStorageProvider({
   provider: config.STORAGE_PROVIDER,
   localBasePath: config.RECEIPT_STORAGE_PATH,
-});
+})
 
-let ocrProvider: OCRProvider = new LocalOCRProvider();
+let ocrProvider: OCRProvider = new LocalOCRProvider()
 
 export function getMemoryStats(): {
-  rss: number;
-  heapUsed: number;
-  heapTotal: number;
-  external: number;
-  arrayBuffers: number;
+  rss: number
+  heapUsed: number
+  heapTotal: number
+  external: number
+  arrayBuffers: number
 } {
-  const m = process.memoryUsage();
+  const m = process.memoryUsage()
   return {
     rss: Math.round((m.rss / 1048576) * 10) / 10,
     heapUsed: Math.round((m.heapUsed / 1048576) * 10) / 10,
     heapTotal: Math.round((m.heapTotal / 1048576) * 10) / 10,
     external: Math.round((m.external / 1048576) * 10) / 10,
     arrayBuffers: Math.round((m.arrayBuffers / 1048576) * 10) / 10,
-  };
+  }
 }
 
 export function formatMemUsage(stage: string): string {
-  const m = getMemoryStats();
-  return `[${stage}] rss=${m.rss}MB heapUsed=${m.heapUsed}MB heapTotal=${m.heapTotal}MB ext=${m.external}MB arrayBuffers=${m.arrayBuffers}MB`;
+  const m = getMemoryStats()
+  return `[${stage}] rss=${m.rss}MB heapUsed=${m.heapUsed}MB heapTotal=${m.heapTotal}MB ext=${m.external}MB arrayBuffers=${m.arrayBuffers}MB`
 }
 
 export function setOCRProvider(provider: OCRProvider) {
-  ocrProvider = provider;
+  ocrProvider = provider
 }
 
-export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResult>): Promise<ReceiptJobResult> {
-  const { receiptId } = job.data;
-  const startTime = Date.now();
+export async function processReceiptJob(
+  job: Job<ReceiptJobData, ReceiptJobResult>,
+): Promise<ReceiptJobResult> {
+  const { receiptId } = job.data
+  const startTime = Date.now()
 
-  logger.info({ receiptId, jobId: job.id, mem: getMemoryStats() }, formatMemUsage('job.start'));
+  logger.info(
+    { receiptId, jobId: job.id, mem: getMemoryStats() },
+    formatMemUsage('job.start'),
+  )
 
   // 1. Fetch receipt and user details from database
   const receipt = await prisma.receipt.findUnique({
@@ -69,17 +74,20 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
         include: { items: true },
       },
     },
-  });
+  })
 
   if (!receipt) {
-    logger.warn({ receiptId }, 'Receipt record not found in database for job');
-    return { receiptId, success: false, processedAt: new Date().toISOString() };
+    logger.warn({ receiptId }, 'Receipt record not found in database for job')
+    return { receiptId, success: false, processedAt: new Date().toISOString() }
   }
 
   // Idempotency check: if already READY and has extraction, skip
   if (receipt.status === 'READY' && receipt.extraction) {
-    logger.info({ receiptId }, 'Receipt already processed with extraction and marked READY. Idempotent skip.');
-    return { receiptId, success: true, processedAt: new Date().toISOString() };
+    logger.info(
+      { receiptId },
+      'Receipt already processed with extraction and marked READY. Idempotent skip.',
+    )
+    return { receiptId, success: true, processedAt: new Date().toISOString() }
   }
 
   // 2. Mark PROCESSING
@@ -91,45 +99,67 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
       errorCode: null,
       errorMessage: null,
     },
-  });
+  })
 
   try {
     // 3. Read and validate stored file
-    const exists = await storage.exists(receipt.storageKey);
+    const exists = await storage.exists(receipt.storageKey)
     if (!exists) {
-      throw new Error(`Receipt image file not found on disk at storage key: ${receipt.storageKey}`);
+      throw new Error(
+        `Receipt image file not found on disk at storage key: ${receipt.storageKey}`,
+      )
     }
 
-    const fileBuffer = await storage.getFile(receipt.storageKey);
+    const fileBuffer = await storage.getFile(receipt.storageKey)
     if (!fileBuffer || fileBuffer.length === 0) {
-      throw new Error('Stored receipt image file is empty or corrupted');
+      throw new Error('Stored receipt image file is empty or corrupted')
     }
-    logger.info({ receiptId, sizeKB: Math.round(fileBuffer.length / 1024), mem: getMemoryStats() }, formatMemUsage('after.file-read'));
+    logger.info(
+      {
+        receiptId,
+        sizeKB: Math.round(fileBuffer.length / 1024),
+        mem: getMemoryStats(),
+      },
+      formatMemUsage('after.file-read'),
+    )
 
-    const magicCheck = validateImageMagicBytes(fileBuffer);
+    const magicCheck = validateImageMagicBytes(fileBuffer)
     if (!magicCheck.valid) {
-      throw new Error('Stored receipt file failed signature verification');
+      throw new Error('Stored receipt file failed signature verification')
     }
 
     // 4. Perform multi-pass OCR text extraction with preprocessing
-    logger.info({ receiptId }, formatMemUsage('before.ocr'));
-    const ocrResult = await ocrProvider.extractText(fileBuffer, receipt.mimeType);
-    logger.info({ receiptId, mem: getMemoryStats() }, formatMemUsage('after.ocr'));
+    logger.info({ receiptId }, formatMemUsage('before.ocr'))
+    const ocrResult = await ocrProvider.extractText(
+      fileBuffer,
+      receipt.mimeType,
+    )
+    logger.info(
+      { receiptId, mem: getMemoryStats() },
+      formatMemUsage('after.ocr'),
+    )
 
     // Extract quality and debug info if available (EnhancedOCRResult)
-    const enhancedResult = ocrResult as EnhancedOCRResult;
-    const qualityInfo = enhancedResult.quality || null;
-    const debugInfo = enhancedResult.debug || null;
+    const enhancedResult = ocrResult as EnhancedOCRResult
+    const qualityInfo = enhancedResult.quality || null
+    const debugInfo = enhancedResult.debug || null
 
     // 5. Perform deterministic structured extraction (English + Vietnamese)
-    const userCategories = receipt.user.categories.map((c) => ({ id: c.id, name: c.name }));
-    const defaultAccount = receipt.user.accounts.find((a) => a.isDefault) || receipt.user.accounts[0];
+    const userCategories = receipt.user.categories.map((c) => ({
+      id: c.id,
+      name: c.name,
+    }))
+    const defaultAccount =
+      receipt.user.accounts.find((a) => a.isDefault) || receipt.user.accounts[0]
 
     const extracted = extractReceiptData(ocrResult.rawText, {
       userCategories,
       defaultCurrency: defaultAccount?.currency || 'VND',
-    });
-    logger.info({ receiptId, mem: getMemoryStats() }, formatMemUsage('after.extraction'));
+    })
+    logger.info(
+      { receiptId, mem: getMemoryStats() },
+      formatMemUsage('after.extraction'),
+    )
 
     // 6. Persist extraction and line items in database atomically
     await prisma.$transaction(async (tx) => {
@@ -137,45 +167,53 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
       if (receipt.extraction) {
         await tx.receiptItem.deleteMany({
           where: { extractionId: receipt.extraction.id },
-        });
+        })
         await tx.receiptExtraction.delete({
           where: { id: receipt.extraction.id },
-        });
+        })
       }
 
       // Merge image quality + debug info into fieldConfidences JSON (dev inspection)
       const fieldConfidencesWithQuality = {
         ...extracted.fieldConfidences,
-        ...(qualityInfo ? {
-          imageQuality: {
-            rating: qualityInfo.rating,
-            brightness: Math.round(qualityInfo.brightness),
-            contrast: Math.round(qualityInfo.contrast),
-            sharpness: Math.round(qualityInfo.sharpness),
-            resolution: `${qualityInfo.width}x${qualityInfo.height}`,
-            issues: qualityInfo.details,
-          },
-        } : {}),
-        ...(debugInfo ? {
-          ocrPipeline: {
-            documentDetected: debugInfo.documentDetected,
-            documentConfidence: Math.round(debugInfo.documentConfidence * 100) / 100,
-            documentAreaPercent: Math.round(debugInfo.documentAreaFraction * 100),
-            perspectiveCorrected: debugInfo.perspectiveCorrected,
-            originalDimensions: debugInfo.originalDimensions,
-            croppedDimensions: debugInfo.croppedDimensions,
-            candidates: debugInfo.candidateLabels,
-            bestCandidate: enhancedResult.bestCandidate || 'unknown',
-          },
-        } : {}),
-      };
+        ...(qualityInfo
+          ? {
+              imageQuality: {
+                rating: qualityInfo.rating,
+                brightness: Math.round(qualityInfo.brightness),
+                contrast: Math.round(qualityInfo.contrast),
+                sharpness: Math.round(qualityInfo.sharpness),
+                resolution: `${qualityInfo.width}x${qualityInfo.height}`,
+                issues: qualityInfo.details,
+              },
+            }
+          : {}),
+        ...(debugInfo
+          ? {
+              ocrPipeline: {
+                documentDetected: debugInfo.documentDetected,
+                documentConfidence:
+                  Math.round(debugInfo.documentConfidence * 100) / 100,
+                documentAreaPercent: Math.round(
+                  debugInfo.documentAreaFraction * 100,
+                ),
+                perspectiveCorrected: debugInfo.perspectiveCorrected,
+                originalDimensions: debugInfo.originalDimensions,
+                croppedDimensions: debugInfo.croppedDimensions,
+                candidates: debugInfo.candidateLabels,
+                bestCandidate: enhancedResult.bestCandidate || 'unknown',
+              },
+            }
+          : {}),
+      }
 
       const extractionRecord = await tx.receiptExtraction.create({
         data: {
           receiptId: receipt.id,
           merchant: extracted.merchant,
           transactionDate: extracted.transactionDate,
-          totalAmount: extracted.totalAmount !== null ? extracted.totalAmount : undefined,
+          totalAmount:
+            extracted.totalAmount !== null ? extracted.totalAmount : undefined,
           currency: extracted.currency,
           categoryId: extracted.suggestedCategoryId || null,
           accountId: defaultAccount?.id || null,
@@ -189,11 +227,12 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
               description: item.description,
               quantity: item.quantity !== null ? item.quantity : undefined,
               unitPrice: item.unitPrice !== null ? item.unitPrice : undefined,
-              totalPrice: item.totalPrice !== null ? item.totalPrice : undefined,
+              totalPrice:
+                item.totalPrice !== null ? item.totalPrice : undefined,
             })),
           },
         },
-      });
+      })
 
       // 7. Mark receipt READY for user review
       await tx.receipt.update({
@@ -202,12 +241,12 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
           status: 'READY',
           processingCompletedAt: new Date(),
         },
-      });
+      })
 
-      return extractionRecord;
-    });
+      return extractionRecord
+    })
 
-    const durationMs = Date.now() - startTime;
+    const durationMs = Date.now() - startTime
     logger.info(
       {
         receiptId,
@@ -226,28 +265,32 @@ export async function processReceiptJob(job: Job<ReceiptJobData, ReceiptJobResul
         durationMs,
         mem: getMemoryStats(),
       },
-      formatMemUsage('job.end')
-    );
+      formatMemUsage('job.end'),
+    )
 
     return {
       receiptId,
       success: true,
       processedAt: new Date().toISOString(),
-    };
+    }
   } catch (err: any) {
-    const durationMs = Date.now() - startTime;
-    logger.error({ err: err.message, receiptId, durationMs, mem: getMemoryStats() }, 'receipt.failed');
+    const durationMs = Date.now() - startTime
+    logger.error(
+      { err: err.message, receiptId, durationMs, mem: getMemoryStats() },
+      'receipt.failed',
+    )
 
     await prisma.receipt.update({
       where: { id: receiptId },
       data: {
         status: 'FAILED',
         errorCode: 'PROCESSING_FAILED',
-        errorMessage: 'Receipt OCR and extraction failed. Please verify the file and retry.',
+        errorMessage:
+          'Receipt OCR and extraction failed. Please verify the file and retry.',
         processingCompletedAt: new Date(),
       },
-    });
+    })
 
-    throw err;
+    throw err
   }
 }

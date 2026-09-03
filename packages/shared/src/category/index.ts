@@ -1,12 +1,12 @@
-import { z } from 'zod';
+import { z } from 'zod'
 
-export const CATEGORY_TYPES = ['expense', 'income'] as const;
-export type CategoryType = (typeof CATEGORY_TYPES)[number];
+export const CATEGORY_TYPES = ['expense', 'income'] as const
+export type CategoryType = (typeof CATEGORY_TYPES)[number]
 
 export interface DefaultCategorySeed {
-  name: string;
-  type: CategoryType;
-  icon: string;
+  name: string
+  type: CategoryType
+  icon: string
 }
 
 export const DEFAULT_SYSTEM_CATEGORIES: DefaultCategorySeed[] = [
@@ -32,26 +32,32 @@ export const DEFAULT_SYSTEM_CATEGORIES: DefaultCategorySeed[] = [
   { name: 'Gift', type: 'income', icon: 'gift' },
   { name: 'Refund & Cashback', type: 'income', icon: 'rotate-ccw' },
   { name: 'Other Income', type: 'income', icon: 'plus-circle' },
-];
+]
 
 export const createCategorySchema = z.object({
-  name: z.string().trim().min(1, 'Category name is required').max(50, 'Category name too long'),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Category name is required')
+    .max(50, 'Category name too long'),
   type: z.enum(CATEGORY_TYPES, {
-    errorMap: () => ({ message: 'Category type must be either expense or income' }),
+    errorMap: () => ({
+      message: 'Category type must be either expense or income',
+    }),
   }),
   icon: z.string().trim().max(30).optional(),
-});
+})
 
-export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
+export type CreateCategoryInput = z.infer<typeof createCategorySchema>
 
 export interface CategoryResponse {
-  id: string;
-  userId: string | null;
-  name: string;
-  type: CategoryType;
-  icon: string | null;
-  isSystem: boolean;
-  isArchived: boolean;
-  createdAt: string;
-  updatedAt: string;
+  id: string
+  userId: string | null
+  name: string
+  type: CategoryType
+  icon: string | null
+  isSystem: boolean
+  isArchived: boolean
+  createdAt: string
+  updatedAt: string
 }

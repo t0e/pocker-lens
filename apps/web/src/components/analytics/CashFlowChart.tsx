@@ -1,29 +1,32 @@
-import React, { useState } from "react";
-import { MonthlyTrendPoint } from "@pocketlens/shared";
-import { formatMoney } from "@/lib/utils";
-import { Table, BarChart2 } from "lucide-react";
+import React, { useState } from 'react'
+import { MonthlyTrendPoint } from '@pocketlens/shared'
+import { formatMoney } from '@/lib/utils'
+import { Table, BarChart2 } from 'lucide-react'
 
 interface CashFlowChartProps {
-  months: MonthlyTrendPoint[];
-  currency: string;
+  months: MonthlyTrendPoint[]
+  currency: string
 }
 
-export const CashFlowChart: React.FC<CashFlowChartProps> = ({ months, currency }) => {
-  const [showTable, setShowTable] = useState(false);
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+export const CashFlowChart: React.FC<CashFlowChartProps> = ({
+  months,
+  currency,
+}) => {
+  const [showTable, setShowTable] = useState(false)
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
 
   if (!months || months.length === 0) {
     return (
       <div className="p-8 text-center text-zinc-400 dark:text-zinc-500 text-sm">
         No cashflow trend data available for this period.
       </div>
-    );
+    )
   }
 
   const maxVal = Math.max(
     ...months.map((m) => Math.max(m.income, m.expenses)),
-    1
-  );
+    1,
+  )
 
   return (
     <div className="flex flex-col space-y-4">
@@ -32,15 +35,21 @@ export const CashFlowChart: React.FC<CashFlowChartProps> = ({ months, currency }
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-1.5">
             <span className="h-3 w-3 rounded-sm bg-emerald-500" />
-            <span className="font-medium text-zinc-600 dark:text-zinc-400">Income</span>
+            <span className="font-medium text-zinc-600 dark:text-zinc-400">
+              Income
+            </span>
           </div>
           <div className="flex items-center space-x-1.5">
             <span className="h-3 w-3 rounded-sm bg-rose-500" />
-            <span className="font-medium text-zinc-600 dark:text-zinc-400">Expenses</span>
+            <span className="font-medium text-zinc-600 dark:text-zinc-400">
+              Expenses
+            </span>
           </div>
           <div className="flex items-center space-x-1.5">
             <span className="h-2 w-3 rounded-full bg-blue-500" />
-            <span className="font-medium text-zinc-600 dark:text-zinc-400">Net Flow</span>
+            <span className="font-medium text-zinc-600 dark:text-zinc-400">
+              Net Flow
+            </span>
           </div>
         </div>
 
@@ -78,8 +87,13 @@ export const CashFlowChart: React.FC<CashFlowChartProps> = ({ months, currency }
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {months.map((m) => (
-                <tr key={m.month} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
-                  <td className="p-2.5 font-medium text-zinc-900 dark:text-zinc-100">{m.month} ({m.label})</td>
+                <tr
+                  key={m.month}
+                  className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
+                >
+                  <td className="p-2.5 font-medium text-zinc-900 dark:text-zinc-100">
+                    {m.month} ({m.label})
+                  </td>
                   <td className="p-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400">
                     +{formatMoney(m.income, currency)}
                   </td>
@@ -87,10 +101,11 @@ export const CashFlowChart: React.FC<CashFlowChartProps> = ({ months, currency }
                     -{formatMoney(m.expenses, currency)}
                   </td>
                   <td className="p-2.5 text-right font-mono font-semibold text-zinc-900 dark:text-zinc-100">
-                    {m.net >= 0 ? "+" : ""}{formatMoney(m.net, currency)}
+                    {m.net >= 0 ? '+' : ''}
+                    {formatMoney(m.net, currency)}
                   </td>
                   <td className="p-2.5 text-right font-mono text-zinc-500">
-                    {m.savingsRate !== null ? `${m.savingsRate}%` : "—"}
+                    {m.savingsRate !== null ? `${m.savingsRate}%` : '—'}
                   </td>
                 </tr>
               ))}
@@ -103,7 +118,9 @@ export const CashFlowChart: React.FC<CashFlowChartProps> = ({ months, currency }
           {/* Hover Details Popover */}
           {hoveredIdx !== null && months[hoveredIdx] && (
             <div className="mb-3 p-3 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 rounded-xl shadow-lg flex items-center justify-between text-xs animate-in fade-in zoom-in-95 duration-150">
-              <span className="font-bold">{months[hoveredIdx].month} ({months[hoveredIdx].label})</span>
+              <span className="font-bold">
+                {months[hoveredIdx].month} ({months[hoveredIdx].label})
+              </span>
               <div className="flex items-center space-x-3">
                 <span className="text-emerald-400 dark:text-emerald-600">
                   +{formatMoney(months[hoveredIdx].income, currency)}
@@ -120,8 +137,8 @@ export const CashFlowChart: React.FC<CashFlowChartProps> = ({ months, currency }
 
           <div className="grid grid-cols-6 gap-2 sm:gap-4 items-end h-48 sm:h-56 px-2 border-b border-zinc-200 dark:border-zinc-800">
             {months.map((m, idx) => {
-              const incomeHeight = Math.max((m.income / maxVal) * 100, 2);
-              const expenseHeight = Math.max((m.expenses / maxVal) * 100, 2);
+              const incomeHeight = Math.max((m.income / maxVal) * 100, 2)
+              const expenseHeight = Math.max((m.expenses / maxVal) * 100, 2)
 
               return (
                 <div
@@ -139,7 +156,9 @@ export const CashFlowChart: React.FC<CashFlowChartProps> = ({ months, currency }
                     />
                     {/* Expense Bar */}
                     <div
-                      style={{ height: `${m.expenses > 0 ? expenseHeight : 0}%` }}
+                      style={{
+                        height: `${m.expenses > 0 ? expenseHeight : 0}%`,
+                      }}
                       className="w-full bg-rose-500/80 group-hover:bg-rose-500 rounded-t-sm transition-all duration-300 relative"
                     />
                   </div>
@@ -149,11 +168,11 @@ export const CashFlowChart: React.FC<CashFlowChartProps> = ({ months, currency }
                     {m.label}
                   </span>
                 </div>
-              );
+              )
             })}
           </div>
         </div>
       )}
     </div>
-  );
-};
+  )
+}

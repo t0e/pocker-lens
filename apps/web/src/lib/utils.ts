@@ -1,18 +1,21 @@
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-import { getCurrencyMeta } from '@pocketlens/shared';
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+import { getCurrencyMeta } from '@pocketlens/shared'
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+  return twMerge(clsx(inputs))
 }
 
-export function formatMoney(amount: string | number, currency: string = 'USD'): string {
-  const numeric = typeof amount === 'string' ? parseFloat(amount) : amount;
+export function formatMoney(
+  amount: string | number,
+  currency: string = 'USD',
+): string {
+  const numeric = typeof amount === 'string' ? parseFloat(amount) : amount
   if (isNaN(numeric)) {
-    return `0 ${currency}`;
+    return `0 ${currency}`
   }
 
-  const meta = getCurrencyMeta(currency);
+  const meta = getCurrencyMeta(currency)
 
   try {
     return new Intl.NumberFormat('en-US', {
@@ -20,16 +23,19 @@ export function formatMoney(amount: string | number, currency: string = 'USD'): 
       currency: currency.toUpperCase(),
       minimumFractionDigits: meta.decimalDigits,
       maximumFractionDigits: meta.decimalDigits,
-    }).format(numeric);
+    }).format(numeric)
   } catch {
     // Fallback for custom or less common ISO codes
     return `${numeric.toLocaleString('en-US', {
       minimumFractionDigits: meta.decimalDigits,
       maximumFractionDigits: meta.decimalDigits,
-    })} ${currency.toUpperCase()}`;
+    })} ${currency.toUpperCase()}`
   }
 }
 
-export function formatCurrency(amount: number, currency: string = 'USD'): string {
-  return formatMoney(amount, currency);
+export function formatCurrency(
+  amount: number,
+  currency: string = 'USD',
+): string {
+  return formatMoney(amount, currency)
 }

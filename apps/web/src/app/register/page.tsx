@@ -1,43 +1,56 @@
-'use client';
+'use client'
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { AlertCircle, Lock, Mail, User, Loader2, ArrowRight } from 'lucide-react';
+import React, { useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
+import {
+  AlertCircle,
+  Lock,
+  Mail,
+  User,
+  Loader2,
+  ArrowRight,
+} from 'lucide-react'
 
 export default function RegisterPage() {
-  const router = useRouter();
-  const { register } = useAuth();
+  const router = useRouter()
+  const { register } = useAuth()
 
-  const [displayName, setDisplayName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [displayName, setDisplayName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+    e.preventDefault()
+    setError(null)
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
-      return;
+      setError('Password must be at least 8 characters long')
+      return
     }
 
-    setIsSubmitting(true);
+    setIsSubmitting(true)
 
     try {
-      await register({ displayName, email, password });
-      router.push('/');
+      await register({ displayName, email, password })
+      router.push('/')
     } catch (err: any) {
-      setError(err.message || 'Registration failed');
+      setError(err.message || 'Registration failed')
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center p-4 sm:p-6 bg-zinc-50 dark:bg-zinc-950">
@@ -159,5 +172,5 @@ export default function RegisterPage() {
         </Card>
       </div>
     </div>
-  );
+  )
 }

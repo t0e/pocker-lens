@@ -1,10 +1,10 @@
-import { FastifyPluginAsync } from 'fastify';
+import { FastifyPluginAsync } from 'fastify'
 import {
   Prisma,
   Transaction,
   TransactionType as PrismaTransactionType,
   CategoryType as PrismaCategoryType,
-} from '@prisma/client';
+} from '@prisma/client'
 import {
   createTransactionSchema,
   updateTransactionSchema,
@@ -16,10 +16,10 @@ import {
   RuleBasedParser,
   ParserUserContext,
   ParseTransactionResult,
-} from '@pocketlens/shared';
-import { prisma } from '../db/client.js';
-import { formatAccountResponse } from './accounts.js';
-import { formatCategoryResponse } from './categories.js';
+} from '@pocketlens/shared'
+import { prisma } from '../db/client.js'
+import { formatAccountResponse } from './accounts.js'
+import { formatCategoryResponse } from './categories.js'
 
 export function formatTransactionResponse(tx: any): TransactionResponse {
   return {
@@ -29,54 +29,58 @@ export function formatTransactionResponse(tx: any): TransactionResponse {
     accountId: tx.accountId,
     account: tx.account ? formatAccountResponse(tx.account) : undefined,
     transferAccountId: tx.transferAccountId,
-    transferAccount: tx.transferAccount ? formatAccountResponse(tx.transferAccount) : undefined,
+    transferAccount: tx.transferAccount
+      ? formatAccountResponse(tx.transferAccount)
+      : undefined,
     categoryId: tx.categoryId,
     category: tx.category ? formatCategoryResponse(tx.category) : undefined,
     amount: tx.amount.toString(),
     currency: tx.currency,
-    transactionDate: tx.transactionDate instanceof Date ? tx.transactionDate.toISOString() : tx.transactionDate,
+    transactionDate:
+      tx.transactionDate instanceof Date
+        ? tx.transactionDate.toISOString()
+        : tx.transactionDate,
     description: tx.description,
     merchant: tx.merchant,
     notes: tx.notes,
-    createdAt: tx.createdAt instanceof Date ? tx.createdAt.toISOString() : tx.createdAt,
-    updatedAt: tx.updatedAt instanceof Date ? tx.updatedAt.toISOString() : tx.updatedAt,
-  };
+    createdAt:
+      tx.createdAt instanceof Date ? tx.createdAt.toISOString() : tx.createdAt,
+    updatedAt:
+      tx.updatedAt instanceof Date ? tx.updatedAt.toISOString() : tx.updatedAt,
+  }
 }
 
-const parser = new RuleBasedParser();
+const parser = new RuleBasedParser()
 
 export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.addHook('preHandler', fastify.authenticate);
+  fastify.addHook('preHandler', fastify.authenticate)
 
   // POST /transactions/parse (Natural Language Parser - Does NOT create transaction)
   fastify.post('/transactions/parse', async (request, reply) => {
-    const body = request.body as { text?: string };
-    const text = body?.text || '';
-    const userId = request.user.id;
+    const body = request.body as { text?: string }
+    const text = body?.text || ''
+    const userId = request.user.id
 
     if (!text || typeof text !== 'string') {
       return reply.status(400).send({
         statusCode: 400,
         error: 'Bad Request',
         message: 'Input text string is required for parsing',
-      });
+      })
     }
 
     // Load User Accounts Context
     const accounts = await prisma.account.findMany({
       where: { userId, isArchived: false },
       orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
-    });
+    })
 
     // Load User Categories Context
     const categories = await prisma.category.findMany({
       where: {
-        AND: [
-          { OR: [{ isSystem: true }, { userId }] },
-          { isArchived: false },
-        ],
+        AND: [{ OR: [{ isSystem: true }, { userId }] }, { isArchived: false }],
       },
-    });
+    })
 
     // Load recent 10 transactions for context
     const recentTx = await prisma.transaction.findMany({
@@ -90,7 +94,7 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
         categoryId: true,
         type: true,
       },
-    });
+    })
 
     const parserContext: ParserUserContext = {
       accounts: accounts.map((a) => ({
@@ -115,34 +119,39 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
         categoryId: tx.categoryId,
         type: tx.type.toLowerCase() as TransactionType,
       })),
-      preferredCurrency: accounts.find((a) => a.isDefault)?.currency || accounts[0]?.currency || 'VND',
-    };
+      preferredCurrency:
+        accounts.find((a) => a.isDefault)?.currency ||
+        accounts[0]?.currency ||
+        'VND',
+    }
 
-    const result = parser.parse(text, parserContext);
-    return reply.send(result);
-  });
+    const result = parser.parse(text, parserContext)
+    return reply.send(result)
+  })
 
   // GET /transactions/summary (Monthly Income, Expense, Net per Currency)
   fastify.get('/transactions/summary', async (request, reply) => {
-    const query = request.query as { month?: string };
-    const userId = request.user.id;
+    const query = request.query as { month?: string }
+    const userId = request.user.id
 
-    const now = new Date();
-    const targetMonthStr = query.month || `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-    const [yearStr, monthStr] = targetMonthStr.split('-');
-    const year = parseInt(yearStr, 10);
-    const month = parseInt(monthStr, 10);
+    const now = new Date()
+    const targetMonthStr =
+      query.month ||
+      `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
+    const [yearStr, monthStr] = targetMonthStr.split('-')
+    const year = parseInt(yearStr, 10)
+    const month = parseInt(monthStr, 10)
 
     if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
       return reply.status(400).send({
         statusCode: 400,
         error: 'Bad Request',
         message: 'Invalid month format. Expected YYYY-MM (e.g. 2026-08)',
-      });
+      })
     }
 
-    const startOfMonth = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
-    const endOfMonth = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+    const startOfMonth = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0))
+    const endOfMonth = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
 
     // Exclude transfers strictly from monthly income/expense summary
     const transactions = await prisma.transaction.findMany({
@@ -154,71 +163,81 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
           lte: endOfMonth,
         },
       },
-    });
+    })
 
     const aggregates: Record<
       string,
-      { income: Prisma.Decimal; expense: Prisma.Decimal; incomeCount: number; expenseCount: number }
-    > = {};
+      {
+        income: Prisma.Decimal
+        expense: Prisma.Decimal
+        incomeCount: number
+        expenseCount: number
+      }
+    > = {}
 
     for (const tx of transactions) {
-      const cur = tx.currency;
+      const cur = tx.currency
       if (!aggregates[cur]) {
         aggregates[cur] = {
           income: new Prisma.Decimal(0),
           expense: new Prisma.Decimal(0),
           incomeCount: 0,
           expenseCount: 0,
-        };
+        }
       }
 
       if (tx.type === 'INCOME') {
-        aggregates[cur].income = aggregates[cur].income.plus(tx.amount);
-        aggregates[cur].incomeCount++;
+        aggregates[cur].income = aggregates[cur].income.plus(tx.amount)
+        aggregates[cur].incomeCount++
       } else if (tx.type === 'EXPENSE') {
-        aggregates[cur].expense = aggregates[cur].expense.plus(tx.amount);
-        aggregates[cur].expenseCount++;
+        aggregates[cur].expense = aggregates[cur].expense.plus(tx.amount)
+        aggregates[cur].expenseCount++
       }
     }
 
-    const summaries: CurrencyMonthlySummary[] = Object.entries(aggregates).map(([currency, data]) => ({
-      currency,
-      income: data.income.toString(),
-      expense: data.expense.toString(),
-      net: data.income.minus(data.expense).toString(),
-      incomeCount: data.incomeCount,
-      expenseCount: data.expenseCount,
-    }));
+    const summaries: CurrencyMonthlySummary[] = Object.entries(aggregates).map(
+      ([currency, data]) => ({
+        currency,
+        income: data.income.toString(),
+        expense: data.expense.toString(),
+        net: data.income.minus(data.expense).toString(),
+        incomeCount: data.incomeCount,
+        expenseCount: data.expenseCount,
+      }),
+    )
 
     const response: MonthlyFinancialSummaryResponse = {
       month: targetMonthStr,
       summaries,
-    };
+    }
 
-    return reply.send(response);
-  });
+    return reply.send(response)
+  })
 
   // GET /transactions (List with Pagination and Filtering)
   fastify.get('/transactions', async (request, reply) => {
     const query = request.query as {
-      page?: string;
-      limit?: string;
-      type?: string;
-      accountId?: string;
-      categoryId?: string;
-      startDate?: string;
-      endDate?: string;
-      search?: string;
-      currency?: string;
-      minAmount?: string;
-      maxAmount?: string;
-      sortBy?: string;
-    };
+      page?: string
+      limit?: string
+      type?: string
+      accountId?: string
+      categoryId?: string
+      startDate?: string
+      endDate?: string
+      search?: string
+      currency?: string
+      minAmount?: string
+      maxAmount?: string
+      sortBy?: string
+    }
 
-    const userId = request.user.id;
-    const page = Math.max(parseInt(query.page || '1', 10) || 1, 1);
-    const limit = Math.min(Math.max(parseInt(query.limit || '20', 10) || 20, 1), 100);
-    const skip = (page - 1) * limit;
+    const userId = request.user.id
+    const page = Math.max(parseInt(query.page || '1', 10) || 1, 1)
+    const limit = Math.min(
+      Math.max(parseInt(query.limit || '20', 10) || 20, 1),
+      100,
+    )
+    const skip = (page - 1) * limit
 
     const where: Prisma.TransactionWhereInput = {
       userId,
@@ -228,7 +247,10 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
       ...(query.currency ? { currency: query.currency.toUpperCase() } : {}),
       ...(query.accountId
         ? {
-            OR: [{ accountId: query.accountId }, { transferAccountId: query.accountId }],
+            OR: [
+              { accountId: query.accountId },
+              { transferAccountId: query.accountId },
+            ],
           }
         : {}),
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
@@ -240,21 +262,25 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
             },
           }
         : {}),
-    };
+    }
 
     if (query.minAmount !== undefined || query.maxAmount !== undefined) {
-      const min = query.minAmount ? parseFloat(query.minAmount) : undefined;
-      const max = query.maxAmount ? parseFloat(query.maxAmount) : undefined;
+      const min = query.minAmount ? parseFloat(query.minAmount) : undefined
+      const max = query.maxAmount ? parseFloat(query.maxAmount) : undefined
       where.amount = {
         ...(min !== undefined && !isNaN(min) ? { gte: min } : {}),
         ...(max !== undefined && !isNaN(max) ? { lte: max } : {}),
-      };
+      }
     }
 
-    const search = query.search?.trim();
+    const search = query.search?.trim()
     if (search) {
       where.AND = [
-        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        ...(Array.isArray(where.AND)
+          ? where.AND
+          : where.AND
+            ? [where.AND]
+            : []),
         {
           OR: [
             { description: { contains: search, mode: 'insensitive' } },
@@ -262,19 +288,19 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
             { notes: { contains: search, mode: 'insensitive' } },
           ],
         },
-      ];
+      ]
     }
 
     let orderBy: Prisma.TransactionOrderByWithRelationInput[] = [
       { transactionDate: 'desc' },
       { createdAt: 'desc' },
-    ];
+    ]
     if (query.sortBy === 'date_asc') {
-      orderBy = [{ transactionDate: 'asc' }, { createdAt: 'asc' }];
+      orderBy = [{ transactionDate: 'asc' }, { createdAt: 'asc' }]
     } else if (query.sortBy === 'amount_desc') {
-      orderBy = [{ amount: 'desc' }, { transactionDate: 'desc' }];
+      orderBy = [{ amount: 'desc' }, { transactionDate: 'desc' }]
     } else if (query.sortBy === 'amount_asc') {
-      orderBy = [{ amount: 'asc' }, { transactionDate: 'desc' }];
+      orderBy = [{ amount: 'asc' }, { transactionDate: 'desc' }]
     }
 
     const [total, transactions] = await Promise.all([
@@ -290,7 +316,7 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
         skip,
         take: limit,
       }),
-    ]);
+    ])
 
     const response: PaginatedTransactionsResponse = {
       transactions: transactions.map(formatTransactionResponse),
@@ -300,46 +326,50 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
         total,
         totalPages: Math.ceil(total / limit) || 1,
       },
-    };
-
-    return reply.send(response);
-  });
-
-  // GET /transactions/:id
-  fastify.get<{ Params: { id: string } }>('/transactions/:id', async (request, reply) => {
-    const { id } = request.params;
-    const userId = request.user.id;
-
-    const tx = await prisma.transaction.findFirst({
-      where: { id, userId },
-      include: {
-        account: true,
-        transferAccount: true,
-        category: true,
-      },
-    });
-
-    if (!tx) {
-      return reply.status(404).send({
-        statusCode: 404,
-        error: 'Not Found',
-        message: 'Transaction not found',
-      });
     }
 
-    return reply.send(formatTransactionResponse(tx));
-  });
+    return reply.send(response)
+  })
+
+  // GET /transactions/:id
+  fastify.get<{ Params: { id: string } }>(
+    '/transactions/:id',
+    async (request, reply) => {
+      const { id } = request.params
+      const userId = request.user.id
+
+      const tx = await prisma.transaction.findFirst({
+        where: { id, userId },
+        include: {
+          account: true,
+          transferAccount: true,
+          category: true,
+        },
+      })
+
+      if (!tx) {
+        return reply.status(404).send({
+          statusCode: 404,
+          error: 'Not Found',
+          message: 'Transaction not found',
+        })
+      }
+
+      return reply.send(formatTransactionResponse(tx))
+    },
+  )
 
   // POST /transactions (Create Expense, Income, or Transfer)
   fastify.post('/transactions', async (request, reply) => {
-    const parseResult = createTransactionSchema.safeParse(request.body);
+    const parseResult = createTransactionSchema.safeParse(request.body)
     if (!parseResult.success) {
       return reply.status(400).send({
         statusCode: 400,
         error: 'Bad Request',
-        message: parseResult.error.errors[0]?.message || 'Invalid transaction input',
+        message:
+          parseResult.error.errors[0]?.message || 'Invalid transaction input',
         details: parseResult.error.format(),
-      });
+      })
     }
 
     const {
@@ -352,33 +382,33 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
       description,
       merchant,
       notes,
-    } = parseResult.data;
+    } = parseResult.data
 
-    const userId = request.user.id;
-    const amountDecimal = new Prisma.Decimal(amount);
-    const dateObj = new Date(transactionDate);
+    const userId = request.user.id
+    const amountDecimal = new Prisma.Decimal(amount)
+    const dateObj = new Date(transactionDate)
 
     // Verify source account ownership
     const sourceAccount = await prisma.account.findFirst({
       where: { id: accountId, userId },
-    });
+    })
 
     if (!sourceAccount) {
       return reply.status(404).send({
         statusCode: 404,
         error: 'Not Found',
         message: 'Source account not found',
-      });
+      })
     }
 
-    let destinationAccount: any = null;
+    let destinationAccount: any = null
     if (type === 'transfer') {
       if (!transferAccountId) {
         return reply.status(400).send({
           statusCode: 400,
           error: 'Bad Request',
           message: 'Destination account is required for transfers',
-        });
+        })
       }
 
       if (accountId === transferAccountId) {
@@ -386,19 +416,19 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
           statusCode: 400,
           error: 'Bad Request',
           message: 'Source and destination accounts cannot be the same',
-        });
+        })
       }
 
       destinationAccount = await prisma.account.findFirst({
         where: { id: transferAccountId, userId },
-      });
+      })
 
       if (!destinationAccount) {
         return reply.status(404).send({
           statusCode: 404,
           error: 'Not Found',
           message: 'Destination account not found',
-        });
+        })
       }
 
       // Enforce same-currency transfers for Phase 3/4
@@ -407,7 +437,7 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
           statusCode: 400,
           error: 'Bad Request',
           message: `Cross-currency transfers are not supported in Phase 3. Both accounts must use ${sourceAccount.currency}.`,
-        });
+        })
       }
     }
 
@@ -419,14 +449,14 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
           OR: [{ isSystem: true }, { userId }],
           isArchived: false,
         },
-      });
+      })
 
       if (!category) {
         return reply.status(404).send({
           statusCode: 404,
           error: 'Not Found',
           message: 'Category not found',
-        });
+        })
       }
 
       // Verify category type matches transaction type
@@ -435,7 +465,7 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
           statusCode: 400,
           error: 'Bad Request',
           message: 'Selected category is not an expense category',
-        });
+        })
       }
 
       if (type === 'income' && category.type !== 'INCOME') {
@@ -443,7 +473,7 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
           statusCode: 400,
           error: 'Bad Request',
           message: 'Selected category is not an income category',
-        });
+        })
       }
     }
 
@@ -458,7 +488,7 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
               decrement: amountDecimal,
             },
           },
-        });
+        })
       } else if (type === 'income') {
         await tx.account.update({
           where: { id: sourceAccount.id },
@@ -467,7 +497,7 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
               increment: amountDecimal,
             },
           },
-        });
+        })
       } else if (type === 'transfer') {
         await tx.account.update({
           where: { id: sourceAccount.id },
@@ -476,7 +506,7 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
               decrement: amountDecimal,
             },
           },
-        });
+        })
 
         await tx.account.update({
           where: { id: destinationAccount.id },
@@ -485,7 +515,7 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
               increment: amountDecimal,
             },
           },
-        });
+        })
       }
 
       // 2. Insert transaction record
@@ -508,240 +538,270 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
           transferAccount: true,
           category: true,
         },
-      });
-    });
+      })
+    })
 
-    return reply.status(201).send(formatTransactionResponse(createdTx));
-  });
+    return reply.status(201).send(formatTransactionResponse(createdTx))
+  })
 
   // PATCH /transactions/:id (Update Transaction with atomic balance recalculation)
-  fastify.patch<{ Params: { id: string } }>('/transactions/:id', async (request, reply) => {
-    const { id } = request.params;
-    const userId = request.user.id;
+  fastify.patch<{ Params: { id: string } }>(
+    '/transactions/:id',
+    async (request, reply) => {
+      const { id } = request.params
+      const userId = request.user.id
 
-    const parseResult = updateTransactionSchema.safeParse(request.body);
-    if (!parseResult.success) {
-      return reply.status(400).send({
-        statusCode: 400,
-        error: 'Bad Request',
-        message: parseResult.error.errors[0]?.message || 'Invalid update input',
-        details: parseResult.error.format(),
-      });
-    }
-
-    const existingTx = await prisma.transaction.findFirst({
-      where: { id, userId },
-      include: { account: true, transferAccount: true },
-    });
-
-    if (!existingTx) {
-      return reply.status(404).send({
-        statusCode: 404,
-        error: 'Not Found',
-        message: 'Transaction not found',
-      });
-    }
-
-    const updates = parseResult.data;
-    const newType = (updates.type ? updates.type.toUpperCase() : existingTx.type) as PrismaTransactionType;
-    const newAccountId = updates.accountId || existingTx.accountId;
-    const newTransferAccountId =
-      updates.transferAccountId !== undefined ? updates.transferAccountId : existingTx.transferAccountId;
-    const newAmountDecimal = updates.amount ? new Prisma.Decimal(updates.amount) : existingTx.amount;
-    const newDate = updates.transactionDate ? new Date(updates.transactionDate) : existingTx.transactionDate;
-    const newCategoryId = updates.categoryId !== undefined ? updates.categoryId : existingTx.categoryId;
-
-    // Verify source account ownership
-    const sourceAccount = await prisma.account.findFirst({
-      where: { id: newAccountId, userId },
-    });
-
-    if (!sourceAccount) {
-      return reply.status(404).send({
-        statusCode: 404,
-        error: 'Not Found',
-        message: 'Account not found',
-      });
-    }
-
-    let destinationAccount: any = null;
-    if (newType === 'TRANSFER') {
-      if (!newTransferAccountId) {
+      const parseResult = updateTransactionSchema.safeParse(request.body)
+      if (!parseResult.success) {
         return reply.status(400).send({
           statusCode: 400,
           error: 'Bad Request',
-          message: 'Destination account is required for transfers',
-        });
+          message:
+            parseResult.error.errors[0]?.message || 'Invalid update input',
+          details: parseResult.error.format(),
+        })
       }
 
-      if (newAccountId === newTransferAccountId) {
-        return reply.status(400).send({
-          statusCode: 400,
-          error: 'Bad Request',
-          message: 'Source and destination accounts cannot be the same',
-        });
-      }
+      const existingTx = await prisma.transaction.findFirst({
+        where: { id, userId },
+        include: { account: true, transferAccount: true },
+      })
 
-      destinationAccount = await prisma.account.findFirst({
-        where: { id: newTransferAccountId, userId },
-      });
-
-      if (!destinationAccount) {
+      if (!existingTx) {
         return reply.status(404).send({
           statusCode: 404,
           error: 'Not Found',
-          message: 'Destination account not found',
-        });
+          message: 'Transaction not found',
+        })
       }
 
-      if (sourceAccount.currency !== destinationAccount.currency) {
-        return reply.status(400).send({
-          statusCode: 400,
-          error: 'Bad Request',
-          message: `Cross-currency transfers are not supported. Both accounts must use ${sourceAccount.currency}.`,
-        });
-      }
-    }
+      const updates = parseResult.data
+      const newType = (
+        updates.type ? updates.type.toUpperCase() : existingTx.type
+      ) as PrismaTransactionType
+      const newAccountId = updates.accountId || existingTx.accountId
+      const newTransferAccountId =
+        updates.transferAccountId !== undefined
+          ? updates.transferAccountId
+          : existingTx.transferAccountId
+      const newAmountDecimal = updates.amount
+        ? new Prisma.Decimal(updates.amount)
+        : existingTx.amount
+      const newDate = updates.transactionDate
+        ? new Date(updates.transactionDate)
+        : existingTx.transactionDate
+      const newCategoryId =
+        updates.categoryId !== undefined
+          ? updates.categoryId
+          : existingTx.categoryId
 
-    // Verify category if changed
-    if (newCategoryId) {
-      const cat = await prisma.category.findFirst({
-        where: {
-          id: newCategoryId,
-          OR: [{ isSystem: true }, { userId }],
-          isArchived: false,
-        },
-      });
+      // Verify source account ownership
+      const sourceAccount = await prisma.account.findFirst({
+        where: { id: newAccountId, userId },
+      })
 
-      if (!cat) {
+      if (!sourceAccount) {
         return reply.status(404).send({
           statusCode: 404,
           error: 'Not Found',
-          message: 'Category not found',
-        });
-      }
-    }
-
-    // Atomic Balance Reversion & Re-application
-    const updatedTx = await prisma.$transaction(async (tx) => {
-      // 1. Revert previous transaction effect
-      if (existingTx.type === 'EXPENSE') {
-        await tx.account.update({
-          where: { id: existingTx.accountId },
-          data: { currentBalance: { increment: existingTx.amount } },
-        });
-      } else if (existingTx.type === 'INCOME') {
-        await tx.account.update({
-          where: { id: existingTx.accountId },
-          data: { currentBalance: { decrement: existingTx.amount } },
-        });
-      } else if (existingTx.type === 'TRANSFER' && existingTx.transferAccountId) {
-        await tx.account.update({
-          where: { id: existingTx.accountId },
-          data: { currentBalance: { increment: existingTx.amount } },
-        });
-        await tx.account.update({
-          where: { id: existingTx.transferAccountId },
-          data: { currentBalance: { decrement: existingTx.amount } },
-        });
+          message: 'Account not found',
+        })
       }
 
-      // 2. Apply new transaction effect
-      if (newType === 'EXPENSE') {
-        await tx.account.update({
-          where: { id: sourceAccount.id },
-          data: { currentBalance: { decrement: newAmountDecimal } },
-        });
-      } else if (newType === 'INCOME') {
-        await tx.account.update({
-          where: { id: sourceAccount.id },
-          data: { currentBalance: { increment: newAmountDecimal } },
-        });
-      } else if (newType === 'TRANSFER' && destinationAccount) {
-        await tx.account.update({
-          where: { id: sourceAccount.id },
-          data: { currentBalance: { decrement: newAmountDecimal } },
-        });
-        await tx.account.update({
-          where: { id: destinationAccount.id },
-          data: { currentBalance: { increment: newAmountDecimal } },
-        });
+      let destinationAccount: any = null
+      if (newType === 'TRANSFER') {
+        if (!newTransferAccountId) {
+          return reply.status(400).send({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: 'Destination account is required for transfers',
+          })
+        }
+
+        if (newAccountId === newTransferAccountId) {
+          return reply.status(400).send({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: 'Source and destination accounts cannot be the same',
+          })
+        }
+
+        destinationAccount = await prisma.account.findFirst({
+          where: { id: newTransferAccountId, userId },
+        })
+
+        if (!destinationAccount) {
+          return reply.status(404).send({
+            statusCode: 404,
+            error: 'Not Found',
+            message: 'Destination account not found',
+          })
+        }
+
+        if (sourceAccount.currency !== destinationAccount.currency) {
+          return reply.status(400).send({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: `Cross-currency transfers are not supported. Both accounts must use ${sourceAccount.currency}.`,
+          })
+        }
       }
 
-      // 3. Update transaction row
-      return await tx.transaction.update({
-        where: { id },
-        data: {
-          type: newType,
-          accountId: sourceAccount.id,
-          transferAccountId: destinationAccount ? destinationAccount.id : null,
-          categoryId: newCategoryId || null,
-          amount: newAmountDecimal,
-          currency: sourceAccount.currency,
-          transactionDate: newDate,
-          ...(updates.description !== undefined && { description: updates.description }),
-          ...(updates.merchant !== undefined && { merchant: updates.merchant }),
-          ...(updates.notes !== undefined && { notes: updates.notes }),
-        },
-        include: {
-          account: true,
-          transferAccount: true,
-          category: true,
-        },
-      });
-    });
+      // Verify category if changed
+      if (newCategoryId) {
+        const cat = await prisma.category.findFirst({
+          where: {
+            id: newCategoryId,
+            OR: [{ isSystem: true }, { userId }],
+            isArchived: false,
+          },
+        })
 
-    return reply.send(formatTransactionResponse(updatedTx));
-  });
+        if (!cat) {
+          return reply.status(404).send({
+            statusCode: 404,
+            error: 'Not Found',
+            message: 'Category not found',
+          })
+        }
+      }
+
+      // Atomic Balance Reversion & Re-application
+      const updatedTx = await prisma.$transaction(async (tx) => {
+        // 1. Revert previous transaction effect
+        if (existingTx.type === 'EXPENSE') {
+          await tx.account.update({
+            where: { id: existingTx.accountId },
+            data: { currentBalance: { increment: existingTx.amount } },
+          })
+        } else if (existingTx.type === 'INCOME') {
+          await tx.account.update({
+            where: { id: existingTx.accountId },
+            data: { currentBalance: { decrement: existingTx.amount } },
+          })
+        } else if (
+          existingTx.type === 'TRANSFER' &&
+          existingTx.transferAccountId
+        ) {
+          await tx.account.update({
+            where: { id: existingTx.accountId },
+            data: { currentBalance: { increment: existingTx.amount } },
+          })
+          await tx.account.update({
+            where: { id: existingTx.transferAccountId },
+            data: { currentBalance: { decrement: existingTx.amount } },
+          })
+        }
+
+        // 2. Apply new transaction effect
+        if (newType === 'EXPENSE') {
+          await tx.account.update({
+            where: { id: sourceAccount.id },
+            data: { currentBalance: { decrement: newAmountDecimal } },
+          })
+        } else if (newType === 'INCOME') {
+          await tx.account.update({
+            where: { id: sourceAccount.id },
+            data: { currentBalance: { increment: newAmountDecimal } },
+          })
+        } else if (newType === 'TRANSFER' && destinationAccount) {
+          await tx.account.update({
+            where: { id: sourceAccount.id },
+            data: { currentBalance: { decrement: newAmountDecimal } },
+          })
+          await tx.account.update({
+            where: { id: destinationAccount.id },
+            data: { currentBalance: { increment: newAmountDecimal } },
+          })
+        }
+
+        // 3. Update transaction row
+        return await tx.transaction.update({
+          where: { id },
+          data: {
+            type: newType,
+            accountId: sourceAccount.id,
+            transferAccountId: destinationAccount
+              ? destinationAccount.id
+              : null,
+            categoryId: newCategoryId || null,
+            amount: newAmountDecimal,
+            currency: sourceAccount.currency,
+            transactionDate: newDate,
+            ...(updates.description !== undefined && {
+              description: updates.description,
+            }),
+            ...(updates.merchant !== undefined && {
+              merchant: updates.merchant,
+            }),
+            ...(updates.notes !== undefined && { notes: updates.notes }),
+          },
+          include: {
+            account: true,
+            transferAccount: true,
+            category: true,
+          },
+        })
+      })
+
+      return reply.send(formatTransactionResponse(updatedTx))
+    },
+  )
 
   // DELETE /transactions/:id (Atomic Reversal and Deletion)
-  fastify.delete<{ Params: { id: string } }>('/transactions/:id', async (request, reply) => {
-    const { id } = request.params;
-    const userId = request.user.id;
+  fastify.delete<{ Params: { id: string } }>(
+    '/transactions/:id',
+    async (request, reply) => {
+      const { id } = request.params
+      const userId = request.user.id
 
-    const existingTx = await prisma.transaction.findFirst({
-      where: { id, userId },
-    });
+      const existingTx = await prisma.transaction.findFirst({
+        where: { id, userId },
+      })
 
-    if (!existingTx) {
-      return reply.status(404).send({
-        statusCode: 404,
-        error: 'Not Found',
-        message: 'Transaction not found',
-      });
-    }
-
-    await prisma.$transaction(async (tx) => {
-      // Revert balance effects
-      if (existingTx.type === 'EXPENSE') {
-        await tx.account.update({
-          where: { id: existingTx.accountId },
-          data: { currentBalance: { increment: existingTx.amount } },
-        });
-      } else if (existingTx.type === 'INCOME') {
-        await tx.account.update({
-          where: { id: existingTx.accountId },
-          data: { currentBalance: { decrement: existingTx.amount } },
-        });
-      } else if (existingTx.type === 'TRANSFER' && existingTx.transferAccountId) {
-        await tx.account.update({
-          where: { id: existingTx.accountId },
-          data: { currentBalance: { increment: existingTx.amount } },
-        });
-        await tx.account.update({
-          where: { id: existingTx.transferAccountId },
-          data: { currentBalance: { decrement: existingTx.amount } },
-        });
+      if (!existingTx) {
+        return reply.status(404).send({
+          statusCode: 404,
+          error: 'Not Found',
+          message: 'Transaction not found',
+        })
       }
 
-      await tx.transaction.delete({
-        where: { id },
-      });
-    });
+      await prisma.$transaction(async (tx) => {
+        // Revert balance effects
+        if (existingTx.type === 'EXPENSE') {
+          await tx.account.update({
+            where: { id: existingTx.accountId },
+            data: { currentBalance: { increment: existingTx.amount } },
+          })
+        } else if (existingTx.type === 'INCOME') {
+          await tx.account.update({
+            where: { id: existingTx.accountId },
+            data: { currentBalance: { decrement: existingTx.amount } },
+          })
+        } else if (
+          existingTx.type === 'TRANSFER' &&
+          existingTx.transferAccountId
+        ) {
+          await tx.account.update({
+            where: { id: existingTx.accountId },
+            data: { currentBalance: { increment: existingTx.amount } },
+          })
+          await tx.account.update({
+            where: { id: existingTx.transferAccountId },
+            data: { currentBalance: { decrement: existingTx.amount } },
+          })
+        }
 
-    return reply.send({
-      success: true,
-      message: 'Transaction deleted and balance adjusted successfully',
-    });
-  });
-};
+        await tx.transaction.delete({
+          where: { id },
+        })
+      })
+
+      return reply.send({
+        success: true,
+        message: 'Transaction deleted and balance adjusted successfully',
+      })
+    },
+  )
+}

@@ -1,6 +1,6 @@
-'use client';
+'use client'
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   PieChart,
   Plus,
@@ -23,7 +23,7 @@ import {
   Layers,
   ArrowRight,
   Info,
-} from 'lucide-react';
+} from 'lucide-react'
 import {
   MonthlyBudgetsResponse,
   BudgetResponse,
@@ -32,170 +32,205 @@ import {
   RecurringTransactionResponse,
   UpcomingOccurrenceResponse,
   SubscriptionSummaryResponse,
-} from '@pocketlens/shared';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { BudgetModal } from '@/components/budgets/BudgetModal';
-import { RecurringModal } from '@/components/recurring/RecurringModal';
-import { apiClient } from '@/lib/api-client';
-import { formatMoney } from '@/lib/utils';
+} from '@pocketlens/shared'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
+import { Button } from '@/components/ui/Button'
+import { BudgetModal } from '@/components/budgets/BudgetModal'
+import { RecurringModal } from '@/components/recurring/RecurringModal'
+import { apiClient } from '@/lib/api-client'
+import { formatMoney } from '@/lib/utils'
 
 export default function BudgetsPage() {
   // Tabs: 'budgets' | 'subscriptions' | 'upcoming' | 'recurring'
-  const [activeTab, setActiveTab] = useState<'budgets' | 'subscriptions' | 'upcoming' | 'recurring'>('budgets');
+  const [activeTab, setActiveTab] = useState<
+    'budgets' | 'subscriptions' | 'upcoming' | 'recurring'
+  >('budgets')
 
   // Month state for budgets
-  const [currentMonth, setCurrentMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [currentMonth, setCurrentMonth] = useState(() =>
+    new Date().toISOString().slice(0, 7),
+  )
 
   // Data states
-  const [budgetsData, setBudgetsData] = useState<MonthlyBudgetsResponse | null>(null);
-  const [subscriptionsData, setSubscriptionsData] = useState<SubscriptionSummaryResponse | null>(null);
-  const [upcomingList, setUpcomingList] = useState<UpcomingOccurrenceResponse[]>([]);
-  const [recurringList, setRecurringList] = useState<RecurringTransactionResponse[]>([]);
-  const [categories, setCategories] = useState<CategoryResponse[]>([]);
-  const [accounts, setAccounts] = useState<AccountResponse[]>([]);
+  const [budgetsData, setBudgetsData] = useState<MonthlyBudgetsResponse | null>(
+    null,
+  )
+  const [subscriptionsData, setSubscriptionsData] =
+    useState<SubscriptionSummaryResponse | null>(null)
+  const [upcomingList, setUpcomingList] = useState<
+    UpcomingOccurrenceResponse[]
+  >([])
+  const [recurringList, setRecurringList] = useState<
+    RecurringTransactionResponse[]
+  >([])
+  const [categories, setCategories] = useState<CategoryResponse[]>([])
+  const [accounts, setAccounts] = useState<AccountResponse[]>([])
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isProcessingDue, setIsProcessingDue] = useState(false);
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isProcessingDue, setIsProcessingDue] = useState(false)
 
   // Modals state
-  const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
-  const [budgetToEdit, setBudgetToEdit] = useState<BudgetResponse | null>(null);
+  const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false)
+  const [budgetToEdit, setBudgetToEdit] = useState<BudgetResponse | null>(null)
 
-  const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
-  const [recurringToEdit, setRecurringToEdit] = useState<RecurringTransactionResponse | null>(null);
-  const [modalIsSubscription, setModalIsSubscription] = useState(false);
+  const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false)
+  const [recurringToEdit, setRecurringToEdit] =
+    useState<RecurringTransactionResponse | null>(null)
+  const [modalIsSubscription, setModalIsSubscription] = useState(false)
 
   // Load categories and accounts once
   useEffect(() => {
     apiClient<CategoryResponse[]>('/categories')
       .then((res) => setCategories(res || []))
-      .catch(() => {});
+      .catch(() => {})
 
     apiClient<AccountResponse[]>('/accounts')
       .then((res) => setAccounts(res || []))
-      .catch(() => {});
-  }, []);
+      .catch(() => {})
+  }, [])
 
   // Fetch budgets data whenever currentMonth changes
   const fetchBudgets = useCallback(async () => {
     try {
-      setIsLoading(true);
-      setError(null);
-      const data = await apiClient<MonthlyBudgetsResponse>(`/budgets?month=${currentMonth}`);
-      setBudgetsData(data);
+      setIsLoading(true)
+      setError(null)
+      const data = await apiClient<MonthlyBudgetsResponse>(
+        `/budgets?month=${currentMonth}`,
+      )
+      setBudgetsData(data)
     } catch (err: any) {
-      setError(err.message || 'Failed to load budgets');
+      setError(err.message || 'Failed to load budgets')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  }, [currentMonth]);
+  }, [currentMonth])
 
   // Fetch subscriptions
   const fetchSubscriptions = useCallback(async () => {
     try {
-      setIsLoading(true);
-      setError(null);
-      const data = await apiClient<SubscriptionSummaryResponse>('/subscriptions');
-      setSubscriptionsData(data);
+      setIsLoading(true)
+      setError(null)
+      const data =
+        await apiClient<SubscriptionSummaryResponse>('/subscriptions')
+      setSubscriptionsData(data)
     } catch (err: any) {
-      setError(err.message || 'Failed to load subscriptions');
+      setError(err.message || 'Failed to load subscriptions')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  }, []);
+  }, [])
 
   // Fetch upcoming
   const fetchUpcoming = useCallback(async () => {
     try {
-      setIsLoading(true);
-      setError(null);
-      const data = await apiClient<{ upcoming: UpcomingOccurrenceResponse[] }>('/recurring/upcoming?days=35');
-      setUpcomingList(data.upcoming || []);
+      setIsLoading(true)
+      setError(null)
+      const data = await apiClient<{ upcoming: UpcomingOccurrenceResponse[] }>(
+        '/recurring/upcoming?days=35',
+      )
+      setUpcomingList(data.upcoming || [])
     } catch (err: any) {
-      setError(err.message || 'Failed to load upcoming payments');
+      setError(err.message || 'Failed to load upcoming payments')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  }, []);
+  }, [])
 
   // Fetch all recurring
   const fetchRecurring = useCallback(async () => {
     try {
-      setIsLoading(true);
-      setError(null);
-      const data = await apiClient<{ recurringTransactions: RecurringTransactionResponse[] }>('/recurring');
-      setRecurringList(data.recurringTransactions || []);
+      setIsLoading(true)
+      setError(null)
+      const data = await apiClient<{
+        recurringTransactions: RecurringTransactionResponse[]
+      }>('/recurring')
+      setRecurringList(data.recurringTransactions || [])
     } catch (err: any) {
-      setError(err.message || 'Failed to load recurring transactions');
+      setError(err.message || 'Failed to load recurring transactions')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
     if (activeTab === 'budgets') {
-      fetchBudgets();
+      fetchBudgets()
     } else if (activeTab === 'subscriptions') {
-      fetchSubscriptions();
+      fetchSubscriptions()
     } else if (activeTab === 'upcoming') {
-      fetchUpcoming();
+      fetchUpcoming()
     } else if (activeTab === 'recurring') {
-      fetchRecurring();
+      fetchRecurring()
     }
-  }, [activeTab, fetchBudgets, fetchSubscriptions, fetchUpcoming, fetchRecurring]);
+  }, [
+    activeTab,
+    fetchBudgets,
+    fetchSubscriptions,
+    fetchUpcoming,
+    fetchRecurring,
+  ])
 
   // Month navigation helpers
   const handlePrevMonth = () => {
-    const [year, month] = currentMonth.split('-').map(Number);
-    let prevYear = year;
-    let prevMonth = month - 1;
+    const [year, month] = currentMonth.split('-').map(Number)
+    let prevYear = year
+    let prevMonth = month - 1
     if (prevMonth === 0) {
-      prevYear -= 1;
-      prevMonth = 12;
+      prevYear -= 1
+      prevMonth = 12
     }
-    setCurrentMonth(`${prevYear}-${String(prevMonth).padStart(2, '0')}`);
-  };
+    setCurrentMonth(`${prevYear}-${String(prevMonth).padStart(2, '0')}`)
+  }
 
   const handleNextMonth = () => {
-    const [year, month] = currentMonth.split('-').map(Number);
-    let nextYear = year;
-    let nextMonth = month + 1;
+    const [year, month] = currentMonth.split('-').map(Number)
+    let nextYear = year
+    let nextMonth = month + 1
     if (nextMonth === 13) {
-      nextYear += 1;
-      nextMonth = 1;
+      nextYear += 1
+      nextMonth = 1
     }
-    setCurrentMonth(`${nextYear}-${String(nextMonth).padStart(2, '0')}`);
-  };
+    setCurrentMonth(`${nextYear}-${String(nextMonth).padStart(2, '0')}`)
+  }
 
   const formatMonthLabel = (monthStr: string) => {
-    const [year, month] = monthStr.split('-').map(Number);
-    const d = new Date(Date.UTC(year, month - 1, 1));
-    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-  };
+    const [year, month] = monthStr.split('-').map(Number)
+    const d = new Date(Date.UTC(year, month - 1, 1))
+    return d.toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    })
+  }
 
   // Budget Actions
   const handleDeleteBudget = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this budget?')) return;
+    if (!confirm('Are you sure you want to delete this budget?')) return
     try {
-      await apiClient(`/budgets/${id}`, { method: 'DELETE' });
-      fetchBudgets();
+      await apiClient(`/budgets/${id}`, { method: 'DELETE' })
+      fetchBudgets()
     } catch (err: any) {
-      alert(err.message || 'Failed to delete budget');
+      alert(err.message || 'Failed to delete budget')
     }
-  };
+  }
 
   const handleCopyPreviousMonth = async () => {
-    const [year, month] = currentMonth.split('-').map(Number);
-    let prevYear = year;
-    let prevMonth = month - 1;
+    const [year, month] = currentMonth.split('-').map(Number)
+    let prevYear = year
+    let prevMonth = month - 1
     if (prevMonth === 0) {
-      prevYear -= 1;
-      prevMonth = 12;
+      prevYear -= 1
+      prevMonth = 12
     }
-    const fromMonth = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+    const fromMonth = `${prevYear}-${String(prevMonth).padStart(2, '0')}`
 
     try {
       const res: any = await apiClient('/budgets/copy', {
@@ -204,55 +239,65 @@ export default function BudgetsPage() {
           fromMonth,
           toMonth: currentMonth,
         }),
-      });
-      alert(res.message || 'Budgets copied successfully');
-      fetchBudgets();
+      })
+      alert(res.message || 'Budgets copied successfully')
+      fetchBudgets()
     } catch (err: any) {
-      alert(err.message || 'Failed to copy budgets from previous month');
+      alert(err.message || 'Failed to copy budgets from previous month')
     }
-  };
+  }
 
   // Recurring / Subscription Actions
-  const handleToggleRecurringStatus = async (item: RecurringTransactionResponse) => {
+  const handleToggleRecurringStatus = async (
+    item: RecurringTransactionResponse,
+  ) => {
     try {
       await apiClient(`/recurring/${item.id}/status`, {
         method: 'PATCH',
         body: JSON.stringify({ isActive: !item.isActive }),
-      });
-      if (activeTab === 'subscriptions') fetchSubscriptions();
-      else if (activeTab === 'recurring') fetchRecurring();
+      })
+      if (activeTab === 'subscriptions') fetchSubscriptions()
+      else if (activeTab === 'recurring') fetchRecurring()
     } catch (err: any) {
-      alert(err.message || 'Failed to update status');
+      alert(err.message || 'Failed to update status')
     }
-  };
+  }
 
   const handleDeleteRecurring = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this recurring template? Historical transactions will remain intact.')) {
-      return;
+    if (
+      !confirm(
+        'Are you sure you want to delete this recurring template? Historical transactions will remain intact.',
+      )
+    ) {
+      return
     }
     try {
-      await apiClient(`/recurring/${id}`, { method: 'DELETE' });
-      if (activeTab === 'subscriptions') fetchSubscriptions();
-      else if (activeTab === 'recurring') fetchRecurring();
+      await apiClient(`/recurring/${id}`, { method: 'DELETE' })
+      if (activeTab === 'subscriptions') fetchSubscriptions()
+      else if (activeTab === 'recurring') fetchRecurring()
     } catch (err: any) {
-      alert(err.message || 'Failed to delete recurring transaction');
+      alert(err.message || 'Failed to delete recurring transaction')
     }
-  };
+  }
 
   const handleProcessDue = async () => {
-    setIsProcessingDue(true);
+    setIsProcessingDue(true)
     try {
-      const res: any = await apiClient('/recurring/process-due', { method: 'POST' });
-      alert(`Processed due items: ${res.generatedCount} transaction(s) generated.`);
-      if (activeTab === 'upcoming') fetchUpcoming();
-      else if (activeTab === 'recurring') fetchRecurring();
-      else if (activeTab === 'subscriptions') fetchSubscriptions();
+      const res: any = await apiClient('/recurring/process-due', {
+        method: 'POST',
+      })
+      alert(
+        `Processed due items: ${res.generatedCount} transaction(s) generated.`,
+      )
+      if (activeTab === 'upcoming') fetchUpcoming()
+      else if (activeTab === 'recurring') fetchRecurring()
+      else if (activeTab === 'subscriptions') fetchSubscriptions()
     } catch (err: any) {
-      alert(err.message || 'Failed to process due recurring transactions');
+      alert(err.message || 'Failed to process due recurring transactions')
     } finally {
-      setIsProcessingDue(false);
+      setIsProcessingDue(false)
     }
-  };
+  }
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-fadeIn">
@@ -263,7 +308,8 @@ export default function BudgetsPage() {
             Budgets & Recurring Planning
           </h2>
           <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
-            Category spending limits, subscription tracking, and automated recurring expenses
+            Category spending limits, subscription tracking, and automated
+            recurring expenses
           </p>
         </div>
 
@@ -273,8 +319,8 @@ export default function BudgetsPage() {
               variant="primary"
               size="md"
               onClick={() => {
-                setBudgetToEdit(null);
-                setIsBudgetModalOpen(true);
+                setBudgetToEdit(null)
+                setIsBudgetModalOpen(true)
               }}
               className="space-x-1.5 shadow-sm shadow-emerald-500/10"
             >
@@ -286,14 +332,18 @@ export default function BudgetsPage() {
               variant="primary"
               size="md"
               onClick={() => {
-                setRecurringToEdit(null);
-                setModalIsSubscription(activeTab === 'subscriptions');
-                setIsRecurringModalOpen(true);
+                setRecurringToEdit(null)
+                setModalIsSubscription(activeTab === 'subscriptions')
+                setIsRecurringModalOpen(true)
               }}
               className="space-x-1.5 shadow-sm shadow-emerald-500/10"
             >
               <Plus className="h-4 w-4" />
-              <span>{activeTab === 'subscriptions' ? 'Add Subscription' : 'Add Recurring'}</span>
+              <span>
+                {activeTab === 'subscriptions'
+                  ? 'Add Subscription'
+                  : 'Add Recurring'}
+              </span>
             </Button>
           )}
         </div>
@@ -314,8 +364,8 @@ export default function BudgetsPage() {
           { label: 'Upcoming Payments', value: 'upcoming', icon: Calendar },
           { label: 'All Recurring', value: 'recurring', icon: RotateCcw },
         ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.value;
+          const Icon = tab.icon
+          const isActive = activeTab === tab.value
           return (
             <button
               key={tab.value}
@@ -329,7 +379,7 @@ export default function BudgetsPage() {
               <Icon className="h-3.5 w-3.5" />
               <span>{tab.label}</span>
             </button>
-          );
+          )
         })}
       </div>
 
@@ -339,13 +389,23 @@ export default function BudgetsPage() {
           {/* Month Selector Bar */}
           <div className="flex items-center justify-between p-3 sm:p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
             <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" onClick={handlePrevMonth} className="p-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrevMonth}
+                className="p-2"
+              >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="text-sm sm:text-base font-bold text-zinc-900 dark:text-zinc-50 min-w-[150px] text-center">
                 {formatMonthLabel(currentMonth)}
               </span>
-              <Button variant="outline" size="sm" onClick={handleNextMonth} className="p-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNextMonth}
+                className="p-2"
+              >
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -364,7 +424,9 @@ export default function BudgetsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentMonth(new Date().toISOString().slice(0, 7))}
+                onClick={() =>
+                  setCurrentMonth(new Date().toISOString().slice(0, 7))
+                }
                 className="text-xs"
               >
                 Current Month
@@ -375,7 +437,9 @@ export default function BudgetsPage() {
           {isLoading ? (
             <div className="py-20 flex flex-col items-center justify-center text-zinc-500">
               <Loader2 className="h-8 w-8 animate-spin text-emerald-500 mb-3" />
-              <span className="text-sm">Calculating budget usage & progress...</span>
+              <span className="text-sm">
+                Calculating budget usage & progress...
+              </span>
             </div>
           ) : !budgetsData || budgetsData.budgets.length === 0 ? (
             /* Empty State */
@@ -389,7 +453,8 @@ export default function BudgetsPage() {
                     No budgets set for {formatMonthLabel(currentMonth)}
                   </h3>
                   <p className="text-xs text-zinc-500">
-                    Set category spending limits to track how much you can still spend this month.
+                    Set category spending limits to track how much you can still
+                    spend this month.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2 justify-center pt-2">
@@ -397,8 +462,8 @@ export default function BudgetsPage() {
                     variant="primary"
                     size="md"
                     onClick={() => {
-                      setBudgetToEdit(null);
-                      setIsBudgetModalOpen(true);
+                      setBudgetToEdit(null)
+                      setIsBudgetModalOpen(true)
                     }}
                     className="space-x-1.5"
                   >
@@ -421,25 +486,31 @@ export default function BudgetsPage() {
             <div className="space-y-6">
               {/* Month Summaries Cards per Currency */}
               {Object.entries(budgetsData.summaries).map(([currency, sum]) => (
-                <Card key={currency} className="p-4 sm:p-5 bg-gradient-to-br from-zinc-900 to-zinc-800 text-white dark:from-zinc-900 dark:to-zinc-950 border-zinc-700/50 shadow-md">
+                <Card
+                  key={currency}
+                  className="p-4 sm:p-5 bg-gradient-to-br from-zinc-900 to-zinc-800 text-white dark:from-zinc-900 dark:to-zinc-950 border-zinc-700/50 shadow-md"
+                >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-700/60">
                     <div>
                       <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
                         {currency} Monthly Budget Overview
                       </span>
                       <div className="text-xl sm:text-2xl font-black text-zinc-50 mt-0.5">
-                        {formatMoney(sum.totalSpent, currency)} / {formatMoney(sum.totalBudget, currency)}
+                        {formatMoney(sum.totalSpent, currency)} /{' '}
+                        {formatMoney(sum.totalBudget, currency)}
                       </div>
                     </div>
 
                     <div className="text-left sm:text-right">
-                      <span className={`text-xs sm:text-sm font-extrabold px-2.5 py-1 rounded-full ${
-                        sum.overallPercentage >= 100
-                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                          : sum.overallPercentage >= 80
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                          : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                      }`}>
+                      <span
+                        className={`text-xs sm:text-sm font-extrabold px-2.5 py-1 rounded-full ${
+                          sum.overallPercentage >= 100
+                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                            : sum.overallPercentage >= 80
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                              : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        }`}
+                      >
                         {sum.overallPercentage}% Used
                       </span>
                       <div className="text-xs text-zinc-400 mt-1">
@@ -458,10 +529,12 @@ export default function BudgetsPage() {
                           sum.overallPercentage >= 100
                             ? 'bg-rose-500'
                             : sum.overallPercentage >= 80
-                            ? 'bg-amber-500'
-                            : 'bg-emerald-500'
+                              ? 'bg-amber-500'
+                              : 'bg-emerald-500'
                         }`}
-                        style={{ width: `${Math.min(sum.overallPercentage, 100)}%` }}
+                        style={{
+                          width: `${Math.min(sum.overallPercentage, 100)}%`,
+                        }}
                       />
                     </div>
                   </div>
@@ -471,11 +544,14 @@ export default function BudgetsPage() {
               {/* Category Budgets Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                 {budgetsData.budgets.map((b) => {
-                  const isOver = b.status === 'OVER_BUDGET';
-                  const isWarning = b.status === 'WARNING';
+                  const isOver = b.status === 'OVER_BUDGET'
+                  const isWarning = b.status === 'WARNING'
 
                   return (
-                    <Card key={b.id} className="p-4 sm:p-5 space-y-3.5 hover:shadow-md transition-shadow">
+                    <Card
+                      key={b.id}
+                      className="p-4 sm:p-5 space-y-3.5 hover:shadow-md transition-shadow"
+                    >
                       {/* Header */}
                       <div className="flex items-center justify-between">
                         <div>
@@ -483,12 +559,16 @@ export default function BudgetsPage() {
                             <span className="text-sm sm:text-base font-bold text-zinc-900 dark:text-zinc-100">
                               {b.categoryName}
                             </span>
-                            <Badge variant="default" className="text-[10px] font-mono">
+                            <Badge
+                              variant="default"
+                              className="text-[10px] font-mono"
+                            >
                               {b.currency}
                             </Badge>
                           </div>
                           <span className="text-xs text-zinc-400 font-medium">
-                            {formatMoney(b.spent, b.currency)} of {formatMoney(b.amount, b.currency)}
+                            {formatMoney(b.spent, b.currency)} of{' '}
+                            {formatMoney(b.amount, b.currency)}
                           </span>
                         </div>
 
@@ -499,8 +579,8 @@ export default function BudgetsPage() {
                               isOver
                                 ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
                                 : isWarning
-                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                  : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
                             }`}
                           >
                             <span>{b.percentage}%</span>
@@ -513,7 +593,11 @@ export default function BudgetsPage() {
                         <div className="h-2.5 w-full rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all ${
-                              isOver ? 'bg-rose-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'
+                              isOver
+                                ? 'bg-rose-500'
+                                : isWarning
+                                  ? 'bg-amber-500'
+                                  : 'bg-emerald-500'
                             }`}
                             style={{ width: `${Math.min(b.percentage, 100)}%` }}
                           />
@@ -528,8 +612,8 @@ export default function BudgetsPage() {
                               isOver
                                 ? 'text-rose-600 dark:text-rose-400'
                                 : isWarning
-                                ? 'text-amber-600 dark:text-amber-400'
-                                : 'text-zinc-800 dark:text-zinc-200'
+                                  ? 'text-amber-600 dark:text-amber-400'
+                                  : 'text-zinc-800 dark:text-zinc-200'
                             }`}
                           >
                             {isOver
@@ -543,8 +627,8 @@ export default function BudgetsPage() {
                       <div className="flex items-center justify-end space-x-2 pt-1 border-t border-zinc-100 dark:border-zinc-800/80">
                         <button
                           onClick={() => {
-                            setBudgetToEdit(b);
-                            setIsBudgetModalOpen(true);
+                            setBudgetToEdit(b)
+                            setIsBudgetModalOpen(true)
                           }}
                           className="p-1.5 text-xs text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors flex items-center space-x-1"
                         >
@@ -560,7 +644,7 @@ export default function BudgetsPage() {
                         </button>
                       </div>
                     </Card>
-                  );
+                  )
                 })}
               </div>
             </div>
@@ -576,7 +660,8 @@ export default function BudgetsPage() {
               <Loader2 className="h-8 w-8 animate-spin text-emerald-500 mb-3" />
               <span className="text-sm">Loading active subscriptions...</span>
             </div>
-          ) : !subscriptionsData || subscriptionsData.subscriptions.length === 0 ? (
+          ) : !subscriptionsData ||
+            subscriptionsData.subscriptions.length === 0 ? (
             <Card className="border-dashed border-2 py-14">
               <CardContent className="flex flex-col items-center justify-center text-center space-y-4">
                 <div className="h-16 w-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
@@ -587,16 +672,17 @@ export default function BudgetsPage() {
                     No subscriptions tracked yet
                   </h3>
                   <p className="text-xs text-zinc-500">
-                    Add services like Netflix, Spotify, iCloud, or gym memberships to monitor monthly recurring costs.
+                    Add services like Netflix, Spotify, iCloud, or gym
+                    memberships to monitor monthly recurring costs.
                   </p>
                 </div>
                 <Button
                   variant="primary"
                   size="md"
                   onClick={() => {
-                    setRecurringToEdit(null);
-                    setModalIsSubscription(true);
-                    setIsRecurringModalOpen(true);
+                    setRecurringToEdit(null)
+                    setModalIsSubscription(true)
+                    setIsRecurringModalOpen(true)
                   }}
                   className="space-x-1.5"
                 >
@@ -609,23 +695,33 @@ export default function BudgetsPage() {
             <div className="space-y-6">
               {/* Estimated Monthly Cost Banners per Currency */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {Object.entries(subscriptionsData.monthlyEstimates).map(([currency, est]) => (
-                  <Card key={currency} className="p-4 bg-zinc-900 text-white dark:bg-zinc-950 border-zinc-800">
-                    <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                      {currency} Monthly Estimated Cost
-                    </span>
-                    <div className="text-2xl font-black text-zinc-50 mt-1">
-                      {formatMoney(est, currency)}
-                      <span className="text-xs font-normal text-zinc-400 ml-1">/ month</span>
-                    </div>
-                  </Card>
-                ))}
+                {Object.entries(subscriptionsData.monthlyEstimates).map(
+                  ([currency, est]) => (
+                    <Card
+                      key={currency}
+                      className="p-4 bg-zinc-900 text-white dark:bg-zinc-950 border-zinc-800"
+                    >
+                      <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                        {currency} Monthly Estimated Cost
+                      </span>
+                      <div className="text-2xl font-black text-zinc-50 mt-1">
+                        {formatMoney(est, currency)}
+                        <span className="text-xs font-normal text-zinc-400 ml-1">
+                          / month
+                        </span>
+                      </div>
+                    </Card>
+                  ),
+                )}
               </div>
 
               {/* Subscriptions List */}
               <Card className="divide-y divide-zinc-100 dark:divide-zinc-800 overflow-hidden shadow-sm">
                 {subscriptionsData.subscriptions.map((sub) => (
-                  <div key={sub.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-zinc-50/70 dark:hover:bg-zinc-900/60 transition-colors">
+                  <div
+                    key={sub.id}
+                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-zinc-50/70 dark:hover:bg-zinc-900/60 transition-colors"
+                  >
                     <div className="flex items-center space-x-3.5 min-w-0">
                       <div className="h-11 w-11 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
                         <CreditCard className="h-5 w-5" />
@@ -636,7 +732,10 @@ export default function BudgetsPage() {
                             {sub.description}
                           </span>
                           {!sub.isActive && (
-                            <Badge variant="default" className="bg-zinc-100 text-zinc-500 text-[10px]">
+                            <Badge
+                              variant="default"
+                              className="bg-zinc-100 text-zinc-500 text-[10px]"
+                            >
                               Paused
                             </Badge>
                           )}
@@ -651,7 +750,8 @@ export default function BudgetsPage() {
                           )}
                           <span>•</span>
                           <span className="font-semibold text-zinc-600 dark:text-zinc-300">
-                            Next: {new Date(sub.nextRunDate).toLocaleDateString()}
+                            Next:{' '}
+                            {new Date(sub.nextRunDate).toLocaleDateString()}
                           </span>
                         </div>
                       </div>
@@ -672,15 +772,23 @@ export default function BudgetsPage() {
                         <button
                           onClick={() => handleToggleRecurringStatus(sub)}
                           className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
-                          title={sub.isActive ? 'Pause subscription' : 'Resume subscription'}
+                          title={
+                            sub.isActive
+                              ? 'Pause subscription'
+                              : 'Resume subscription'
+                          }
                         >
-                          {sub.isActive ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          {sub.isActive ? (
+                            <Pause className="h-4 w-4" />
+                          ) : (
+                            <Play className="h-4 w-4" />
+                          )}
                         </button>
                         <button
                           onClick={() => {
-                            setRecurringToEdit(sub);
-                            setModalIsSubscription(true);
-                            setIsRecurringModalOpen(true);
+                            setRecurringToEdit(sub)
+                            setModalIsSubscription(true)
+                            setIsRecurringModalOpen(true)
                           }}
                           className="p-2 text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
                           title="Edit"
@@ -710,14 +818,18 @@ export default function BudgetsPage() {
           <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60 flex items-start space-x-2 text-xs text-indigo-900 dark:text-indigo-200">
             <Info className="h-4 w-4 shrink-0 mt-0.5" />
             <span>
-              Upcoming payments are scheduled projections over the next 35 days. They do not affect account balances or category budgets until actually generated.
+              Upcoming payments are scheduled projections over the next 35 days.
+              They do not affect account balances or category budgets until
+              actually generated.
             </span>
           </div>
 
           {isLoading ? (
             <div className="py-20 flex flex-col items-center justify-center text-zinc-500">
               <Loader2 className="h-8 w-8 animate-spin text-emerald-500 mb-3" />
-              <span className="text-sm">Calculating upcoming scheduled dates...</span>
+              <span className="text-sm">
+                Calculating upcoming scheduled dates...
+              </span>
             </div>
           ) : upcomingList.length === 0 ? (
             <Card className="border-dashed border-2 py-14">
@@ -730,7 +842,8 @@ export default function BudgetsPage() {
                     No upcoming payments scheduled
                   </h3>
                   <p className="text-xs text-zinc-500">
-                    Active recurring expenses and subscriptions will automatically appear here.
+                    Active recurring expenses and subscriptions will
+                    automatically appear here.
                   </p>
                 </div>
               </CardContent>
@@ -738,15 +851,21 @@ export default function BudgetsPage() {
           ) : (
             <Card className="divide-y divide-zinc-100 dark:divide-zinc-800 overflow-hidden shadow-sm">
               {upcomingList.map((item, idx) => {
-                const dateObj = new Date(item.scheduledFor);
-                const isToday = new Date().toDateString() === dateObj.toDateString();
+                const dateObj = new Date(item.scheduledFor)
+                const isToday =
+                  new Date().toDateString() === dateObj.toDateString()
 
                 return (
-                  <div key={idx} className="p-4 flex items-center justify-between hover:bg-zinc-50/70 dark:hover:bg-zinc-900/60 transition-colors">
+                  <div
+                    key={idx}
+                    className="p-4 flex items-center justify-between hover:bg-zinc-50/70 dark:hover:bg-zinc-900/60 transition-colors"
+                  >
                     <div className="flex items-center space-x-3.5 min-w-0">
                       <div className="h-11 w-11 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 flex flex-col items-center justify-center shrink-0 border border-zinc-200/60 dark:border-zinc-700/60 font-bold">
                         <span className="text-[10px] uppercase text-zinc-400">
-                          {dateObj.toLocaleDateString('en-US', { month: 'short' })}
+                          {dateObj.toLocaleDateString('en-US', {
+                            month: 'short',
+                          })}
                         </span>
                         <span className="text-xs">{dateObj.getUTCDate()}</span>
                       </div>
@@ -769,7 +888,9 @@ export default function BudgetsPage() {
                         </div>
                         <div className="text-xs text-zinc-400 mt-0.5">
                           <span>{item.accountName}</span>
-                          {item.categoryName && <span> • {item.categoryName}</span>}
+                          {item.categoryName && (
+                            <span> • {item.categoryName}</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -779,7 +900,7 @@ export default function BudgetsPage() {
                       {formatMoney(item.amount, item.currency)}
                     </div>
                   </div>
-                );
+                )
               })}
             </Card>
           )}
@@ -800,7 +921,9 @@ export default function BudgetsPage() {
               disabled={isProcessingDue}
               className="text-xs space-x-1.5"
             >
-              <RotateCcw className={`h-3.5 w-3.5 ${isProcessingDue ? 'animate-spin' : ''}`} />
+              <RotateCcw
+                className={`h-3.5 w-3.5 ${isProcessingDue ? 'animate-spin' : ''}`}
+              />
               <span>Check Due Items</span>
             </Button>
           </div>
@@ -821,16 +944,17 @@ export default function BudgetsPage() {
                     No recurring templates
                   </h3>
                   <p className="text-xs text-zinc-500">
-                    Automate repeating expenses like rent, utilities, and income like monthly salaries.
+                    Automate repeating expenses like rent, utilities, and income
+                    like monthly salaries.
                   </p>
                 </div>
                 <Button
                   variant="primary"
                   size="md"
                   onClick={() => {
-                    setRecurringToEdit(null);
-                    setModalIsSubscription(false);
-                    setIsRecurringModalOpen(true);
+                    setRecurringToEdit(null)
+                    setModalIsSubscription(false)
+                    setIsRecurringModalOpen(true)
                   }}
                   className="space-x-1.5"
                 >
@@ -842,7 +966,10 @@ export default function BudgetsPage() {
           ) : (
             <Card className="divide-y divide-zinc-100 dark:divide-zinc-800 overflow-hidden shadow-sm">
               {recurringList.map((rec) => (
-                <div key={rec.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-zinc-50/70 dark:hover:bg-zinc-900/60 transition-colors">
+                <div
+                  key={rec.id}
+                  className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-zinc-50/70 dark:hover:bg-zinc-900/60 transition-colors"
+                >
                   <div className="flex items-center space-x-3.5 min-w-0">
                     <div className="h-11 w-11 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 flex items-center justify-center shrink-0">
                       <RotateCcw className="h-5 w-5" />
@@ -853,7 +980,10 @@ export default function BudgetsPage() {
                           {rec.description}
                         </span>
                         {!rec.isActive ? (
-                          <Badge variant="default" className="bg-zinc-100 text-zinc-500 text-[10px]">
+                          <Badge
+                            variant="default"
+                            className="bg-zinc-100 text-zinc-500 text-[10px]"
+                          >
                             Paused
                           </Badge>
                         ) : (
@@ -887,13 +1017,17 @@ export default function BudgetsPage() {
                         className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
                         title={rec.isActive ? 'Pause' : 'Resume'}
                       >
-                        {rec.isActive ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                        {rec.isActive ? (
+                          <Pause className="h-4 w-4" />
+                        ) : (
+                          <Play className="h-4 w-4" />
+                        )}
                       </button>
                       <button
                         onClick={() => {
-                          setRecurringToEdit(rec);
-                          setModalIsSubscription(rec.isSubscription);
-                          setIsRecurringModalOpen(true);
+                          setRecurringToEdit(rec)
+                          setModalIsSubscription(rec.isSubscription)
+                          setIsRecurringModalOpen(true)
                         }}
                         className="p-2 text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
                         title="Edit"
@@ -920,8 +1054,8 @@ export default function BudgetsPage() {
       <BudgetModal
         isOpen={isBudgetModalOpen}
         onClose={() => {
-          setIsBudgetModalOpen(false);
-          setBudgetToEdit(null);
+          setIsBudgetModalOpen(false)
+          setBudgetToEdit(null)
         }}
         onSuccess={fetchBudgets}
         categories={categories}
@@ -933,13 +1067,13 @@ export default function BudgetsPage() {
       <RecurringModal
         isOpen={isRecurringModalOpen}
         onClose={() => {
-          setIsRecurringModalOpen(false);
-          setRecurringToEdit(null);
+          setIsRecurringModalOpen(false)
+          setRecurringToEdit(null)
         }}
         onSuccess={() => {
-          if (activeTab === 'subscriptions') fetchSubscriptions();
-          else if (activeTab === 'upcoming') fetchUpcoming();
-          else if (activeTab === 'recurring') fetchRecurring();
+          if (activeTab === 'subscriptions') fetchSubscriptions()
+          else if (activeTab === 'upcoming') fetchUpcoming()
+          else if (activeTab === 'recurring') fetchRecurring()
         }}
         accounts={accounts}
         categories={categories}
@@ -947,5 +1081,5 @@ export default function BudgetsPage() {
         defaultIsSubscription={modalIsSubscription}
       />
     </div>
-  );
+  )
 }

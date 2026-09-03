@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server'
 
 export async function GET() {
   return NextResponse.json({
@@ -7,5 +7,5 @@ export async function GET() {
     timestamp: new Date().toISOString(),
     version: '0.1.0',
     phase: 'Phase 1: Project Foundation',
-  });
+  })
 }

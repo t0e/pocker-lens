@@ -1,36 +1,42 @@
-'use client';
+'use client'
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { AlertCircle, Lock, Mail, Loader2, ArrowRight } from 'lucide-react';
+import React, { useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
+import { AlertCircle, Lock, Mail, Loader2, ArrowRight } from 'lucide-react'
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { login } = useAuth();
+  const router = useRouter()
+  const { login } = useAuth()
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setIsSubmitting(true);
+    e.preventDefault()
+    setError(null)
+    setIsSubmitting(true)
 
     try {
-      await login({ email, password });
-      router.push('/');
+      await login({ email, password })
+      router.push('/')
     } catch (err: any) {
-      setError(err.message || 'Invalid email or password');
+      setError(err.message || 'Invalid email or password')
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center p-4 sm:p-6 bg-zinc-50 dark:bg-zinc-950">
@@ -134,5 +140,5 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
-  );
+  )
 }

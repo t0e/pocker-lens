@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from "fastify";
+import { FastifyPluginAsync } from 'fastify'
 import {
   getFinancialSummary,
   getCashFlowTrends,
@@ -9,29 +9,29 @@ import {
   getBudgetPerformance,
   getCommitmentsSummary,
   generateSpendingInsights,
-} from "../services/analytics.js";
-import { TimeRangeType, TimeRangeTypeSchema } from "@pocketlens/shared";
+} from '../services/analytics.js'
+import { TimeRangeType, TimeRangeTypeSchema } from '@pocketlens/shared'
 
 export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.addHook("preHandler", fastify.authenticate);
+  fastify.addHook('preHandler', fastify.authenticate)
 
   // 1. GET /analytics/summary
-  fastify.get("/analytics/summary", async (request, reply) => {
+  fastify.get('/analytics/summary', async (request, reply) => {
     const query = request.query as {
-      timeRange?: string;
-      month?: string;
-      startDate?: string;
-      endDate?: string;
-      currency?: string;
-      reportingCurrency?: string;
-    };
-    const userId = request.user.id;
+      timeRange?: string
+      month?: string
+      startDate?: string
+      endDate?: string
+      currency?: string
+      reportingCurrency?: string
+    }
+    const userId = request.user.id
 
     const timeRange = (
       TimeRangeTypeSchema.safeParse(query.timeRange).success
         ? query.timeRange
-        : "current_month"
-    ) as TimeRangeType;
+        : 'current_month'
+    ) as TimeRangeType
 
     const result = await getFinancialSummary(
       userId,
@@ -40,42 +40,45 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
       query.startDate,
       query.endDate,
       query.currency,
-      query.reportingCurrency
-    );
+      query.reportingCurrency,
+    )
 
-    return reply.send(result);
-  });
+    return reply.send(result)
+  })
 
   // 2. GET /analytics/trends
-  fastify.get("/analytics/trends", async (request, reply) => {
+  fastify.get('/analytics/trends', async (request, reply) => {
     const query = request.query as {
-      currency?: string;
-      months?: string;
-    };
-    const userId = request.user.id;
-    const currency = query.currency || "VND";
-    const monthsCount = Math.min(Math.max(parseInt(query.months || "6", 10) || 6, 2), 24);
+      currency?: string
+      months?: string
+    }
+    const userId = request.user.id
+    const currency = query.currency || 'VND'
+    const monthsCount = Math.min(
+      Math.max(parseInt(query.months || '6', 10) || 6, 2),
+      24,
+    )
 
-    const result = await getCashFlowTrends(userId, currency, monthsCount);
-    return reply.send(result);
-  });
+    const result = await getCashFlowTrends(userId, currency, monthsCount)
+    return reply.send(result)
+  })
 
   // 3. GET /analytics/categories
-  fastify.get("/analytics/categories", async (request, reply) => {
+  fastify.get('/analytics/categories', async (request, reply) => {
     const query = request.query as {
-      timeRange?: string;
-      month?: string;
-      startDate?: string;
-      endDate?: string;
-      currency?: string;
-    };
-    const userId = request.user.id;
-    const currency = query.currency || "VND";
+      timeRange?: string
+      month?: string
+      startDate?: string
+      endDate?: string
+      currency?: string
+    }
+    const userId = request.user.id
+    const currency = query.currency || 'VND'
     const timeRange = (
       TimeRangeTypeSchema.safeParse(query.timeRange).success
         ? query.timeRange
-        : "current_month"
-    ) as TimeRangeType;
+        : 'current_month'
+    ) as TimeRangeType
 
     const result = await getCategoryBreakdown(
       userId,
@@ -83,30 +86,33 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
       query.month,
       query.startDate,
       query.endDate,
-      currency
-    );
+      currency,
+    )
 
-    return reply.send(result);
-  });
+    return reply.send(result)
+  })
 
   // 4. GET /analytics/merchants
-  fastify.get("/analytics/merchants", async (request, reply) => {
+  fastify.get('/analytics/merchants', async (request, reply) => {
     const query = request.query as {
-      timeRange?: string;
-      month?: string;
-      startDate?: string;
-      endDate?: string;
-      currency?: string;
-      limit?: string;
-    };
-    const userId = request.user.id;
-    const currency = query.currency || "VND";
-    const limit = Math.min(Math.max(parseInt(query.limit || "10", 10) || 10, 1), 50);
+      timeRange?: string
+      month?: string
+      startDate?: string
+      endDate?: string
+      currency?: string
+      limit?: string
+    }
+    const userId = request.user.id
+    const currency = query.currency || 'VND'
+    const limit = Math.min(
+      Math.max(parseInt(query.limit || '10', 10) || 10, 1),
+      50,
+    )
     const timeRange = (
       TimeRangeTypeSchema.safeParse(query.timeRange).success
         ? query.timeRange
-        : "current_month"
-    ) as TimeRangeType;
+        : 'current_month'
+    ) as TimeRangeType
 
     const result = await getMerchantBreakdown(
       userId,
@@ -115,30 +121,33 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
       query.startDate,
       query.endDate,
       currency,
-      limit
-    );
+      limit,
+    )
 
-    return reply.send(result);
-  });
+    return reply.send(result)
+  })
 
   // 5. GET /analytics/expenses/biggest
-  fastify.get("/analytics/expenses/biggest", async (request, reply) => {
+  fastify.get('/analytics/expenses/biggest', async (request, reply) => {
     const query = request.query as {
-      timeRange?: string;
-      month?: string;
-      startDate?: string;
-      endDate?: string;
-      currency?: string;
-      limit?: string;
-    };
-    const userId = request.user.id;
-    const currency = query.currency || "VND";
-    const limit = Math.min(Math.max(parseInt(query.limit || "10", 10) || 10, 1), 50);
+      timeRange?: string
+      month?: string
+      startDate?: string
+      endDate?: string
+      currency?: string
+      limit?: string
+    }
+    const userId = request.user.id
+    const currency = query.currency || 'VND'
+    const limit = Math.min(
+      Math.max(parseInt(query.limit || '10', 10) || 10, 1),
+      50,
+    )
     const timeRange = (
       TimeRangeTypeSchema.safeParse(query.timeRange).success
         ? query.timeRange
-        : "current_month"
-    ) as TimeRangeType;
+        : 'current_month'
+    ) as TimeRangeType
 
     const result = await getBiggestExpenses(
       userId,
@@ -147,28 +156,28 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
       query.startDate,
       query.endDate,
       currency,
-      limit
-    );
+      limit,
+    )
 
-    return reply.send(result);
-  });
+    return reply.send(result)
+  })
 
   // 6. GET /analytics/accounts
-  fastify.get("/analytics/accounts", async (request, reply) => {
+  fastify.get('/analytics/accounts', async (request, reply) => {
     const query = request.query as {
-      timeRange?: string;
-      month?: string;
-      startDate?: string;
-      endDate?: string;
-      currency?: string;
-      reportingCurrency?: string;
-    };
-    const userId = request.user.id;
+      timeRange?: string
+      month?: string
+      startDate?: string
+      endDate?: string
+      currency?: string
+      reportingCurrency?: string
+    }
+    const userId = request.user.id
     const timeRange = (
       TimeRangeTypeSchema.safeParse(query.timeRange).success
         ? query.timeRange
-        : "current_month"
-    ) as TimeRangeType;
+        : 'current_month'
+    ) as TimeRangeType
 
     const result = await getAccountActivity(
       userId,
@@ -177,47 +186,47 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
       query.startDate,
       query.endDate,
       query.currency,
-      query.reportingCurrency
-    );
+      query.reportingCurrency,
+    )
 
-    return reply.send(result);
-  });
+    return reply.send(result)
+  })
 
   // 7. GET /analytics/budgets
-  fastify.get("/analytics/budgets", async (request, reply) => {
+  fastify.get('/analytics/budgets', async (request, reply) => {
     const query = request.query as {
-      month?: string;
-      currency?: string;
-    };
-    const userId = request.user.id;
-    const currency = query.currency || "VND";
+      month?: string
+      currency?: string
+    }
+    const userId = request.user.id
+    const currency = query.currency || 'VND'
 
-    const result = await getBudgetPerformance(userId, query.month, currency);
-    return reply.send(result);
-  });
+    const result = await getBudgetPerformance(userId, query.month, currency)
+    return reply.send(result)
+  })
 
   // 8. GET /analytics/subscriptions
-  fastify.get("/analytics/subscriptions", async (request, reply) => {
+  fastify.get('/analytics/subscriptions', async (request, reply) => {
     const query = request.query as {
-      currency?: string;
-    };
-    const userId = request.user.id;
-    const currency = query.currency || "VND";
+      currency?: string
+    }
+    const userId = request.user.id
+    const currency = query.currency || 'VND'
 
-    const result = await getCommitmentsSummary(userId, currency);
-    return reply.send(result);
-  });
+    const result = await getCommitmentsSummary(userId, currency)
+    return reply.send(result)
+  })
 
   // 9. GET /analytics/insights
-  fastify.get("/analytics/insights", async (request, reply) => {
+  fastify.get('/analytics/insights', async (request, reply) => {
     const query = request.query as {
-      month?: string;
-      currency?: string;
-    };
-    const userId = request.user.id;
-    const currency = query.currency || "VND";
+      month?: string
+      currency?: string
+    }
+    const userId = request.user.id
+    const currency = query.currency || 'VND'
 
-    const result = await generateSpendingInsights(userId, query.month, currency);
-    return reply.send(result);
-  });
-};
+    const result = await generateSpendingInsights(userId, query.month, currency)
+    return reply.send(result)
+  })
+}

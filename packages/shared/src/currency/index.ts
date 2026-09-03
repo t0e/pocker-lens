@@ -12,17 +12,27 @@ export const SUPPORTED_CURRENCIES = [
   { code: 'IDR', name: 'Indonesian Rupiah', symbol: 'Rp', decimalDigits: 0 },
   { code: 'MYR', name: 'Malaysian Ringgit', symbol: 'RM', decimalDigits: 2 },
   { code: 'PHP', name: 'Philippine Peso', symbol: '₱', decimalDigits: 2 },
-] as const;
+] as const
 
-export type CurrencyCode = (typeof SUPPORTED_CURRENCIES)[number]['code'];
+export type CurrencyCode = (typeof SUPPORTED_CURRENCIES)[number]['code']
 
-export const CURRENCY_CODES = SUPPORTED_CURRENCIES.map((c) => c.code) as [CurrencyCode, ...CurrencyCode[]];
+export const CURRENCY_CODES = SUPPORTED_CURRENCIES.map((c) => c.code) as [
+  CurrencyCode,
+  ...CurrencyCode[],
+]
 
 export function isValidCurrencyCode(code: string): code is CurrencyCode {
-  return SUPPORTED_CURRENCIES.some((c) => c.code === code.toUpperCase());
+  return SUPPORTED_CURRENCIES.some((c) => c.code === code.toUpperCase())
 }
 
 export function getCurrencyMeta(code: string) {
-  const found = SUPPORTED_CURRENCIES.find((c) => c.code === code.toUpperCase());
-  return found || { code: code.toUpperCase(), name: code.toUpperCase(), symbol: code.toUpperCase(), decimalDigits: 2 };
+  const found = SUPPORTED_CURRENCIES.find((c) => c.code === code.toUpperCase())
+  return (
+    found || {
+      code: code.toUpperCase(),
+      name: code.toUpperCase(),
+      symbol: code.toUpperCase(),
+      decimalDigits: 2,
+    }
+  )
 }

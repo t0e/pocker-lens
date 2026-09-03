@@ -1,18 +1,18 @@
-'use client';
+'use client'
 
-import React, { useState, useEffect } from 'react';
-import { X, PieChart, Sparkles, Loader2, AlertCircle } from 'lucide-react';
-import { CategoryResponse, BudgetResponse } from '@pocketlens/shared';
-import { Button } from '../ui/Button';
-import { apiClient } from '@/lib/api-client';
+import React, { useState, useEffect } from 'react'
+import { X, PieChart, Sparkles, Loader2, AlertCircle } from 'lucide-react'
+import { CategoryResponse, BudgetResponse } from '@pocketlens/shared'
+import { Button } from '../ui/Button'
+import { apiClient } from '@/lib/api-client'
 
 interface BudgetModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
-  categories: CategoryResponse[];
-  initialMonth: string;
-  budgetToEdit?: BudgetResponse | null;
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+  categories: CategoryResponse[]
+  initialMonth: string
+  budgetToEdit?: BudgetResponse | null
 }
 
 export const BudgetModal: React.FC<BudgetModalProps> = ({
@@ -23,50 +23,54 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
   initialMonth,
   budgetToEdit,
 }) => {
-  const [categoryId, setCategoryId] = useState('');
-  const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('VND');
-  const [month, setMonth] = useState(initialMonth);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [categoryId, setCategoryId] = useState('')
+  const [amount, setAmount] = useState('')
+  const [currency, setCurrency] = useState('VND')
+  const [month, setMonth] = useState(initialMonth)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Filter only EXPENSE categories
-  const expenseCategories = categories.filter((c) => c.type === 'expense' && !c.isArchived);
+  const expenseCategories = categories.filter(
+    (c) => c.type === 'expense' && !c.isArchived,
+  )
 
   useEffect(() => {
     if (budgetToEdit) {
-      setCategoryId(budgetToEdit.categoryId);
-      setAmount(budgetToEdit.amount.toString());
-      setCurrency(budgetToEdit.currency);
-      setMonth(budgetToEdit.month);
+      setCategoryId(budgetToEdit.categoryId)
+      setAmount(budgetToEdit.amount.toString())
+      setCurrency(budgetToEdit.currency)
+      setMonth(budgetToEdit.month)
     } else {
-      const firstExp = categories.find((c) => c.type === 'expense' && !c.isArchived);
-      setCategoryId(firstExp?.id || '');
-      setAmount('');
-      setCurrency('VND');
-      setMonth(initialMonth);
+      const firstExp = categories.find(
+        (c) => c.type === 'expense' && !c.isArchived,
+      )
+      setCategoryId(firstExp?.id || '')
+      setAmount('')
+      setCurrency('VND')
+      setMonth(initialMonth)
     }
-    setError(null);
-  }, [budgetToEdit, initialMonth, isOpen, categories]);
+    setError(null)
+  }, [budgetToEdit, initialMonth, isOpen, categories])
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSubmitting) return;
+    e.preventDefault()
+    if (isSubmitting) return
 
     if (!amount || parseFloat(amount) <= 0) {
-      setError('Please provide a valid budget amount');
-      return;
+      setError('Please provide a valid budget amount')
+      return
     }
 
     if (!budgetToEdit && !categoryId) {
-      setError('Please select an expense category');
-      return;
+      setError('Please select an expense category')
+      return
     }
 
-    setIsSubmitting(true);
-    setError(null);
+    setIsSubmitting(true)
+    setError(null)
 
     try {
       if (budgetToEdit) {
@@ -76,7 +80,7 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
           body: JSON.stringify({
             amount: parseFloat(amount),
           }),
-        });
+        })
       } else {
         // Create new budget
         await apiClient('/budgets', {
@@ -87,17 +91,17 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
             currency,
             month,
           }),
-        });
+        })
       }
 
-      onSuccess();
-      onClose();
+      onSuccess()
+      onClose()
     } catch (err: any) {
-      setError(err.message || 'Failed to save budget');
+      setError(err.message || 'Failed to save budget')
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/70 backdrop-blur-sm animate-fadeIn">
@@ -225,7 +229,9 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
               ) : (
                 <>
                   <Sparkles className="h-3.5 w-3.5" />
-                  <span>{budgetToEdit ? 'Update Budget' : 'Create Budget'}</span>
+                  <span>
+                    {budgetToEdit ? 'Update Budget' : 'Create Budget'}
+                  </span>
                 </>
               )}
             </Button>
@@ -233,5 +239,5 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
         </form>
       </div>
     </div>
-  );
-};
+  )
+}

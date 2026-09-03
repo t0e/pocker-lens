@@ -8,11 +8,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-pocketlens}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pocketlens_dev_password}
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -25,11 +25,11 @@ services:
     container_name: pocketlens-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - '6379:6379'
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -42,10 +42,17 @@ services:
       context: .
       dockerfile: docker/api.Dockerfile
     container_name: pocketlens-migrate
-    restart: "no"
+    restart: 'no'
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-pocketlens}:${POSTGRES_PASSWORD:-pocketlens_dev_password}@postgres:5432/${POSTGRES_DB:-pocketlens}?schema=public
-    command: ["npx", "prisma", "migrate", "deploy", "--schema=./apps/api/prisma/schema.prisma"]
+    command:
+      [
+        'npx',
+        'prisma',
+        'migrate',
+        'deploy',
+        '--schema=./apps/api/prisma/schema.prisma',
+      ]
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,7 +65,7 @@ services:
       dockerfile: docker/api.Dockerfile
     container_name: pocketlens-api
     restart: unless-stopped
-    command: ["node", "./apps/api/dist/server.js"]
+    command: ['node', './apps/api/dist/server.js']
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       API_PORT: 4000
@@ -68,7 +75,7 @@ services:
       STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
       RECEIPT_STORAGE_PATH: ${RECEIPT_STORAGE_PATH:-/data/receipts}
     ports:
-      - "${API_PORT:-4000}:4000"
+      - '${API_PORT:-4000}:4000'
     volumes:
       - receipt_data:/data/receipts
     depends_on:
@@ -79,7 +86,7 @@ services:
       migrate:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:4000/health"]
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:4000/health']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -122,12 +129,12 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
     ports:
-      - "${WEB_PORT:-3000}:3000"
+      - '${WEB_PORT:-3000}:3000'
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/api/health"]
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:3000/api/health']
       interval: 10s
       timeout: 5s
       retries: 5

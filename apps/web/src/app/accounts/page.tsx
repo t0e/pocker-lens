@@ -1,6 +1,6 @@
-'use client';
+'use client'
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   Landmark,
   CreditCard,
@@ -17,64 +17,72 @@ import {
   AlertCircle,
   X,
   Layers,
-} from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+} from 'lucide-react'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
+import { Button } from '@/components/ui/Button'
 import {
   AccountResponse,
   AccountType,
   ACCOUNT_TYPES,
   SUPPORTED_CURRENCIES,
   CreateAccountInput,
-} from '@pocketlens/shared';
-import { apiClient } from '@/lib/api-client';
-import { formatMoney } from '@/lib/utils';
+} from '@pocketlens/shared'
+import { apiClient } from '@/lib/api-client'
+import { formatMoney } from '@/lib/utils'
 
 export default function AccountsPage() {
-  const [accounts, setAccounts] = useState<AccountResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [includeArchived, setIncludeArchived] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<AccountResponse[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [includeArchived, setIncludeArchived] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Modal State
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<AccountResponse | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [editingAccount, setEditingAccount] = useState<AccountResponse | null>(
+    null,
+  )
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Form State
   const [formData, setFormData] = useState<{
-    name: string;
-    type: AccountType;
-    currency: string;
-    openingBalance: string;
-    isDefault: boolean;
+    name: string
+    type: AccountType
+    currency: string
+    openingBalance: string
+    isDefault: boolean
   }>({
     name: '',
     type: 'bank',
     currency: 'VND',
     openingBalance: '0',
     isDefault: false,
-  });
+  })
 
   const fetchAccounts = useCallback(async () => {
     try {
-      setIsLoading(true);
-      setError(null);
+      setIsLoading(true)
+      setError(null)
       const data = await apiClient<AccountResponse[]>(
-        `/accounts?includeArchived=${includeArchived}`
-      );
-      setAccounts(data);
+        `/accounts?includeArchived=${includeArchived}`,
+      )
+      setAccounts(data)
     } catch (err: any) {
-      setError(err.message || 'Failed to load accounts');
+      setError(err.message || 'Failed to load accounts')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  }, [includeArchived]);
+  }, [includeArchived])
 
   useEffect(() => {
-    fetchAccounts();
-  }, [fetchAccounts]);
+    fetchAccounts()
+  }, [fetchAccounts])
 
   const handleOpenCreate = () => {
     setFormData({
@@ -83,47 +91,47 @@ export default function AccountsPage() {
       currency: 'VND',
       openingBalance: '0',
       isDefault: false,
-    });
-    setError(null);
-    setIsCreateOpen(true);
-  };
+    })
+    setError(null)
+    setIsCreateOpen(true)
+  }
 
   const handleOpenEdit = (account: AccountResponse) => {
-    setEditingAccount(account);
+    setEditingAccount(account)
     setFormData({
       name: account.name,
       type: account.type,
       currency: account.currency,
       openingBalance: account.openingBalance,
       isDefault: account.isDefault,
-    });
-    setError(null);
-  };
+    })
+    setError(null)
+  }
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
+    e.preventDefault()
+    setIsSubmitting(true)
+    setError(null)
 
     try {
       await apiClient<AccountResponse>('/accounts', {
         method: 'POST',
         body: JSON.stringify(formData),
-      });
-      setIsCreateOpen(false);
-      await fetchAccounts();
+      })
+      setIsCreateOpen(false)
+      await fetchAccounts()
     } catch (err: any) {
-      setError(err.message || 'Failed to create account');
+      setError(err.message || 'Failed to create account')
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
   const handleEditSubmit = async (e: React.FormEvent) => {
-    if (!editingAccount) return;
-    e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
+    if (!editingAccount) return
+    e.preventDefault()
+    setIsSubmitting(true)
+    setError(null)
 
     try {
       await apiClient<AccountResponse>(`/accounts/${editingAccount.id}`, {
@@ -134,15 +142,15 @@ export default function AccountsPage() {
           currency: formData.currency,
           isDefault: formData.isDefault,
         }),
-      });
-      setEditingAccount(null);
-      await fetchAccounts();
+      })
+      setEditingAccount(null)
+      await fetchAccounts()
     } catch (err: any) {
-      setError(err.message || 'Failed to update account');
+      setError(err.message || 'Failed to update account')
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
   const handleToggleArchive = async (account: AccountResponse) => {
     try {
@@ -150,47 +158,50 @@ export default function AccountsPage() {
         await apiClient(`/accounts/${account.id}`, {
           method: 'PATCH',
           body: JSON.stringify({ isArchived: false }),
-        });
+        })
       } else {
         await apiClient(`/accounts/${account.id}`, {
           method: 'DELETE',
-        });
+        })
       }
-      await fetchAccounts();
+      await fetchAccounts()
     } catch (err: any) {
-      alert(err.message || 'Failed to update archive status');
+      alert(err.message || 'Failed to update archive status')
     }
-  };
+  }
 
   const getAccountIcon = (type: AccountType) => {
     switch (type) {
       case 'bank':
-        return <Landmark className="h-5 w-5" />;
+        return <Landmark className="h-5 w-5" />
       case 'credit_card':
-        return <CreditCard className="h-5 w-5" />;
+        return <CreditCard className="h-5 w-5" />
       case 'savings':
-        return <PiggyBank className="h-5 w-5" />;
+        return <PiggyBank className="h-5 w-5" />
       case 'e_wallet':
-        return <Smartphone className="h-5 w-5" />;
+        return <Smartphone className="h-5 w-5" />
       case 'cash':
-        return <Wallet className="h-5 w-5" />;
+        return <Wallet className="h-5 w-5" />
       default:
-        return <CircleDot className="h-5 w-5" />;
+        return <CircleDot className="h-5 w-5" />
     }
-  };
+  }
 
   // Group balances accurately by currency without fake exchange rate conversions
-  const currencyTotals = accounts.reduce((acc, account) => {
-    if (!account.isArchived) {
-      const cur = account.currency;
-      const balanceNum = parseFloat(account.currentBalance) || 0;
-      acc[cur] = (acc[cur] || 0) + balanceNum;
-    }
-    return acc;
-  }, {} as Record<string, number>);
+  const currencyTotals = accounts.reduce(
+    (acc, account) => {
+      if (!account.isArchived) {
+        const cur = account.currency
+        const balanceNum = parseFloat(account.currentBalance) || 0
+        acc[cur] = (acc[cur] || 0) + balanceNum
+      }
+      return acc
+    },
+    {} as Record<string, number>,
+  )
 
-  const activeAccounts = accounts.filter((a) => !a.isArchived);
-  const archivedAccounts = accounts.filter((a) => a.isArchived);
+  const activeAccounts = accounts.filter((a) => !a.isArchived)
+  const archivedAccounts = accounts.filter((a) => a.isArchived)
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-fadeIn">
@@ -244,7 +255,8 @@ export default function AccountsPage() {
               </CardTitle>
             </div>
             <CardDescription className="text-xs text-zinc-400">
-              Balances are grouped per ISO currency without exchange-rate assumptions
+              Balances are grouped per ISO currency without exchange-rate
+              assumptions
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -254,7 +266,9 @@ export default function AccountsPage() {
                   key={currency}
                   className="p-3.5 rounded-xl bg-zinc-800/80 border border-zinc-700/60 flex flex-col justify-between"
                 >
-                  <span className="text-xs font-semibold text-zinc-400">{currency} Accounts</span>
+                  <span className="text-xs font-semibold text-zinc-400">
+                    {currency} Accounts
+                  </span>
                   <span className="text-xl sm:text-2xl font-extrabold text-zinc-50 mt-1">
                     {formatMoney(total, currency)}
                   </span>
@@ -283,10 +297,16 @@ export default function AccountsPage() {
                 No accounts yet
               </h3>
               <p className="text-xs text-zinc-500">
-                Add your cash, bank account, card, or wallet to start tracking your money.
+                Add your cash, bank account, card, or wallet to start tracking
+                your money.
               </p>
             </div>
-            <Button variant="primary" size="md" onClick={handleOpenCreate} className="space-x-1.5">
+            <Button
+              variant="primary"
+              size="md"
+              onClick={handleOpenCreate}
+              className="space-x-1.5"
+            >
               <Plus className="h-4 w-4" />
               <span>Add Account</span>
             </Button>
@@ -309,7 +329,9 @@ export default function AccountsPage() {
                       </div>
                       <div>
                         <div className="flex items-center space-x-1.5">
-                          <CardTitle className="text-base font-bold">{account.name}</CardTitle>
+                          <CardTitle className="text-base font-bold">
+                            {account.name}
+                          </CardTitle>
                           {account.isDefault && (
                             <span title="Default Account">
                               <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
@@ -332,7 +354,8 @@ export default function AccountsPage() {
                   </div>
                   <div className="flex items-center justify-between text-xs text-zinc-400 mt-1 pt-3 border-t border-zinc-100 dark:border-zinc-800/80">
                     <span>
-                      Opening: {formatMoney(account.openingBalance, account.currency)}
+                      Opening:{' '}
+                      {formatMoney(account.openingBalance, account.currency)}
                     </span>
                     <div className="flex items-center space-x-1">
                       <button
@@ -405,7 +428,9 @@ export default function AccountsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">Add New Account</h3>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
+                Add New Account
+              </h3>
               <button
                 onClick={() => setIsCreateOpen(false)}
                 className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
@@ -423,7 +448,9 @@ export default function AccountsPage() {
                   type="text"
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   placeholder="e.g. Vietcombank Salary, Cash Wallet"
                   className="w-full px-3.5 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
@@ -436,7 +463,12 @@ export default function AccountsPage() {
                   </label>
                   <select
                     value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value as AccountType })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        type: e.target.value as AccountType,
+                      })
+                    }
                     className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     {ACCOUNT_TYPES.map((t) => (
@@ -453,7 +485,9 @@ export default function AccountsPage() {
                   </label>
                   <select
                     value={formData.currency}
-                    onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, currency: e.target.value })
+                    }
                     className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     {SUPPORTED_CURRENCIES.map((c) => (
@@ -473,7 +507,9 @@ export default function AccountsPage() {
                   type="text"
                   required
                   value={formData.openingBalance}
-                  onChange={(e) => setFormData({ ...formData, openingBalance: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, openingBalance: e.target.value })
+                  }
                   placeholder="0.00"
                   className="w-full px-3.5 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
@@ -484,10 +520,15 @@ export default function AccountsPage() {
                   type="checkbox"
                   id="create-is-default"
                   checked={formData.isDefault}
-                  onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, isDefault: e.target.checked })
+                  }
                   className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
                 />
-                <label htmlFor="create-is-default" className="text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer">
+                <label
+                  htmlFor="create-is-default"
+                  className="text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer"
+                >
                   Set as default account for transactions
                 </label>
               </div>
@@ -522,7 +563,9 @@ export default function AccountsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">Edit Account</h3>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
+                Edit Account
+              </h3>
               <button
                 onClick={() => setEditingAccount(null)}
                 className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
@@ -540,7 +583,9 @@ export default function AccountsPage() {
                   type="text"
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   className="w-full px-3.5 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -552,7 +597,12 @@ export default function AccountsPage() {
                   </label>
                   <select
                     value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value as AccountType })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        type: e.target.value as AccountType,
+                      })
+                    }
                     className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     {ACCOUNT_TYPES.map((t) => (
@@ -569,7 +619,9 @@ export default function AccountsPage() {
                   </label>
                   <select
                     value={formData.currency}
-                    onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, currency: e.target.value })
+                    }
                     className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     {SUPPORTED_CURRENCIES.map((c) => (
@@ -586,10 +638,15 @@ export default function AccountsPage() {
                   type="checkbox"
                   id="edit-is-default"
                   checked={formData.isDefault}
-                  onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, isDefault: e.target.checked })
+                  }
                   className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
                 />
-                <label htmlFor="edit-is-default" className="text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer">
+                <label
+                  htmlFor="edit-is-default"
+                  className="text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer"
+                >
                   Default Account
                 </label>
               </div>
@@ -619,5 +676,5 @@ export default function AccountsPage() {
         </div>
       )}
     </div>
-  );
+  )
 }

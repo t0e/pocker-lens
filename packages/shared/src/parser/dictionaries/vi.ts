@@ -1,4 +1,4 @@
-import { LanguageDictionary } from './en.js';
+import { LanguageDictionary } from './en.js'
 
 export const viDictionary: LanguageDictionary = {
   incomeKeywords: [
@@ -99,8 +99,23 @@ export const viDictionary: LanguageDictionary = {
       'sacombank',
       'vib',
     ],
-    credit_card: ['thẻ tín dụng', 'the tin dung', 'thẻ', 'the', 'visa', 'mastercard'],
-    e_wallet: ['momo', 'zalopay', 'shopeepay', 'vnpay', 'viettelpay', 'ví điện tử', 'vi dien tu'],
+    credit_card: [
+      'thẻ tín dụng',
+      'the tin dung',
+      'thẻ',
+      'the',
+      'visa',
+      'mastercard',
+    ],
+    e_wallet: [
+      'momo',
+      'zalopay',
+      'shopeepay',
+      'vnpay',
+      'viettelpay',
+      'ví điện tử',
+      'vi dien tu',
+    ],
     savings: ['tiết kiệm', 'tiet kiem', 'sổ tiết kiệm', 'so tiet kiem'],
   },
   categoryKeywords: {
@@ -142,7 +157,7 @@ export const viDictionary: LanguageDictionary = {
       'ăn vặt',
       'an vat',
     ],
-    'Groceries': [
+    Groceries: [
       'đi chợ',
       'di cho',
       'chợ',
@@ -166,7 +181,7 @@ export const viDictionary: LanguageDictionary = {
       'cá',
       'ca',
     ],
-    'Transport': [
+    Transport: [
       'grab',
       'be',
       'gojek',
@@ -207,7 +222,7 @@ export const viDictionary: LanguageDictionary = {
       'sửa nhà',
       'sua nha',
     ],
-    'Shopping': [
+    Shopping: [
       'mua sắm',
       'mua sam',
       'shopee',
@@ -225,7 +240,7 @@ export const viDictionary: LanguageDictionary = {
       'sách',
       'sach',
     ],
-    'Entertainment': [
+    Entertainment: [
       'xem phim',
       'rạp chiếu phim',
       'rap chieu phim',
@@ -255,7 +270,7 @@ export const viDictionary: LanguageDictionary = {
       'tập gym',
       'tap gym',
     ],
-    'Education': [
+    Education: [
       'học phí',
       'hoc phi',
       'tiền học',
@@ -301,7 +316,7 @@ export const viDictionary: LanguageDictionary = {
       'lam mong',
       'nail',
     ],
-    'Salary': [
+    Salary: [
       'lương',
       'luong',
       'tiền lương',
@@ -320,18 +335,68 @@ export const viDictionary: LanguageDictionary = {
       'du an',
       'freelance',
     ],
-    'Bonus': ['tiền thưởng', 'tien thuong', 'thưởng tết', 'thuong tet', 'thưởng nóng', 'thuong nong'],
-    'Investment & Dividends': ['tiền lãi', 'tien lai', 'lãi tiết kiệm', 'lai tiet kiem', 'cổ tức', 'co tuc', 'chứng khoán', 'chung khoan'],
-    'Gift': ['quà tặng', 'qua tang', 'lì xì', 'li xi', 'mừng tuổi', 'mung tuoi', 'tiền mừng', 'tien mung'],
-    'Refund & Cashback': ['hoàn tiền', 'hoan tien', 'trả lại tiền', 'tra lai tien', 'cashback'],
+    Bonus: [
+      'tiền thưởng',
+      'tien thuong',
+      'thưởng tết',
+      'thuong tet',
+      'thưởng nóng',
+      'thuong nong',
+    ],
+    'Investment & Dividends': [
+      'tiền lãi',
+      'tien lai',
+      'lãi tiết kiệm',
+      'lai tiet kiem',
+      'cổ tức',
+      'co tuc',
+      'chứng khoán',
+      'chung khoan',
+    ],
+    Gift: [
+      'quà tặng',
+      'qua tang',
+      'lì xì',
+      'li xi',
+      'mừng tuổi',
+      'mung tuoi',
+      'tiền mừng',
+      'tien mung',
+    ],
+    'Refund & Cashback': [
+      'hoàn tiền',
+      'hoan tien',
+      'trả lại tiền',
+      'tra lai tien',
+      'cashback',
+    ],
   },
   dateKeywords: {
-    today: ['hôm nay', 'hom nay', 'hôm nay', 'nay', 'sáng nay', 'sang nay', 'trưa nay', 'trua nay', 'tối nay', 'toi nay'],
-    yesterday: ['hôm qua', 'hom qua', 'qua', 'hôm trước', 'hom truoc', 'tối qua', 'toi qua'],
+    today: [
+      'hôm nay',
+      'hom nay',
+      'hôm nay',
+      'nay',
+      'sáng nay',
+      'sang nay',
+      'trưa nay',
+      'trua nay',
+      'tối nay',
+      'toi nay',
+    ],
+    yesterday: [
+      'hôm qua',
+      'hom qua',
+      'qua',
+      'hôm trước',
+      'hom truoc',
+      'tối qua',
+      'toi qua',
+    ],
   },
   multipliers: {
     thousand: ['k', 'nghìn', 'nghin', 'ngàn', 'ngan'],
     million: ['tr', 'triệu', 'trieu', 'củ', 'cu', 'm'],
     billion: ['tỷ', 'ty', 'b'],
   },
-};
+}

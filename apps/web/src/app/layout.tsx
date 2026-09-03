@@ -1,17 +1,18 @@
-import type { Metadata } from 'next';
-import './globals.css';
-import { AuthProvider } from '@/context/AuthContext';
-import { AppShell } from '@/components/layout/AppShell';
+import type { Metadata } from 'next'
+import './globals.css'
+import { AuthProvider } from '@/context/AuthContext'
+import { AppShell } from '@/components/layout/AppShell'
 
 export const metadata: Metadata = {
   title: 'PocketLens — Mobile-First Personal Finance Tracker',
-  description: 'Multilingual personal finance tracker focused on fast transaction capture.',
-};
+  description:
+    'Multilingual personal finance tracker focused on fast transaction capture.',
+}
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
     <html lang="en" className="h-full">
@@ -21,5 +22,5 @@ export default function RootLayout({
         </AuthProvider>
       </body>
     </html>
-  );
+  )
 }

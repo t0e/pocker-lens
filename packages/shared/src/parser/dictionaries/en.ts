@@ -1,26 +1,26 @@
 export interface LanguageDictionary {
-  incomeKeywords: string[];
-  expenseKeywords: string[];
-  transferKeywords: string[];
-  transferFromKeywords: string[];
-  transferToKeywords: string[];
+  incomeKeywords: string[]
+  expenseKeywords: string[]
+  transferKeywords: string[]
+  transferFromKeywords: string[]
+  transferToKeywords: string[]
   accountTypeKeywords: {
-    cash: string[];
-    bank: string[];
-    credit_card: string[];
-    e_wallet: string[];
-    savings: string[];
-  };
-  categoryKeywords: Record<string, string[]>;
+    cash: string[]
+    bank: string[]
+    credit_card: string[]
+    e_wallet: string[]
+    savings: string[]
+  }
+  categoryKeywords: Record<string, string[]>
   dateKeywords: {
-    today: string[];
-    yesterday: string[];
-  };
+    today: string[]
+    yesterday: string[]
+  }
   multipliers: {
-    thousand: string[];
-    million: string[];
-    billion: string[];
-  };
+    thousand: string[]
+    million: string[]
+    billion: string[]
+  }
 }
 
 export const enDictionary: LanguageDictionary = {
@@ -72,9 +72,42 @@ export const enDictionary: LanguageDictionary = {
   transferToKeywords: ['to', 'into'],
   accountTypeKeywords: {
     cash: ['cash', 'wallet', 'pocket cash', 'physical cash'],
-    bank: ['bank', 'checking', 'checking account', 'debit', 'vcb', 'vietcombank', 'techcombank', 'tcb', 'acb', 'mbbank', 'bidv', 'tpbank', 'vpbank', 'chase', 'wells fargo', 'bofa'],
-    credit_card: ['credit card', 'credit', 'card', 'visa', 'mastercard', 'amex'],
-    e_wallet: ['wallet', 'paypal', 'apple pay', 'google pay', 'momo', 'zalopay', 'shopeepay', 'vnpay'],
+    bank: [
+      'bank',
+      'checking',
+      'checking account',
+      'debit',
+      'vcb',
+      'vietcombank',
+      'techcombank',
+      'tcb',
+      'acb',
+      'mbbank',
+      'bidv',
+      'tpbank',
+      'vpbank',
+      'chase',
+      'wells fargo',
+      'bofa',
+    ],
+    credit_card: [
+      'credit card',
+      'credit',
+      'card',
+      'visa',
+      'mastercard',
+      'amex',
+    ],
+    e_wallet: [
+      'wallet',
+      'paypal',
+      'apple pay',
+      'google pay',
+      'momo',
+      'zalopay',
+      'shopeepay',
+      'vnpay',
+    ],
     savings: ['savings', 'saving', 'high yield', 'vault'],
   },
   categoryKeywords: {
@@ -101,7 +134,7 @@ export const enDictionary: LanguageDictionary = {
       'kfc',
       'dining',
     ],
-    'Groceries': [
+    Groceries: [
       'groceries',
       'grocery',
       'supermarket',
@@ -116,7 +149,7 @@ export const enDictionary: LanguageDictionary = {
       'whole foods',
       'trader joes',
     ],
-    'Transport': [
+    Transport: [
       'transport',
       'transportation',
       'grab',
@@ -146,7 +179,7 @@ export const enDictionary: LanguageDictionary = {
       'maintenance',
       'repair',
     ],
-    'Shopping': [
+    Shopping: [
       'shopping',
       'clothes',
       'clothing',
@@ -159,7 +192,7 @@ export const enDictionary: LanguageDictionary = {
       'furniture',
       'store',
     ],
-    'Entertainment': [
+    Entertainment: [
       'entertainment',
       'movie',
       'cinema',
@@ -187,7 +220,7 @@ export const enDictionary: LanguageDictionary = {
       'fitness',
       'gym',
     ],
-    'Education': [
+    Education: [
       'education',
       'course',
       'tuition',
@@ -228,13 +261,7 @@ export const enDictionary: LanguageDictionary = {
       'skincare',
       'cosmetics',
     ],
-    'Salary': [
-      'salary',
-      'monthly salary',
-      'paycheck',
-      'payroll',
-      'wages',
-    ],
+    Salary: ['salary', 'monthly salary', 'paycheck', 'payroll', 'wages'],
     'Freelance & Side Gig': [
       'freelance',
       'side gig',
@@ -242,9 +269,15 @@ export const enDictionary: LanguageDictionary = {
       'client payment',
       'consulting',
     ],
-    'Bonus': ['bonus', 'year end bonus', 'performance bonus', 'incentive'],
-    'Investment & Dividends': ['investment', 'dividends', 'stock', 'crypto', 'interest'],
-    'Gift': ['gift', 'present', 'birthday money'],
+    Bonus: ['bonus', 'year end bonus', 'performance bonus', 'incentive'],
+    'Investment & Dividends': [
+      'investment',
+      'dividends',
+      'stock',
+      'crypto',
+      'interest',
+    ],
+    Gift: ['gift', 'present', 'birthday money'],
     'Refund & Cashback': ['refund', 'cashback', 'reimbursement', 'returned'],
   },
   dateKeywords: {
@@ -256,4 +289,4 @@ export const enDictionary: LanguageDictionary = {
     million: ['m', 'mil', 'million', 'millions'],
     billion: ['b', 'bil', 'billion', 'billions'],
   },
-};
+}

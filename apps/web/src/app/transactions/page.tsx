@@ -1,6 +1,6 @@
-'use client';
+'use client'
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   Plus,
   ArrowDownLeft,
@@ -35,42 +35,50 @@ import {
   Gift,
   PlusCircle,
   Tag,
-} from 'lucide-react';
+} from 'lucide-react'
 import {
   TransactionResponse,
   TransactionType,
   AccountResponse,
   CategoryResponse,
   PaginatedTransactionsResponse,
-} from '@pocketlens/shared';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { TransactionModal } from '@/components/transactions/TransactionModal';
-import { apiClient } from '@/lib/api-client';
-import { formatMoney } from '@/lib/utils';
+} from '@pocketlens/shared'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
+import { TransactionModal } from '@/components/transactions/TransactionModal'
+import { apiClient } from '@/lib/api-client'
+import { formatMoney } from '@/lib/utils'
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState<TransactionResponse[]>([]);
-  const [accounts, setAccounts] = useState<AccountResponse[]>([]);
-  const [categories, setCategories] = useState<CategoryResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [transactions, setTransactions] = useState<TransactionResponse[]>([])
+  const [accounts, setAccounts] = useState<AccountResponse[]>([])
+  const [categories, setCategories] = useState<CategoryResponse[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Pagination & Filtering state
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [accountFilter, setAccountFilter] = useState<string>('all');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [currencyFilter, setCurrencyFilter] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [sortBy, setSortBy] = useState<string>('date_desc');
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [accountFilter, setAccountFilter] = useState<string>('all')
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [currencyFilter, setCurrencyFilter] = useState<string>('all')
+  const [searchQuery, setSearchQuery] = useState<string>('')
+  const [sortBy, setSortBy] = useState<string>('date_desc')
 
   // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingTransaction, setEditingTransaction] = useState<TransactionResponse | null>(null);
-  const [repeatTransaction, setRepeatTransaction] = useState<TransactionResponse | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingTransaction, setEditingTransaction] =
+    useState<TransactionResponse | null>(null)
+  const [repeatTransaction, setRepeatTransaction] =
+    useState<TransactionResponse | null>(null)
 
   // Fetch accounts & categories once
   useEffect(() => {
@@ -79,176 +87,201 @@ export default function TransactionsPage() {
         const [accs, cats] = await Promise.all([
           apiClient<AccountResponse[]>('/accounts?includeArchived=true'),
           apiClient<CategoryResponse[]>('/categories'),
-        ]);
-        setAccounts(accs);
-        setCategories(cats);
+        ])
+        setAccounts(accs)
+        setCategories(cats)
       } catch (err: any) {
-        console.error('Failed to load accounts or categories:', err);
+        console.error('Failed to load accounts or categories:', err)
       }
     }
-    loadAuxData();
-  }, []);
+    loadAuxData()
+  }, [])
 
   const fetchTransactions = useCallback(async () => {
     try {
-      setIsLoading(true);
-      setError(null);
+      setIsLoading(true)
+      setError(null)
 
       const params = new URLSearchParams({
         page: page.toString(),
         limit: '20',
         sortBy,
-      });
+      })
 
       if (typeFilter !== 'all') {
-        params.append('type', typeFilter);
+        params.append('type', typeFilter)
       }
       if (accountFilter !== 'all') {
-        params.append('accountId', accountFilter);
+        params.append('accountId', accountFilter)
       }
       if (categoryFilter !== 'all') {
-        params.append('categoryId', categoryFilter);
+        params.append('categoryId', categoryFilter)
       }
       if (currencyFilter !== 'all') {
-        params.append('currency', currencyFilter);
+        params.append('currency', currencyFilter)
       }
       if (searchQuery.trim()) {
-        params.append('search', searchQuery.trim());
+        params.append('search', searchQuery.trim())
       }
 
-      const data = await apiClient<PaginatedTransactionsResponse>(`/transactions?${params.toString()}`);
-      setTransactions(data.transactions);
-      setTotalPages(data.pagination.totalPages);
-      setTotalCount(data.pagination.total);
+      const data = await apiClient<PaginatedTransactionsResponse>(
+        `/transactions?${params.toString()}`,
+      )
+      setTransactions(data.transactions)
+      setTotalPages(data.pagination.totalPages)
+      setTotalCount(data.pagination.total)
     } catch (err: any) {
-      setError(err.message || 'Failed to load transactions');
+      setError(err.message || 'Failed to load transactions')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  }, [page, typeFilter, accountFilter, categoryFilter, currencyFilter, searchQuery, sortBy]);
+  }, [
+    page,
+    typeFilter,
+    accountFilter,
+    categoryFilter,
+    currencyFilter,
+    searchQuery,
+    sortBy,
+  ])
 
   useEffect(() => {
-    fetchTransactions();
-  }, [fetchTransactions]);
+    fetchTransactions()
+  }, [fetchTransactions])
 
   // Keyboard shortcut listener ('N' or 'Cmd+K' / 'Ctrl+K')
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const activeTag = (document.activeElement?.tagName || '').toLowerCase();
-      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
-        return;
+      const activeTag = (document.activeElement?.tagName || '').toLowerCase()
+      if (
+        activeTag === 'input' ||
+        activeTag === 'textarea' ||
+        activeTag === 'select'
+      ) {
+        return
       }
 
-      if (e.key === 'n' || e.key === 'N' || ((e.metaKey || e.ctrlKey) && e.key === 'k')) {
-        e.preventDefault();
-        setEditingTransaction(null);
-        setRepeatTransaction(null);
-        setIsModalOpen(true);
+      if (
+        e.key === 'n' ||
+        e.key === 'N' ||
+        ((e.metaKey || e.ctrlKey) && e.key === 'k')
+      ) {
+        e.preventDefault()
+        setEditingTransaction(null)
+        setRepeatTransaction(null)
+        setIsModalOpen(true)
       }
-    };
+    }
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const handleOpenCreate = () => {
-    setEditingTransaction(null);
-    setRepeatTransaction(null);
-    setIsModalOpen(true);
-  };
+    setEditingTransaction(null)
+    setRepeatTransaction(null)
+    setIsModalOpen(true)
+  }
 
   const handleOpenEdit = (tx: TransactionResponse) => {
-    setRepeatTransaction(null);
-    setEditingTransaction(tx);
-    setIsModalOpen(true);
-  };
+    setRepeatTransaction(null)
+    setEditingTransaction(tx)
+    setIsModalOpen(true)
+  }
 
   const handleRepeat = (tx: TransactionResponse) => {
-    setEditingTransaction(null);
-    setRepeatTransaction(tx);
-    setIsModalOpen(true);
-  };
+    setEditingTransaction(null)
+    setRepeatTransaction(tx)
+    setIsModalOpen(true)
+  }
 
   const handleDelete = async (tx: TransactionResponse) => {
-    if (!confirm(`Are you sure you want to delete "${tx.description}"? Account balances will be adjusted.`)) {
-      return;
+    if (
+      !confirm(
+        `Are you sure you want to delete "${tx.description}"? Account balances will be adjusted.`,
+      )
+    ) {
+      return
     }
 
     try {
-      await apiClient(`/transactions/${tx.id}`, { method: 'DELETE' });
-      await fetchTransactions();
+      await apiClient(`/transactions/${tx.id}`, { method: 'DELETE' })
+      await fetchTransactions()
     } catch (err: any) {
-      alert(err.message || 'Failed to delete transaction');
+      alert(err.message || 'Failed to delete transaction')
     }
-  };
+  }
 
   // Group transactions by date heading
-  const groupedTransactions = transactions.reduce((groups, tx) => {
-    const dateObj = new Date(tx.transactionDate);
-    const today = new Date();
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+  const groupedTransactions = transactions.reduce(
+    (groups, tx) => {
+      const dateObj = new Date(tx.transactionDate)
+      const today = new Date()
+      const yesterday = new Date()
+      yesterday.setDate(yesterday.getDate() - 1)
 
-    let dateLabel = dateObj.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+      let dateLabel = dateObj.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
 
-    if (dateObj.toDateString() === today.toDateString()) {
-      dateLabel = 'Today';
-    } else if (dateObj.toDateString() === yesterday.toDateString()) {
-      dateLabel = 'Yesterday';
-    }
+      if (dateObj.toDateString() === today.toDateString()) {
+        dateLabel = 'Today'
+      } else if (dateObj.toDateString() === yesterday.toDateString()) {
+        dateLabel = 'Yesterday'
+      }
 
-    if (!groups[dateLabel]) {
-      groups[dateLabel] = [];
-    }
-    groups[dateLabel].push(tx);
-    return groups;
-  }, {} as Record<string, TransactionResponse[]>);
+      if (!groups[dateLabel]) {
+        groups[dateLabel] = []
+      }
+      groups[dateLabel].push(tx)
+      return groups
+    },
+    {} as Record<string, TransactionResponse[]>,
+  )
 
   const getCategoryIcon = (iconName?: string | null) => {
     switch (iconName) {
       case 'utensils':
-        return <Utensils className="h-3.5 w-3.5" />;
+        return <Utensils className="h-3.5 w-3.5" />
       case 'shopping-cart':
       case 'shopping-bag':
-        return <ShoppingBag className="h-3.5 w-3.5" />;
+        return <ShoppingBag className="h-3.5 w-3.5" />
       case 'car':
-        return <Car className="h-3.5 w-3.5" />;
+        return <Car className="h-3.5 w-3.5" />
       case 'home':
-        return <Home className="h-3.5 w-3.5" />;
+        return <Home className="h-3.5 w-3.5" />
       case 'film':
-        return <Film className="h-3.5 w-3.5" />;
+        return <Film className="h-3.5 w-3.5" />
       case 'heart-pulse':
-        return <HeartPulse className="h-3.5 w-3.5" />;
+        return <HeartPulse className="h-3.5 w-3.5" />
       case 'book-open':
-        return <BookOpen className="h-3.5 w-3.5" />;
+        return <BookOpen className="h-3.5 w-3.5" />
       case 'zap':
-        return <Zap className="h-3.5 w-3.5" />;
+        return <Zap className="h-3.5 w-3.5" />
       case 'plane':
-        return <Plane className="h-3.5 w-3.5" />;
+        return <Plane className="h-3.5 w-3.5" />
       case 'sparkles':
-        return <Sparkles className="h-3.5 w-3.5" />;
+        return <Sparkles className="h-3.5 w-3.5" />
       case 'banknote':
-        return <Banknote className="h-3.5 w-3.5" />;
+        return <Banknote className="h-3.5 w-3.5" />
       case 'briefcase':
-        return <Briefcase className="h-3.5 w-3.5" />;
+        return <Briefcase className="h-3.5 w-3.5" />
       case 'award':
-        return <Award className="h-3.5 w-3.5" />;
+        return <Award className="h-3.5 w-3.5" />
       case 'trending-up':
-        return <TrendingUp className="h-3.5 w-3.5" />;
+        return <TrendingUp className="h-3.5 w-3.5" />
       case 'gift':
-        return <Gift className="h-3.5 w-3.5" />;
+        return <Gift className="h-3.5 w-3.5" />
       case 'rotate-ccw':
-        return <RotateCcw className="h-3.5 w-3.5" />;
+        return <RotateCcw className="h-3.5 w-3.5" />
       case 'plus-circle':
-        return <PlusCircle className="h-3.5 w-3.5" />;
+        return <PlusCircle className="h-3.5 w-3.5" />
       default:
-        return <Tag className="h-3.5 w-3.5" />;
+        return <Tag className="h-3.5 w-3.5" />
     }
-  };
+  }
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-fadeIn">
@@ -256,8 +289,8 @@ export default function TransactionsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-              Transactions
-            </h2>
+            Transactions
+          </h2>
           <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
             Log and manage your expenses, income, and account transfers
           </p>
@@ -291,14 +324,24 @@ export default function TransactionsPage() {
               placeholder="Search description, merchant, notes..."
               value={searchQuery}
               onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setPage(1);
+                setSearchQuery(e.target.value)
+                setPage(1)
               }}
               className="w-full text-xs pl-8 pr-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
             <span className="absolute left-2.5 top-2.5 text-zinc-400">
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <svg
+                className="h-3.5 w-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
               </svg>
             </span>
           </div>
@@ -314,8 +357,8 @@ export default function TransactionsPage() {
               <button
                 key={tab.value}
                 onClick={() => {
-                  setTypeFilter(tab.value);
-                  setPage(1);
+                  setTypeFilter(tab.value)
+                  setPage(1)
                 }}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-all whitespace-nowrap ${
                   typeFilter === tab.value
@@ -335,8 +378,8 @@ export default function TransactionsPage() {
           <select
             value={accountFilter}
             onChange={(e) => {
-              setAccountFilter(e.target.value);
-              setPage(1);
+              setAccountFilter(e.target.value)
+              setPage(1)
             }}
             className="text-xs px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           >
@@ -352,8 +395,8 @@ export default function TransactionsPage() {
           <select
             value={categoryFilter}
             onChange={(e) => {
-              setCategoryFilter(e.target.value);
-              setPage(1);
+              setCategoryFilter(e.target.value)
+              setPage(1)
             }}
             className="text-xs px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           >
@@ -369,8 +412,8 @@ export default function TransactionsPage() {
           <select
             value={currencyFilter}
             onChange={(e) => {
-              setCurrencyFilter(e.target.value);
-              setPage(1);
+              setCurrencyFilter(e.target.value)
+              setPage(1)
             }}
             className="text-xs px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           >
@@ -384,8 +427,8 @@ export default function TransactionsPage() {
           <select
             value={sortBy}
             onChange={(e) => {
-              setSortBy(e.target.value);
-              setPage(1);
+              setSortBy(e.target.value)
+              setPage(1)
             }}
             className="text-xs px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 ml-auto"
           >
@@ -415,12 +458,19 @@ export default function TransactionsPage() {
                 No transactions recorded
               </h3>
               <p className="text-xs text-zinc-500">
-                {typeFilter !== 'all' || accountFilter !== 'all' || categoryFilter !== 'all'
+                {typeFilter !== 'all' ||
+                accountFilter !== 'all' ||
+                categoryFilter !== 'all'
                   ? 'No transactions match the selected filters.'
                   : 'Start logging your daily expenses, salary income, or account transfers with natural language or manual entry.'}
               </p>
             </div>
-            <Button variant="primary" size="md" onClick={handleOpenCreate} className="space-x-1.5">
+            <Button
+              variant="primary"
+              size="md"
+              onClick={handleOpenCreate}
+              className="space-x-1.5"
+            >
               <Sparkles className="h-4 w-4" />
               <span>Add First Transaction</span>
             </Button>
@@ -436,9 +486,9 @@ export default function TransactionsPage() {
 
               <Card className="divide-y divide-zinc-100 dark:divide-zinc-800/80 overflow-hidden shadow-sm">
                 {items.map((tx) => {
-                  const isExpense = tx.type === 'expense';
-                  const isIncome = tx.type === 'income';
-                  const isTransfer = tx.type === 'transfer';
+                  const isExpense = tx.type === 'expense'
+                  const isIncome = tx.type === 'income'
+                  const isTransfer = tx.type === 'transfer'
 
                   return (
                     <div
@@ -453,8 +503,8 @@ export default function TransactionsPage() {
                             isExpense
                               ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400'
                               : isIncome
-                              ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
-                              : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400'
+                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400'
                           }`}
                         >
                           {isExpense ? (
@@ -512,8 +562,8 @@ export default function TransactionsPage() {
                               isExpense
                                 ? 'text-zinc-900 dark:text-zinc-50'
                                 : isIncome
-                                ? 'text-emerald-600 dark:text-emerald-400'
-                                : 'text-indigo-600 dark:text-indigo-400'
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : 'text-indigo-600 dark:text-indigo-400'
                             }`}
                           >
                             {isExpense ? '-' : isIncome ? '+' : '⇄ '}
@@ -552,7 +602,7 @@ export default function TransactionsPage() {
                         </div>
                       </div>
                     </div>
-                  );
+                  )
                 })}
               </Card>
             </div>
@@ -602,5 +652,5 @@ export default function TransactionsPage() {
         categories={categories}
       />
     </div>
-  );
+  )
 }

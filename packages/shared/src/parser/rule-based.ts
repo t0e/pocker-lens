@@ -5,23 +5,23 @@ import {
   ParsedTransactionDraft,
   UserAccountContext,
   UserCategoryContext,
-} from './types.js';
-import { enDictionary } from './dictionaries/en.js';
-import { viDictionary } from './dictionaries/vi.js';
-import { TransactionType } from '../transaction/index.js';
+} from './types.js'
+import { enDictionary } from './dictionaries/en.js'
+import { viDictionary } from './dictionaries/vi.js'
+import { TransactionType } from '../transaction/index.js'
 
 export function removeVietnameseAccents(str: string): string {
   return str
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[đĐ]/g, (m) => (m === 'đ' ? 'd' : 'D'))
-    .toLowerCase();
+    .toLowerCase()
 }
 
 export class RuleBasedParser implements TransactionInputParser {
   parse(inputText: string, context: ParserUserContext): ParseTransactionResult {
-    const rawText = inputText.trim();
-    const warnings: string[] = [];
+    const rawText = inputText.trim()
+    const warnings: string[] = []
 
     if (!rawText) {
       return {
@@ -29,69 +29,93 @@ export class RuleBasedParser implements TransactionInputParser {
         parsed: this.createEmptyDraft(),
         warnings: ['Empty input text'],
         requiresConfirmation: true,
-      };
+      }
     }
 
-    let workingText = rawText;
-    const lowerNormalized = removeVietnameseAccents(rawText);
+    let workingText = rawText
+    const lowerNormalized = removeVietnameseAccents(rawText)
 
     // 1. Parse Date
-    const { date, dateConfidence, cleanedFromDate } = this.extractDate(workingText, lowerNormalized);
-    workingText = cleanedFromDate;
+    const { date, dateConfidence, cleanedFromDate } = this.extractDate(
+      workingText,
+      lowerNormalized,
+    )
+    workingText = cleanedFromDate
 
     // 2. Parse Amount & Currency
-    const { amount, currency, amountConfidence, cleanedFromAmount } = this.extractAmountAndCurrency(
-      workingText,
-      context
-    );
-    workingText = cleanedFromAmount;
+    const { amount, currency, amountConfidence, cleanedFromAmount } =
+      this.extractAmountAndCurrency(workingText, context)
+    workingText = cleanedFromAmount
 
     // 3. Determine Transaction Type (Transfer vs Income vs Expense)
-    const { type, typeConfidence } = this.detectTransactionType(rawText, lowerNormalized);
+    const { type, typeConfidence } = this.detectTransactionType(
+      rawText,
+      lowerNormalized,
+    )
 
     // 4. Match Accounts (Source & Transfer Destination)
-    let accountId: string | null = null;
-    let accountName: string | null = null;
-    let transferAccountId: string | null = null;
-    let transferAccountName: string | null = null;
-    let accountConfidence = 0;
+    let accountId: string | null = null
+    let accountName: string | null = null
+    let transferAccountId: string | null = null
+    let transferAccountName: string | null = null
+    let accountConfidence = 0
 
     if (type === 'transfer') {
-      const transferMatch = this.matchTransferAccounts(rawText, lowerNormalized, context.accounts);
-      accountId = transferMatch.sourceAccountId;
-      accountName = transferMatch.sourceAccountName;
-      transferAccountId = transferMatch.destAccountId;
-      transferAccountName = transferMatch.destAccountName;
-      accountConfidence = transferMatch.confidence;
+      const transferMatch = this.matchTransferAccounts(
+        rawText,
+        lowerNormalized,
+        context.accounts,
+      )
+      accountId = transferMatch.sourceAccountId
+      accountName = transferMatch.sourceAccountName
+      transferAccountId = transferMatch.destAccountId
+      transferAccountName = transferMatch.destAccountName
+      accountConfidence = transferMatch.confidence
 
       if (!accountId || !transferAccountId) {
-        warnings.push('Please verify both source and destination accounts for the transfer.');
-      } else if (transferMatch.sourceAccountCurrency !== transferMatch.destAccountCurrency) {
-        warnings.push('Source and destination accounts must use the same currency in Phase 3.');
+        warnings.push(
+          'Please verify both source and destination accounts for the transfer.',
+        )
+      } else if (
+        transferMatch.sourceAccountCurrency !==
+        transferMatch.destAccountCurrency
+      ) {
+        warnings.push(
+          'Source and destination accounts must use the same currency in Phase 3.',
+        )
       }
     } else {
-      const accountMatch = this.matchSingleAccount(rawText, lowerNormalized, context.accounts);
-      accountId = accountMatch.accountId;
-      accountName = accountMatch.accountName;
-      accountConfidence = accountMatch.confidence;
+      const accountMatch = this.matchSingleAccount(
+        rawText,
+        lowerNormalized,
+        context.accounts,
+      )
+      accountId = accountMatch.accountId
+      accountName = accountMatch.accountName
+      accountConfidence = accountMatch.confidence
 
       if (!accountId) {
-        warnings.push('No matching account found. Please select an account.');
+        warnings.push('No matching account found. Please select an account.')
       }
     }
 
     // 5. Match Category (For Income/Expense)
-    let categoryId: string | null = null;
-    let categoryName: string | null = null;
-    let categoryIcon: string | null = null;
-    let categoryConfidence = 0;
+    let categoryId: string | null = null
+    let categoryName: string | null = null
+    let categoryIcon: string | null = null
+    let categoryConfidence = 0
 
     if (type !== 'transfer') {
-      const catMatch = this.matchCategory(rawText, lowerNormalized, type, context.categories);
-      categoryId = catMatch.categoryId;
-      categoryName = catMatch.categoryName;
-      categoryIcon = catMatch.categoryIcon;
-      categoryConfidence = catMatch.confidence;
+      const catMatch = this.matchCategory(
+        rawText,
+        lowerNormalized,
+        type,
+        context.categories,
+      )
+      categoryId = catMatch.categoryId
+      categoryName = catMatch.categoryName
+      categoryIcon = catMatch.categoryIcon
+      categoryConfidence = catMatch.confidence
     }
 
     // 6. Extract Description & Merchant
@@ -99,17 +123,17 @@ export class RuleBasedParser implements TransactionInputParser {
       rawText,
       workingText,
       categoryName,
-      type
-    );
+      type,
+    )
 
     // 7. Resolve Final Currency
-    let finalCurrency = currency;
+    let finalCurrency = currency
     if (!finalCurrency && accountId) {
-      const acc = context.accounts.find((a) => a.id === accountId);
-      if (acc) finalCurrency = acc.currency;
+      const acc = context.accounts.find((a) => a.id === accountId)
+      if (acc) finalCurrency = acc.currency
     }
     if (!finalCurrency) {
-      finalCurrency = context.preferredCurrency || 'VND';
+      finalCurrency = context.preferredCurrency || 'VND'
     }
 
     // Overall Confidence
@@ -120,10 +144,11 @@ export class RuleBasedParser implements TransactionInputParser {
           accountConfidence * 0.25 +
           (type === 'transfer' ? 1.0 : categoryConfidence) * 0.2) *
         dateConfidence
-      ).toFixed(2)
-    );
+      ).toFixed(2),
+    )
 
-    const requiresConfirmation = overallConfidence < 0.85 || !amount || !accountId;
+    const requiresConfirmation =
+      overallConfidence < 0.85 || !amount || !accountId
 
     return {
       rawText,
@@ -152,7 +177,7 @@ export class RuleBasedParser implements TransactionInputParser {
       },
       warnings,
       requiresConfirmation,
-    };
+    }
   }
 
   private createEmptyDraft(): ParsedTransactionDraft {
@@ -178,123 +203,140 @@ export class RuleBasedParser implements TransactionInputParser {
         date: 1,
         overall: 0,
       },
-    };
+    }
   }
 
   // --- Date Parsing ---
-  private extractDate(text: string, lowerNorm: string): { date: Date; dateConfidence: number; cleanedFromDate: string } {
-    const now = new Date();
-    let cleaned = text;
+  private extractDate(
+    text: string,
+    lowerNorm: string,
+  ): { date: Date; dateConfidence: number; cleanedFromDate: string } {
+    const now = new Date()
+    let cleaned = text
 
     // Check Yesterday
-    const yesterdayKeywords = [...enDictionary.dateKeywords.yesterday, ...viDictionary.dateKeywords.yesterday];
+    const yesterdayKeywords = [
+      ...enDictionary.dateKeywords.yesterday,
+      ...viDictionary.dateKeywords.yesterday,
+    ]
     for (const kw of yesterdayKeywords) {
-      const reg = new RegExp(`\\b${kw}\\b`, 'i');
+      const reg = new RegExp(`\\b${kw}\\b`, 'i')
       if (reg.test(cleaned) || lowerNorm.includes(kw)) {
-        const yDate = new Date();
-        yDate.setDate(now.getDate() - 1);
-        cleaned = cleaned.replace(reg, '').trim();
-        return { date: yDate, dateConfidence: 1.0, cleanedFromDate: cleaned };
+        const yDate = new Date()
+        yDate.setDate(now.getDate() - 1)
+        cleaned = cleaned.replace(reg, '').trim()
+        return { date: yDate, dateConfidence: 1.0, cleanedFromDate: cleaned }
       }
     }
 
     // Check Today
-    const todayKeywords = [...enDictionary.dateKeywords.today, ...viDictionary.dateKeywords.today];
+    const todayKeywords = [
+      ...enDictionary.dateKeywords.today,
+      ...viDictionary.dateKeywords.today,
+    ]
     for (const kw of todayKeywords) {
-      const reg = new RegExp(`\\b${kw}\\b`, 'i');
+      const reg = new RegExp(`\\b${kw}\\b`, 'i')
       if (reg.test(cleaned)) {
-        cleaned = cleaned.replace(reg, '').trim();
-        return { date: now, dateConfidence: 1.0, cleanedFromDate: cleaned };
+        cleaned = cleaned.replace(reg, '').trim()
+        return { date: now, dateConfidence: 1.0, cleanedFromDate: cleaned }
       }
     }
 
-    return { date: now, dateConfidence: 0.9, cleanedFromDate: cleaned };
+    return { date: now, dateConfidence: 0.9, cleanedFromDate: cleaned }
   }
 
   // --- Amount & Multipliers Parsing ---
   private extractAmountAndCurrency(
     text: string,
-    context: ParserUserContext
-  ): { amount: string | null; currency: string | null; amountConfidence: number; cleanedFromAmount: string } {
-    let cleaned = text;
-    let detectedCurrency: string | null = null;
+    context: ParserUserContext,
+  ): {
+    amount: string | null
+    currency: string | null
+    amountConfidence: number
+    cleanedFromAmount: string
+  } {
+    let cleaned = text
+    let detectedCurrency: string | null = null
 
     // Check explicit currency markers
     if (/\b(vnd|vnd|d|dong|dong)\b|₫/i.test(cleaned)) {
-      detectedCurrency = 'VND';
-      cleaned = cleaned.replace(/\b(vnd|vnd|dong|dong)\b|₫/gi, ' ');
+      detectedCurrency = 'VND'
+      cleaned = cleaned.replace(/\b(vnd|vnd|dong|dong)\b|₫/gi, ' ')
     } else if (/\b(usd|dollar|dollars)\b|\$/i.test(cleaned)) {
-      detectedCurrency = 'USD';
-      cleaned = cleaned.replace(/\b(usd|dollar|dollars)\b|\$/gi, ' ');
+      detectedCurrency = 'USD'
+      cleaned = cleaned.replace(/\b(usd|dollar|dollars)\b|\$/gi, ' ')
     } else if (/\b(eur|euro)\b|€/i.test(cleaned)) {
-      detectedCurrency = 'EUR';
-      cleaned = cleaned.replace(/\b(eur|euro)\b|€/gi, ' ');
+      detectedCurrency = 'EUR'
+      cleaned = cleaned.replace(/\b(eur|euro)\b|€/gi, ' ')
     }
 
     // Match numbers with multiplier suffix or words:
     // e.g. 85k, 85.5k, 2m, 32tr, 32 triệu, 80 nghìn, 85,000, 1500.50
     // Pattern 1: Number + Multiplier Token (k, tr, m, trieu, nghin, củ, v.v.)
-    const multiplierRegex = /(\d+(?:[.,]\d+)?)\s*(k|ngh[iì]n|ng[aà]n|thousand|tr|tri[eệ]u|mil|million|c[uủ]|m|b|t[yỷ]|billion)\b/i;
-    const multMatch = cleaned.match(multiplierRegex);
+    const multiplierRegex =
+      /(\d+(?:[.,]\d+)?)\s*(k|ngh[iì]n|ng[aà]n|thousand|tr|tri[eệ]u|mil|million|c[uủ]|m|b|t[yỷ]|billion)\b/i
+    const multMatch = cleaned.match(multiplierRegex)
 
     if (multMatch) {
-      const numStr = multMatch[1].replace(',', '.');
-      const unit = multMatch[2].toLowerCase();
-      const numVal = parseFloat(numStr);
+      const numStr = multMatch[1].replace(',', '.')
+      const unit = multMatch[2].toLowerCase()
+      const numVal = parseFloat(numStr)
 
-      let multiplier = 1;
-      const lowerUnit = removeVietnameseAccents(unit);
+      let multiplier = 1
+      const lowerUnit = removeVietnameseAccents(unit)
 
       if (['k', 'nghin', 'ngan', 'thousand'].includes(lowerUnit)) {
-        multiplier = 1000;
-        if (!detectedCurrency) detectedCurrency = 'VND';
-      } else if (['tr', 'trieu', 'cu', 'm', 'mil', 'million'].includes(lowerUnit)) {
-        multiplier = 1000000;
+        multiplier = 1000
+        if (!detectedCurrency) detectedCurrency = 'VND'
+      } else if (
+        ['tr', 'trieu', 'cu', 'm', 'mil', 'million'].includes(lowerUnit)
+      ) {
+        multiplier = 1000000
         if (!detectedCurrency && ['tr', 'trieu', 'cu'].includes(lowerUnit)) {
-          detectedCurrency = 'VND';
+          detectedCurrency = 'VND'
         }
       } else if (['b', 'ty', 'billion'].includes(lowerUnit)) {
-        multiplier = 1000000000;
+        multiplier = 1000000000
       }
 
-      const totalVal = Math.round(numVal * multiplier);
-      cleaned = cleaned.replace(multMatch[0], ' ').trim();
+      const totalVal = Math.round(numVal * multiplier)
+      cleaned = cleaned.replace(multMatch[0], ' ').trim()
 
       return {
         amount: totalVal.toString(),
         currency: detectedCurrency,
         amountConfidence: 1.0,
         cleanedFromAmount: cleaned,
-      };
+      }
     }
 
     // Pattern 2: Raw number with formatted thousands (e.g. 85,000 or 85.000 or 1500.50)
     // 85,000 or 85.000 (VND standard)
-    const formattedIntRegex = /\b(\d{1,3}(?:[.,]\d{3})+)\b/;
-    const formattedMatch = cleaned.match(formattedIntRegex);
+    const formattedIntRegex = /\b(\d{1,3}(?:[.,]\d{3})+)\b/
+    const formattedMatch = cleaned.match(formattedIntRegex)
     if (formattedMatch) {
-      const rawNum = formattedMatch[1].replace(/[.,]/g, '');
-      cleaned = cleaned.replace(formattedMatch[0], ' ').trim();
+      const rawNum = formattedMatch[1].replace(/[.,]/g, '')
+      cleaned = cleaned.replace(formattedMatch[0], ' ').trim()
       return {
         amount: rawNum,
         currency: detectedCurrency || 'VND',
         amountConfidence: 0.98,
         cleanedFromAmount: cleaned,
-      };
+      }
     }
 
     // Pattern 3: Standard decimal or integer (e.g. 1500.50 or 85000 or 100)
-    const plainNumRegex = /\b(\d+(?:\.\d{1,4})?)\b/;
-    const plainMatch = cleaned.match(plainNumRegex);
+    const plainNumRegex = /\b(\d+(?:\.\d{1,4})?)\b/
+    const plainMatch = cleaned.match(plainNumRegex)
     if (plainMatch) {
-      const rawNum = plainMatch[1];
-      cleaned = cleaned.replace(plainMatch[0], ' ').trim();
+      const rawNum = plainMatch[1]
+      cleaned = cleaned.replace(plainMatch[0], ' ').trim()
       return {
         amount: rawNum,
         currency: detectedCurrency,
         amountConfidence: 0.95,
         cleanedFromAmount: cleaned,
-      };
+      }
     }
 
     return {
@@ -302,130 +344,155 @@ export class RuleBasedParser implements TransactionInputParser {
       currency: detectedCurrency,
       amountConfidence: 0,
       cleanedFromAmount: cleaned,
-    };
+    }
   }
 
   // --- Transaction Type Detection ---
   private detectTransactionType(
     rawText: string,
-    lowerNorm: string
+    lowerNorm: string,
   ): { type: TransactionType; typeConfidence: number } {
     // 1. Check Transfer keywords
-    const transferKeywords = [...enDictionary.transferKeywords, ...viDictionary.transferKeywords];
+    const transferKeywords = [
+      ...enDictionary.transferKeywords,
+      ...viDictionary.transferKeywords,
+    ]
     for (const kw of transferKeywords) {
-      const kwNorm = removeVietnameseAccents(kw);
+      const kwNorm = removeVietnameseAccents(kw)
       if (lowerNorm.includes(kwNorm)) {
-        return { type: 'transfer', typeConfidence: 0.98 };
+        return { type: 'transfer', typeConfidence: 0.98 }
       }
     }
 
     // Check "from ... to ..." or "từ ... sang ..."
     if (
       (lowerNorm.includes('from ') && lowerNorm.includes(' to ')) ||
-      (lowerNorm.includes('tu ') && (lowerNorm.includes(' sang ') || lowerNorm.includes(' vao ')))
+      (lowerNorm.includes('tu ') &&
+        (lowerNorm.includes(' sang ') || lowerNorm.includes(' vao ')))
     ) {
-      return { type: 'transfer', typeConfidence: 0.95 };
+      return { type: 'transfer', typeConfidence: 0.95 }
     }
 
     // 2. Check Income keywords
-    const incomeKeywords = [...enDictionary.incomeKeywords, ...viDictionary.incomeKeywords];
+    const incomeKeywords = [
+      ...enDictionary.incomeKeywords,
+      ...viDictionary.incomeKeywords,
+    ]
     for (const kw of incomeKeywords) {
-      const kwNorm = removeVietnameseAccents(kw);
+      const kwNorm = removeVietnameseAccents(kw)
       if (lowerNorm.includes(kwNorm)) {
-        return { type: 'income', typeConfidence: 0.95 };
+        return { type: 'income', typeConfidence: 0.95 }
       }
     }
 
     // 3. Default to Expense
-    return { type: 'expense', typeConfidence: 0.85 };
+    return { type: 'expense', typeConfidence: 0.85 }
   }
 
   // --- Single Account Matching ---
   private matchSingleAccount(
     rawText: string,
     lowerNorm: string,
-    accounts: UserAccountContext[]
-  ): { accountId: string | null; accountName: string | null; confidence: number } {
-    const activeAccounts = accounts.filter((a) => !a.isArchived);
+    accounts: UserAccountContext[],
+  ): {
+    accountId: string | null
+    accountName: string | null
+    confidence: number
+  } {
+    const activeAccounts = accounts.filter((a) => !a.isArchived)
     if (activeAccounts.length === 0) {
-      return { accountId: null, accountName: null, confidence: 0 };
+      return { accountId: null, accountName: null, confidence: 0 }
     }
 
     // Exact or normalized name matching in text
     for (const acc of activeAccounts) {
-      const accNorm = removeVietnameseAccents(acc.name);
+      const accNorm = removeVietnameseAccents(acc.name)
       if (lowerNorm.includes(accNorm)) {
-        return { accountId: acc.id, accountName: acc.name, confidence: 0.98 };
+        return { accountId: acc.id, accountName: acc.name, confidence: 0.98 }
       }
     }
 
     // Alias / Type keyword matching (e.g. "cash", "tien mat", "vcb", "vietcombank", "bank")
     for (const acc of activeAccounts) {
-      const accType = acc.type.toLowerCase();
-      const enAliases = (enDictionary.accountTypeKeywords as any)[accType] || [];
-      const viAliases = (viDictionary.accountTypeKeywords as any)[accType] || [];
-      const allAliases = [...enAliases, ...viAliases];
+      const accType = acc.type.toLowerCase()
+      const enAliases = (enDictionary.accountTypeKeywords as any)[accType] || []
+      const viAliases = (viDictionary.accountTypeKeywords as any)[accType] || []
+      const allAliases = [...enAliases, ...viAliases]
 
       for (const alias of allAliases) {
-        const aliasNorm = removeVietnameseAccents(alias);
-        const regex = new RegExp(`\\b${aliasNorm}\\b`, 'i');
+        const aliasNorm = removeVietnameseAccents(alias)
+        const regex = new RegExp(`\\b${aliasNorm}\\b`, 'i')
         if (regex.test(lowerNorm) || lowerNorm.includes(aliasNorm)) {
-          return { accountId: acc.id, accountName: acc.name, confidence: 0.92 };
+          return { accountId: acc.id, accountName: acc.name, confidence: 0.92 }
         }
       }
     }
 
     // Default account fallback
-    const defaultAcc = activeAccounts.find((a) => a.isDefault);
+    const defaultAcc = activeAccounts.find((a) => a.isDefault)
     if (defaultAcc) {
-      return { accountId: defaultAcc.id, accountName: defaultAcc.name, confidence: 0.7 };
+      return {
+        accountId: defaultAcc.id,
+        accountName: defaultAcc.name,
+        confidence: 0.7,
+      }
     }
 
     if (activeAccounts.length === 1) {
-      return { accountId: activeAccounts[0].id, accountName: activeAccounts[0].name, confidence: 0.8 };
+      return {
+        accountId: activeAccounts[0].id,
+        accountName: activeAccounts[0].name,
+        confidence: 0.8,
+      }
     }
 
-    return { accountId: null, accountName: null, confidence: 0 };
+    return { accountId: null, accountName: null, confidence: 0 }
   }
 
   // --- Transfer Accounts Matching (Source -> Destination) ---
   private matchTransferAccounts(
     rawText: string,
     lowerNorm: string,
-    accounts: UserAccountContext[]
+    accounts: UserAccountContext[],
   ): {
-    sourceAccountId: string | null;
-    sourceAccountName: string | null;
-    sourceAccountCurrency: string | null;
-    destAccountId: string | null;
-    destAccountName: string | null;
-    destAccountCurrency: string | null;
-    confidence: number;
+    sourceAccountId: string | null
+    sourceAccountName: string | null
+    sourceAccountCurrency: string | null
+    destAccountId: string | null
+    destAccountName: string | null
+    destAccountCurrency: string | null
+    confidence: number
   } {
-    const activeAccounts = accounts.filter((a) => !a.isArchived);
+    const activeAccounts = accounts.filter((a) => !a.isArchived)
 
     // Extract segments using "from X to Y" or "từ X sang Y"
-    let sourceAcc: UserAccountContext | null = null;
-    let destAcc: UserAccountContext | null = null;
+    let sourceAcc: UserAccountContext | null = null
+    let destAcc: UserAccountContext | null = null
 
     // Try finding "from/từ <source>"
-    const fromKeywords = [...enDictionary.transferFromKeywords, ...viDictionary.transferFromKeywords];
-    const toKeywords = [...enDictionary.transferToKeywords, ...viDictionary.transferToKeywords];
+    const fromKeywords = [
+      ...enDictionary.transferFromKeywords,
+      ...viDictionary.transferFromKeywords,
+    ]
+    const toKeywords = [
+      ...enDictionary.transferToKeywords,
+      ...viDictionary.transferToKeywords,
+    ]
 
     for (const acc of activeAccounts) {
-      const accNorm = removeVietnameseAccents(acc.name);
+      const accNorm = removeVietnameseAccents(acc.name)
       for (const fromKw of fromKeywords) {
-        const fromPattern = `${fromKw} ${accNorm}`;
+        const fromPattern = `${fromKw} ${accNorm}`
         if (lowerNorm.includes(fromPattern)) {
-          sourceAcc = acc;
-          break;
+          sourceAcc = acc
+          break
         }
       }
       for (const toKw of toKeywords) {
-        const toPattern = `${toKw} ${accNorm}`;
+        const toPattern = `${toKw} ${accNorm}`
         if (lowerNorm.includes(toPattern)) {
-          destAcc = acc;
-          break;
+          destAcc = acc
+          break
         }
       }
     }
@@ -433,21 +500,23 @@ export class RuleBasedParser implements TransactionInputParser {
     // Try keyword type match for source/dest (e.g. "from Vietcombank to Cash" or "từ vietcombank sang tiền mặt")
     if (!sourceAcc || !destAcc) {
       for (const acc of activeAccounts) {
-        const accType = acc.type.toLowerCase();
-        const enAliases = (enDictionary.accountTypeKeywords as any)[accType] || [];
-        const viAliases = (viDictionary.accountTypeKeywords as any)[accType] || [];
-        const aliases = [...enAliases, ...viAliases];
+        const accType = acc.type.toLowerCase()
+        const enAliases =
+          (enDictionary.accountTypeKeywords as any)[accType] || []
+        const viAliases =
+          (viDictionary.accountTypeKeywords as any)[accType] || []
+        const aliases = [...enAliases, ...viAliases]
 
         for (const alias of aliases) {
-          const aliasNorm = removeVietnameseAccents(alias);
+          const aliasNorm = removeVietnameseAccents(alias)
           for (const fromKw of fromKeywords) {
             if (lowerNorm.includes(`${fromKw} ${aliasNorm}`) && !sourceAcc) {
-              sourceAcc = acc;
+              sourceAcc = acc
             }
           }
           for (const toKw of toKeywords) {
             if (lowerNorm.includes(`${toKw} ${aliasNorm}`) && !destAcc) {
-              destAcc = acc;
+              destAcc = acc
             }
           }
         }
@@ -456,20 +525,26 @@ export class RuleBasedParser implements TransactionInputParser {
 
     // Fallback: If 2 distinct accounts are mentioned anywhere in text
     if (!sourceAcc || !destAcc) {
-      const mentioned: UserAccountContext[] = [];
+      const mentioned: UserAccountContext[] = []
       for (const acc of activeAccounts) {
-        const accNorm = removeVietnameseAccents(acc.name);
-        if (lowerNorm.includes(accNorm) && !mentioned.some((m) => m.id === acc.id)) {
-          mentioned.push(acc);
+        const accNorm = removeVietnameseAccents(acc.name)
+        if (
+          lowerNorm.includes(accNorm) &&
+          !mentioned.some((m) => m.id === acc.id)
+        ) {
+          mentioned.push(acc)
         }
       }
       if (mentioned.length >= 2) {
-        sourceAcc = sourceAcc || mentioned[0];
-        destAcc = destAcc || (mentioned[1].id !== sourceAcc.id ? mentioned[1] : mentioned[0]);
+        sourceAcc = sourceAcc || mentioned[0]
+        destAcc =
+          destAcc ||
+          (mentioned[1].id !== sourceAcc.id ? mentioned[1] : mentioned[0])
       }
     }
 
-    const confidence = sourceAcc && destAcc ? 0.95 : sourceAcc || destAcc ? 0.6 : 0;
+    const confidence =
+      sourceAcc && destAcc ? 0.95 : sourceAcc || destAcc ? 0.6 : 0
 
     return {
       sourceAccountId: sourceAcc ? sourceAcc.id : null,
@@ -479,7 +554,7 @@ export class RuleBasedParser implements TransactionInputParser {
       destAccountName: destAcc ? destAcc.name : null,
       destAccountCurrency: destAcc ? destAcc.currency : null,
       confidence,
-    };
+    }
   }
 
   // --- Category Matching ---
@@ -487,37 +562,57 @@ export class RuleBasedParser implements TransactionInputParser {
     rawText: string,
     lowerNorm: string,
     type: TransactionType,
-    categories: UserCategoryContext[]
-  ): { categoryId: string | null; categoryName: string | null; categoryIcon: string | null; confidence: number } {
-    const validCategories = categories.filter((c) => c.type === type);
+    categories: UserCategoryContext[],
+  ): {
+    categoryId: string | null
+    categoryName: string | null
+    categoryIcon: string | null
+    confidence: number
+  } {
+    const validCategories = categories.filter((c) => c.type === type)
 
     // 1. Direct name match in categories
     for (const cat of validCategories) {
-      const catNorm = removeVietnameseAccents(cat.name);
+      const catNorm = removeVietnameseAccents(cat.name)
       if (lowerNorm.includes(catNorm)) {
-        return { categoryId: cat.id, categoryName: cat.name, categoryIcon: cat.icon, confidence: 0.95 };
-      }
-    }
-
-    // 2. Dictionary keyword match
-    const enDict = enDictionary.categoryKeywords;
-    const viDict = viDictionary.categoryKeywords;
-
-    for (const cat of validCategories) {
-      const enKeywords = enDict[cat.name] || [];
-      const viKeywords = viDict[cat.name] || [];
-      const allKeywords = [...enKeywords, ...viKeywords];
-
-      for (const kw of allKeywords) {
-        const kwNorm = removeVietnameseAccents(kw);
-        const regex = new RegExp(`\\b${kwNorm}\\b`, 'i');
-        if (regex.test(lowerNorm) || lowerNorm.includes(kwNorm)) {
-          return { categoryId: cat.id, categoryName: cat.name, categoryIcon: cat.icon, confidence: 0.88 };
+        return {
+          categoryId: cat.id,
+          categoryName: cat.name,
+          categoryIcon: cat.icon,
+          confidence: 0.95,
         }
       }
     }
 
-    return { categoryId: null, categoryName: null, categoryIcon: null, confidence: 0 };
+    // 2. Dictionary keyword match
+    const enDict = enDictionary.categoryKeywords
+    const viDict = viDictionary.categoryKeywords
+
+    for (const cat of validCategories) {
+      const enKeywords = enDict[cat.name] || []
+      const viKeywords = viDict[cat.name] || []
+      const allKeywords = [...enKeywords, ...viKeywords]
+
+      for (const kw of allKeywords) {
+        const kwNorm = removeVietnameseAccents(kw)
+        const regex = new RegExp(`\\b${kwNorm}\\b`, 'i')
+        if (regex.test(lowerNorm) || lowerNorm.includes(kwNorm)) {
+          return {
+            categoryId: cat.id,
+            categoryName: cat.name,
+            categoryIcon: cat.icon,
+            confidence: 0.88,
+          }
+        }
+      }
+    }
+
+    return {
+      categoryId: null,
+      categoryName: null,
+      categoryIcon: null,
+      confidence: 0,
+    }
   }
 
   // --- Description & Merchant Extraction ---
@@ -525,7 +620,7 @@ export class RuleBasedParser implements TransactionInputParser {
     rawText: string,
     cleanedText: string,
     categoryName: string | null,
-    type: TransactionType
+    type: TransactionType,
   ): { description: string; merchant: string | null } {
     // Detect well-known merchants
     const merchantKeywords = [
@@ -553,31 +648,41 @@ export class RuleBasedParser implements TransactionInputParser {
       'Lotte Cinema',
       'Netflix',
       'Spotify',
-    ];
+    ]
 
-    let merchant: string | null = null;
-    const lowerRaw = rawText.toLowerCase();
+    let merchant: string | null = null
+    const lowerRaw = rawText.toLowerCase()
 
     for (const m of merchantKeywords) {
       if (lowerRaw.includes(m.toLowerCase())) {
-        merchant = m;
-        break;
+        merchant = m
+        break
       }
     }
 
     // Clean up description
     let desc = cleanedText
-      .replace(/\b(to|from|into|từ|tu|sang|vào|vao|đến|den|bằng|bang|with|qua)\b/gi, ' ')
+      .replace(
+        /\b(to|from|into|từ|tu|sang|vào|vao|đến|den|bằng|bang|with|qua)\b/gi,
+        ' ',
+      )
       .replace(/\s+/g, ' ')
-      .trim();
+      .trim()
 
     // Capitalize first letter
     if (desc.length > 0) {
-      desc = desc.charAt(0).toUpperCase() + desc.slice(1);
+      desc = desc.charAt(0).toUpperCase() + desc.slice(1)
     } else {
-      desc = merchant || categoryName || (type === 'transfer' ? 'Transfer' : type === 'income' ? 'Income' : 'Expense');
+      desc =
+        merchant ||
+        categoryName ||
+        (type === 'transfer'
+          ? 'Transfer'
+          : type === 'income'
+            ? 'Income'
+            : 'Expense')
     }
 
-    return { description: desc, merchant };
+    return { description: desc, merchant }
   }
 }

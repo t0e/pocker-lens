@@ -1,8 +1,8 @@
-'use client';
+'use client'
 
-import React from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import React from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   ReceiptText,
@@ -12,9 +12,9 @@ import {
   TrendingUp,
   Settings,
   LogOut,
-} from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
-import { cn } from '@/lib/utils';
+} from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
+import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -24,11 +24,11 @@ const NAV_ITEMS = [
   { href: '/receipts', label: 'Receipts', icon: Camera },
   { href: '/budgets', label: 'Budgets', icon: PieChart },
   { href: '/settings', label: 'Settings', icon: Settings },
-];
+]
 
 export const Sidebar: React.FC = () => {
-  const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const pathname = usePathname()
+  const { user, logout } = useAuth()
 
   return (
     <aside className="hidden lg:flex flex-col w-64 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 select-none shrink-0 h-screen sticky top-0">
@@ -42,7 +42,9 @@ export const Sidebar: React.FC = () => {
             <span className="font-bold tracking-tight text-zinc-900 dark:text-zinc-50 text-lg leading-tight">
               PocketLens
             </span>
-            <span className="text-xs text-zinc-400 font-medium">Finance Tracker</span>
+            <span className="text-xs text-zinc-400 font-medium">
+              Finance Tracker
+            </span>
           </div>
         </Link>
       </div>
@@ -50,8 +52,8 @@ export const Sidebar: React.FC = () => {
       {/* Navigation Links */}
       <nav className="space-y-1.5 flex-1">
         {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const Icon = item.icon
+          const isActive = pathname === item.href
           return (
             <Link
               key={item.href}
@@ -60,13 +62,20 @@ export const Sidebar: React.FC = () => {
                 'flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all',
                 isActive
                   ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-sm'
-                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-900'
+                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-900',
               )}
             >
-              <Icon className={cn('h-5 w-5', isActive ? 'text-emerald-400 dark:text-emerald-600' : 'text-zinc-400')} />
+              <Icon
+                className={cn(
+                  'h-5 w-5',
+                  isActive
+                    ? 'text-emerald-400 dark:text-emerald-600'
+                    : 'text-zinc-400',
+                )}
+              />
               <span>{item.label}</span>
             </Link>
-          );
+          )
         })}
       </nav>
 
@@ -82,7 +91,9 @@ export const Sidebar: React.FC = () => {
                 <div className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">
                   {user.displayName}
                 </div>
-                <div className="text-[10px] text-zinc-400 truncate">{user.email}</div>
+                <div className="text-[10px] text-zinc-400 truncate">
+                  {user.email}
+                </div>
               </div>
             </div>
             <button
@@ -96,5 +107,5 @@ export const Sidebar: React.FC = () => {
         </div>
       )}
     </aside>
-  );
-};
+  )
+}

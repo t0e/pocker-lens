@@ -71,6 +71,7 @@ graph TD
 ## ⚡ Key Financial Workflows
 
 ### 1. Receipt Capture & OCR Pipeline
+
 ```text
 Receipt Upload (JPG/PNG/WebP/PDF)
        ↓
@@ -88,6 +89,7 @@ User Confirmation → Transaction Service → Account Balance Update
 ```
 
 ### 2. Unified Transaction Service
+
 ```text
 Manual Entry / Quick Add / OCR Confirm / Recurring Scheduler
        ↓
@@ -99,38 +101,42 @@ Dynamic Budget Spending & Net Worth Updates
 ```
 
 ### 3. Multi-Currency Reporting & Historical FX
-* **Historical Flows**: Transactions from past dates are converted using the exchange rate recorded on that exact transaction date.
-* **Current Net Worth & Balances**: Account balances convert dynamically using the latest active exchange rates.
-* **Missing Rate Resilience**: Missing exchange rates return `null` and mark conversion unavailable rather than falling back to an inaccurate 1:1 rate.
+
+- **Historical Flows**: Transactions from past dates are converted using the exchange rate recorded on that exact transaction date.
+- **Current Net Worth & Balances**: Account balances convert dynamically using the latest active exchange rates.
+- **Missing Rate Resilience**: Missing exchange rates return `null` and mark conversion unavailable rather than falling back to an inaccurate 1:1 rate.
 
 ### 4. Deterministic Intelligence & Duplicate Protection
-* **Merchant Normalization**: Standardizes casing, spacing, and punctuation (e.g., `HIGHLANDS COFFEE` and `Highlands Coffee` map to `highlands coffee`).
-* **User-Isolated Category Learning**: Suggests categories based strictly on the user's historical confirmations for that merchant.
-* **Duplicate Detection**: Flags potential duplicates within $\pm 24\text{ hours}$ based on account, amount, currency, and merchant. Offers users `Keep Both`, `Use Existing` (links receipt), or `Cancel`.
+
+- **Merchant Normalization**: Standardizes casing, spacing, and punctuation (e.g., `HIGHLANDS COFFEE` and `Highlands Coffee` map to `highlands coffee`).
+- **User-Isolated Category Learning**: Suggests categories based strictly on the user's historical confirmations for that merchant.
+- **Duplicate Detection**: Flags potential duplicates within $\pm 24\text{ hours}$ based on account, amount, currency, and merchant. Offers users `Keep Both`, `Use Existing` (links receipt), or `Cancel`.
 
 ---
 
 ## 🛠 Tech Stack
 
-| Domain | Technologies |
-| :--- | :--- |
-| **Frontend** | Next.js 14 (App Router), React 18, Tailwind CSS, Lucide Icons |
-| **Backend API** | Node.js 20, Fastify, TypeScript, Prisma ORM, Zod, Pino |
-| **Worker & Queue** | Node.js 20, BullMQ, Redis 7, Tesseract.js OCR |
-| **Database** | PostgreSQL 16 (Exact `DECIMAL` columns, composite indexes) |
-| **Storage** | Local volume mount (`/data/receipts`) / S3-compatible provider |
-| **Orchestration** | Docker, Docker Compose (Multi-stage Alpine images) |
-| **CI/CD** | GitHub Actions (Lint, type-check, integration tests, build) |
+| Domain             | Technologies                                                   |
+| :----------------- | :------------------------------------------------------------- |
+| **Frontend**       | Next.js 14 (App Router), React 18, Tailwind CSS, Lucide Icons  |
+| **Backend API**    | Node.js 20, Fastify, TypeScript, Prisma ORM, Zod, Pino         |
+| **Worker & Queue** | Node.js 20, BullMQ, Redis 7, Tesseract.js OCR                  |
+| **Database**       | PostgreSQL 16 (Exact `DECIMAL` columns, composite indexes)     |
+| **Storage**        | Local volume mount (`/data/receipts`) / S3-compatible provider |
+| **Orchestration**  | Docker, Docker Compose (Multi-stage Alpine images)             |
+| **CI/CD**          | GitHub Actions (Lint, type-check, integration tests, build)    |
 
 ---
 
 ## 🚀 Quick Start (Local Development)
 
 ### Prerequisites
-* [Docker](https://docs.docker.com/get-docker/) & Docker Compose
-* [Node.js](https://nodejs.org/) v20+ (for local host scripting/testing)
+
+- [Docker](https://docs.docker.com/get-docker/) & Docker Compose
+- [Node.js](https://nodejs.org/) v20+ (for local host scripting/testing)
 
 ### 1. Clone & Configure
+
 ```bash
 git clone https://github.com/t0e/pocker-lens.git
 cd pocker-lens
@@ -138,26 +144,31 @@ cp .env.example .env
 ```
 
 ### 2. Start Services
+
 ```bash
 docker compose up --build
 ```
 
 Docker Compose automatically orchestrates startup in the correct sequence:
+
 1. `postgres` (PostgreSQL 16) & `redis` (Redis 7) initialize and become healthy.
 2. `migrate` runs `prisma migrate deploy` and exits cleanly.
 3. `api` (Fastify API) & `worker` (BullMQ worker) start concurrently with the schema fully prepared.
 4. `web` (Next.js frontend) launches and connects to the API.
 
 ### 3. Access Services
-* **Web Application**: [http://localhost:3000](http://localhost:3000)
-* **API Health Check**: [http://localhost:4000/health](http://localhost:4000/health)
-* **API Readiness Probe**: [http://localhost:4000/ready](http://localhost:4000/ready)
+
+- **Web Application**: [http://localhost:3000](http://localhost:3000)
+- **API Health Check**: [http://localhost:4000/health](http://localhost:4000/health)
+- **API Readiness Probe**: [http://localhost:4000/ready](http://localhost:4000/ready)
 
 ### 4. Stop Services
+
 ```bash
 docker compose down
 ```
-*(Volumes `postgres_data`, `redis_data`, and `receipt_data` persist data across restarts).*
+
+_(Volumes `postgres_data`, `redis_data`, and `receipt_data` persist data across restarts)._
 
 ---
 
@@ -186,20 +197,20 @@ npm run build
 
 ## 🔒 Security & Privacy
 
-* **Authentication**: Bcrypt password hashing (`cost factor 10`), server-side persistent sessions in PostgreSQL, signed `HttpOnly`, `SameSite=Lax` cookies.
-* **CORS & Origin Security**: Configurable allowed origins (`ALLOWED_ORIGINS`) with credentialed requests.
-* **Upload Protections**: Strict file size limits (10 MB), magic-byte file signature validation, sanitized unique storage keys (`cuid()`), and user ownership verification before receipt access.
-* **Error Sanitization**: Production API responses sanitize internal 500 errors to prevent leakage of database schemas, system paths, or library internals.
-* **No Telemetry / No Paid Third-Party Dependencies**: OCR and parsing run locally without leaking financial documents to third-party AI APIs.
+- **Authentication**: Bcrypt password hashing (`cost factor 10`), server-side persistent sessions in PostgreSQL, signed `HttpOnly`, `SameSite=Lax` cookies.
+- **CORS & Origin Security**: Configurable allowed origins (`ALLOWED_ORIGINS`) with credentialed requests.
+- **Upload Protections**: Strict file size limits (10 MB), magic-byte file signature validation, sanitized unique storage keys (`cuid()`), and user ownership verification before receipt access.
+- **Error Sanitization**: Production API responses sanitize internal 500 errors to prevent leakage of database schemas, system paths, or library internals.
+- **No Telemetry / No Paid Third-Party Dependencies**: OCR and parsing run locally without leaking financial documents to third-party AI APIs.
 
 ---
 
 ## ⚠️ Known Limitations
 
-* **No Automatic Bank Syncing**: PocketLens focuses on privacy-friendly manual entry, quick text parsing, and receipt scanning. Direct Open Banking / Plaid integrations are intentionally excluded.
-* **OCR Quality Dependency**: Receipt parsing accuracy depends on photo resolution, lighting, and receipt print condition. The UI provides a side-by-side verification editor to correct extracted fields.
-* **Cross-Currency Transfers**: Transfers between accounts of different currencies are currently recorded as distinct transactions rather than an integrated FX transfer order.
-* **Development vs Production Storage**: Development uses a persistent Docker named volume. Production deployments should configure an S3-compatible object store (e.g. AWS S3, Cloudflare R2, or MinIO).
+- **No Automatic Bank Syncing**: PocketLens focuses on privacy-friendly manual entry, quick text parsing, and receipt scanning. Direct Open Banking / Plaid integrations are intentionally excluded.
+- **OCR Quality Dependency**: Receipt parsing accuracy depends on photo resolution, lighting, and receipt print condition. The UI provides a side-by-side verification editor to correct extracted fields.
+- **Cross-Currency Transfers**: Transfers between accounts of different currencies are currently recorded as distinct transactions rather than an integrated FX transfer order.
+- **Development vs Production Storage**: Development uses a persistent Docker named volume. Production deployments should configure an S3-compatible object store (e.g. AWS S3, Cloudflare R2, or MinIO).
 
 ---
 

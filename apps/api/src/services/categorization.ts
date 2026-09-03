@@ -1,4 +1,4 @@
-import { prisma } from "../db/client.js";
+import { prisma } from '../db/client.js'
 import {
   CategorySuggestionResponse,
   CategorySuggestionConfidence,
@@ -6,7 +6,7 @@ import {
   normalizeMerchant,
   viDictionary,
   enDictionary,
-} from "@pocketlens/shared";
+} from '@pocketlens/shared'
 
 export class CategorizationService {
   /**
@@ -19,17 +19,17 @@ export class CategorizationService {
    */
   public async suggestCategory(
     userId: string,
-    input: SuggestCategoryInput
+    input: SuggestCategoryInput,
   ): Promise<CategorySuggestionResponse> {
-    const rawMerchant = input.merchant?.trim() || "";
-    const rawDescription = input.description?.trim() || "";
+    const rawMerchant = input.merchant?.trim() || ''
+    const rawDescription = input.description?.trim() || ''
 
     // 1. Exact merchant match in user history
     if (rawMerchant) {
       const merchantTxs = await prisma.transaction.findMany({
         where: {
           userId,
-          merchant: { equals: rawMerchant, mode: "insensitive" },
+          merchant: { equals: rawMerchant, mode: 'insensitive' },
           categoryId: { not: null },
         },
         select: {
@@ -37,26 +37,30 @@ export class CategorizationService {
           category: { select: { id: true, name: true, icon: true } },
         },
         take: 50,
-      });
+      })
 
       if (merchantTxs.length > 0) {
-        const counts: Record<string, { count: number; cat: any }> = {};
+        const counts: Record<string, { count: number; cat: any }> = {}
         for (const tx of merchantTxs) {
-          if (!tx.categoryId || !tx.category) continue;
+          if (!tx.categoryId || !tx.category) continue
           if (!counts[tx.categoryId]) {
-            counts[tx.categoryId] = { count: 0, cat: tx.category };
+            counts[tx.categoryId] = { count: 0, cat: tx.category }
           }
-          counts[tx.categoryId].count++;
+          counts[tx.categoryId].count++
         }
 
-        const sorted = Object.values(counts).sort((a, b) => b.count - a.count);
+        const sorted = Object.values(counts).sort((a, b) => b.count - a.count)
         if (sorted.length > 0) {
-          const top = sorted[0];
-          const total = merchantTxs.length;
-          const ratio = top.count / total;
+          const top = sorted[0]
+          const total = merchantTxs.length
+          const ratio = top.count / total
 
           const confidence: CategorySuggestionConfidence =
-            total >= 3 && ratio >= 0.75 ? "HIGH" : total >= 1 && ratio >= 0.5 ? "MEDIUM" : "LOW";
+            total >= 3 && ratio >= 0.75
+              ? 'HIGH'
+              : total >= 1 && ratio >= 0.5
+                ? 'MEDIUM'
+                : 'LOW'
 
           return {
             categoryId: top.cat.id,
@@ -64,12 +68,12 @@ export class CategorizationService {
             categoryIcon: top.cat.icon,
             confidence,
             reason: `Matched user history for "${rawMerchant}" (${top.count}/${total} transactions)`,
-          };
+          }
         }
       }
 
       // 2. Normalized merchant match
-      const normMerchant = normalizeMerchant(rawMerchant);
+      const normMerchant = normalizeMerchant(rawMerchant)
       if (normMerchant && normMerchant !== rawMerchant.toLowerCase()) {
         const allUserTxsWithMerchant = await prisma.transaction.findMany({
           where: {
@@ -83,31 +87,34 @@ export class CategorizationService {
             category: { select: { id: true, name: true, icon: true } },
           },
           take: 100,
-        });
+        })
 
         const matching = allUserTxsWithMerchant.filter(
-          (tx) => tx.merchant && normalizeMerchant(tx.merchant) === normMerchant && tx.category
-        );
+          (tx) =>
+            tx.merchant &&
+            normalizeMerchant(tx.merchant) === normMerchant &&
+            tx.category,
+        )
 
         if (matching.length > 0) {
-          const counts: Record<string, { count: number; cat: any }> = {};
+          const counts: Record<string, { count: number; cat: any }> = {}
           for (const tx of matching) {
-            if (!tx.categoryId || !tx.category) continue;
+            if (!tx.categoryId || !tx.category) continue
             if (!counts[tx.categoryId]) {
-              counts[tx.categoryId] = { count: 0, cat: tx.category };
+              counts[tx.categoryId] = { count: 0, cat: tx.category }
             }
-            counts[tx.categoryId].count++;
+            counts[tx.categoryId].count++
           }
-          const sorted = Object.values(counts).sort((a, b) => b.count - a.count);
+          const sorted = Object.values(counts).sort((a, b) => b.count - a.count)
           if (sorted.length > 0) {
-            const top = sorted[0];
+            const top = sorted[0]
             return {
               categoryId: top.cat.id,
               categoryName: top.cat.name,
               categoryIcon: top.cat.icon,
-              confidence: "MEDIUM",
+              confidence: 'MEDIUM',
               reason: `Matched normalized merchant pattern "${normMerchant}"`,
-            };
+            }
           }
         }
       }
@@ -118,7 +125,7 @@ export class CategorizationService {
       const descTxs = await prisma.transaction.findMany({
         where: {
           userId,
-          description: { contains: rawDescription, mode: "insensitive" },
+          description: { contains: rawDescription, mode: 'insensitive' },
           categoryId: { not: null },
         },
         select: {
@@ -126,69 +133,77 @@ export class CategorizationService {
           category: { select: { id: true, name: true, icon: true } },
         },
         take: 20,
-      });
+      })
 
       if (descTxs.length > 0) {
-        const counts: Record<string, { count: number; cat: any }> = {};
+        const counts: Record<string, { count: number; cat: any }> = {}
         for (const tx of descTxs) {
-          if (!tx.categoryId || !tx.category) continue;
+          if (!tx.categoryId || !tx.category) continue
           if (!counts[tx.categoryId]) {
-            counts[tx.categoryId] = { count: 0, cat: tx.category };
+            counts[tx.categoryId] = { count: 0, cat: tx.category }
           }
-          counts[tx.categoryId].count++;
+          counts[tx.categoryId].count++
         }
-        const sorted = Object.values(counts).sort((a, b) => b.count - a.count);
+        const sorted = Object.values(counts).sort((a, b) => b.count - a.count)
         if (sorted.length > 0) {
-          const top = sorted[0];
+          const top = sorted[0]
           return {
             categoryId: top.cat.id,
             categoryName: top.cat.name,
             categoryIcon: top.cat.icon,
-            confidence: "LOW",
+            confidence: 'LOW',
             reason: `Matched description keyword history for "${rawDescription}"`,
-          };
+          }
         }
       }
     }
 
     // 4. Deterministic dictionary token fallback (EN + VI)
-    const textToMatch = `${rawMerchant} ${rawDescription}`.toLowerCase();
+    const textToMatch = `${rawMerchant} ${rawDescription}`.toLowerCase()
     const categories = await prisma.category.findMany({
       where: {
         OR: [{ isSystem: true }, { userId }],
         isArchived: false,
       },
-    });
+    })
 
-    for (const [catName, keywords] of Object.entries(viDictionary.categoryKeywords)) {
+    for (const [catName, keywords] of Object.entries(
+      viDictionary.categoryKeywords,
+    )) {
       for (const token of keywords) {
         if (textToMatch.includes(token.toLowerCase())) {
-          const matched = categories.find((c) => c.name.toLowerCase().includes(catName.toLowerCase()));
+          const matched = categories.find((c) =>
+            c.name.toLowerCase().includes(catName.toLowerCase()),
+          )
           if (matched) {
             return {
               categoryId: matched.id,
               categoryName: matched.name,
               categoryIcon: matched.icon,
-              confidence: "LOW",
+              confidence: 'LOW',
               reason: `Matched Vietnamese keyword "${token}"`,
-            };
+            }
           }
         }
       }
     }
 
-    for (const [catName, keywords] of Object.entries(enDictionary.categoryKeywords)) {
+    for (const [catName, keywords] of Object.entries(
+      enDictionary.categoryKeywords,
+    )) {
       for (const token of keywords) {
         if (textToMatch.includes(token.toLowerCase())) {
-          const matched = categories.find((c) => c.name.toLowerCase().includes(catName.toLowerCase()));
+          const matched = categories.find((c) =>
+            c.name.toLowerCase().includes(catName.toLowerCase()),
+          )
           if (matched) {
             return {
               categoryId: matched.id,
               categoryName: matched.name,
               categoryIcon: matched.icon,
-              confidence: "LOW",
+              confidence: 'LOW',
               reason: `Matched keyword "${token}"`,
-            };
+            }
           }
         }
       }
@@ -198,10 +213,10 @@ export class CategorizationService {
       categoryId: null,
       categoryName: null,
       categoryIcon: null,
-      confidence: "NONE",
-      reason: "No category pattern detected",
-    };
+      confidence: 'NONE',
+      reason: 'No category pattern detected',
+    }
   }
 }
 
-export const categorizationService = new CategorizationService();
+export const categorizationService = new CategorizationService()

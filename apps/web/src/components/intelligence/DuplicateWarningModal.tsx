@@ -1,21 +1,21 @@
-"use client";
+'use client'
 
-import React from "react";
-import { AlertTriangle, CheckCircle, Copy, X } from "lucide-react";
-import { DuplicateMatch, formatCurrencyAmount } from "@pocketlens/shared";
+import React from 'react'
+import { AlertTriangle, CheckCircle, Copy, X } from 'lucide-react'
+import { DuplicateMatch, formatCurrencyAmount } from '@pocketlens/shared'
 
 interface DuplicateWarningModalProps {
-  isOpen: boolean;
-  match: DuplicateMatch;
+  isOpen: boolean
+  match: DuplicateMatch
   newTransactionData: {
-    description: string;
-    amount: number;
-    currency: string;
-    transactionDate: string;
-  };
-  onKeepBoth: () => void;
-  onUseExisting: (existingId: string) => void;
-  onCancel: () => void;
+    description: string
+    amount: number
+    currency: string
+    transactionDate: string
+  }
+  onKeepBoth: () => void
+  onUseExisting: (existingId: string) => void
+  onCancel: () => void
 }
 
 export const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
@@ -26,9 +26,9 @@ export const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
   onUseExisting,
   onCancel,
 }) => {
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
-  const existing = match.existingTransaction;
+  const existing = match.existingTransaction
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
@@ -40,8 +40,12 @@ export const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
               <AlertTriangle className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">Possible Duplicate Transaction</h3>
-              <p className="text-xs text-amber-300/90 font-medium">Confidence: {match.confidence} Match</p>
+              <h3 className="text-lg font-bold text-white">
+                Possible Duplicate Transaction
+              </h3>
+              <p className="text-xs text-amber-300/90 font-medium">
+                Confidence: {match.confidence} Match
+              </p>
             </div>
           </div>
           <button
@@ -60,23 +64,39 @@ export const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
         <div className="grid grid-cols-2 gap-3 text-xs">
           {/* New Transaction */}
           <div className="bg-slate-800/40 border border-slate-700/60 p-3.5 rounded-xl space-y-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">New Entry</span>
-            <p className="font-semibold text-white truncate">{newTransactionData.description}</p>
-            <p className="text-emerald-400 font-bold text-sm">
-              {formatCurrencyAmount(newTransactionData.amount, newTransactionData.currency)}
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              New Entry
+            </span>
+            <p className="font-semibold text-white truncate">
+              {newTransactionData.description}
             </p>
-            <p className="text-slate-400 text-[11px]">{new Date(newTransactionData.transactionDate).toLocaleDateString()}</p>
+            <p className="text-emerald-400 font-bold text-sm">
+              {formatCurrencyAmount(
+                newTransactionData.amount,
+                newTransactionData.currency,
+              )}
+            </p>
+            <p className="text-slate-400 text-[11px]">
+              {new Date(
+                newTransactionData.transactionDate,
+              ).toLocaleDateString()}
+            </p>
           </div>
 
           {/* Existing Transaction */}
           <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-xl space-y-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Existing in DB</span>
-            <p className="font-semibold text-white truncate">{existing.description}</p>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+              Existing in DB
+            </span>
+            <p className="font-semibold text-white truncate">
+              {existing.description}
+            </p>
             <p className="text-amber-300 font-bold text-sm">
               {formatCurrencyAmount(existing.amount, existing.currency)}
             </p>
             <p className="text-slate-400 text-[11px]">
-              {new Date(existing.transactionDate).toLocaleDateString()} • {existing.accountName}
+              {new Date(existing.transactionDate).toLocaleDateString()} •{' '}
+              {existing.accountName}
             </p>
           </div>
         </div>
@@ -109,5 +129,5 @@ export const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
         </div>
       </div>
     </div>
-  );
-};
+  )
+}

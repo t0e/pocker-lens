@@ -1,6 +1,6 @@
-'use client';
+'use client'
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   Camera,
   Upload,
@@ -18,160 +18,189 @@ import {
   ChevronRight,
   Receipt,
   Layers,
-} from 'lucide-react';
-import { ReceiptResponse, PaginatedReceiptsResponse } from '@pocketlens/shared';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { ReceiptUploadModal } from '@/components/receipts/ReceiptUploadModal';
-import { ReceiptDetailModal } from '@/components/receipts/ReceiptDetailModal';
-import { apiClient } from '@/lib/api-client';
+} from 'lucide-react'
+import { ReceiptResponse, PaginatedReceiptsResponse } from '@pocketlens/shared'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
+import { ReceiptUploadModal } from '@/components/receipts/ReceiptUploadModal'
+import { ReceiptDetailModal } from '@/components/receipts/ReceiptDetailModal'
+import { apiClient } from '@/lib/api-client'
 
 export default function ReceiptsPage() {
-  const [receipts, setReceipts] = useState<ReceiptResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [receipts, setReceipts] = useState<ReceiptResponse[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Pagination & Filtering
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [statusFilter, setStatusFilter] = useState<string>('all')
 
   // Modals
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [selectedReceipt, setSelectedReceipt] = useState<ReceiptResponse | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
+  const [selectedReceipt, setSelectedReceipt] =
+    useState<ReceiptResponse | null>(null)
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
 
-  const fetchReceipts = useCallback(async (isPolling = false) => {
-    try {
-      if (!isPolling) setIsLoading(true);
-      setError(null);
+  const fetchReceipts = useCallback(
+    async (isPolling = false) => {
+      try {
+        if (!isPolling) setIsLoading(true)
+        setError(null)
 
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: '20',
-      });
+        const params = new URLSearchParams({
+          page: page.toString(),
+          limit: '20',
+        })
 
-      if (statusFilter !== 'all') {
-        params.append('status', statusFilter);
+        if (statusFilter !== 'all') {
+          params.append('status', statusFilter)
+        }
+
+        const data = await apiClient<PaginatedReceiptsResponse>(
+          `/receipts?${params.toString()}`,
+        )
+        setReceipts(data.receipts)
+        setTotalPages(data.pagination.totalPages)
+        setTotalCount(data.pagination.total)
+      } catch (err: any) {
+        if (!isPolling) {
+          setError(err.message || 'Failed to load receipts')
+        }
+      } finally {
+        if (!isPolling) setIsLoading(false)
       }
-
-      const data = await apiClient<PaginatedReceiptsResponse>(`/receipts?${params.toString()}`);
-      setReceipts(data.receipts);
-      setTotalPages(data.pagination.totalPages);
-      setTotalCount(data.pagination.total);
-    } catch (err: any) {
-      if (!isPolling) {
-        setError(err.message || 'Failed to load receipts');
-      }
-    } finally {
-      if (!isPolling) setIsLoading(false);
-    }
-  }, [page, statusFilter]);
+    },
+    [page, statusFilter],
+  )
 
   useEffect(() => {
-    fetchReceipts();
-  }, [fetchReceipts]);
+    fetchReceipts()
+  }, [fetchReceipts])
 
   // Polling effect: poll every 3 seconds if any receipt is in non-terminal status ('uploaded', 'queued', 'processing')
   useEffect(() => {
     const hasActiveReceipts = receipts.some(
-      (r) => r.status === 'uploaded' || r.status === 'queued' || r.status === 'processing'
-    );
+      (r) =>
+        r.status === 'uploaded' ||
+        r.status === 'queued' ||
+        r.status === 'processing',
+    )
 
-    if (!hasActiveReceipts) return;
+    if (!hasActiveReceipts) return
 
     const interval = setInterval(() => {
-      fetchReceipts(true);
-    }, 2500);
+      fetchReceipts(true)
+    }, 2500)
 
-    return () => clearInterval(interval);
-  }, [receipts, fetchReceipts]);
+    return () => clearInterval(interval)
+  }, [receipts, fetchReceipts])
 
   const handleOpenDetail = (receipt: ReceiptResponse) => {
-    setSelectedReceipt(receipt);
-    setIsDetailModalOpen(true);
-  };
+    setSelectedReceipt(receipt)
+    setIsDetailModalOpen(true)
+  }
 
   const handleDeleteReceipt = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this receipt and its stored image?')) {
-      return;
+    if (
+      !confirm(
+        'Are you sure you want to delete this receipt and its stored image?',
+      )
+    ) {
+      return
     }
 
     try {
-      await apiClient(`/receipts/${id}`, { method: 'DELETE' });
-      setIsDetailModalOpen(false);
-      setSelectedReceipt(null);
-      await fetchReceipts();
+      await apiClient(`/receipts/${id}`, { method: 'DELETE' })
+      setIsDetailModalOpen(false)
+      setSelectedReceipt(null)
+      await fetchReceipts()
     } catch (err: any) {
-      alert(err.message || 'Failed to delete receipt');
+      alert(err.message || 'Failed to delete receipt')
     }
-  };
+  }
 
   const handleRetryReceipt = async (id: string) => {
     try {
-      await apiClient(`/receipts/${id}/retry`, { method: 'POST' });
-      await fetchReceipts();
+      await apiClient(`/receipts/${id}/retry`, { method: 'POST' })
+      await fetchReceipts()
       if (selectedReceipt && selectedReceipt.id === id) {
-        setIsDetailModalOpen(false);
+        setIsDetailModalOpen(false)
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to retry receipt');
+      alert(err.message || 'Failed to retry receipt')
     }
-  };
+  }
 
   const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
 
   // Group receipts by date heading
-  const groupedReceipts = receipts.reduce((groups, r) => {
-    const dateObj = new Date(r.createdAt);
-    const today = new Date();
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+  const groupedReceipts = receipts.reduce(
+    (groups, r) => {
+      const dateObj = new Date(r.createdAt)
+      const today = new Date()
+      const yesterday = new Date()
+      yesterday.setDate(yesterday.getDate() - 1)
 
-    let dateLabel = dateObj.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+      let dateLabel = dateObj.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
 
-    if (dateObj.toDateString() === today.toDateString()) {
-      dateLabel = 'Today';
-    } else if (dateObj.toDateString() === yesterday.toDateString()) {
-      dateLabel = 'Yesterday';
-    }
+      if (dateObj.toDateString() === today.toDateString()) {
+        dateLabel = 'Today'
+      } else if (dateObj.toDateString() === yesterday.toDateString()) {
+        dateLabel = 'Yesterday'
+      }
 
-    if (!groups[dateLabel]) {
-      groups[dateLabel] = [];
-    }
-    groups[dateLabel].push(r);
-    return groups;
-  }, {} as Record<string, ReceiptResponse[]>);
+      if (!groups[dateLabel]) {
+        groups[dateLabel] = []
+      }
+      groups[dateLabel].push(r)
+      return groups
+    },
+    {} as Record<string, ReceiptResponse[]>,
+  )
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'ready':
-        return <Badge variant="success">Ready</Badge>;
+        return <Badge variant="success">Ready</Badge>
       case 'processing':
         return (
           <Badge variant="info" className="space-x-1">
             <Loader2 className="h-2.5 w-2.5 animate-spin" />
             <span>Processing...</span>
           </Badge>
-        );
+        )
       case 'queued':
-        return <Badge variant="info">Queued</Badge>;
+        return <Badge variant="info">Queued</Badge>
       case 'failed':
-        return <Badge variant="default" className="bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">Failed</Badge>;
+        return (
+          <Badge
+            variant="default"
+            className="bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+          >
+            Failed
+          </Badge>
+        )
       default:
-        return <Badge variant="default">Uploaded</Badge>;
+        return <Badge variant="default">Uploaded</Badge>
     }
-  };
+  }
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-fadeIn">
@@ -182,7 +211,8 @@ export default function ReceiptsPage() {
             Receipt Scanner & OCR
           </h2>
           <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
-            Extract details from English & Vietnamese receipts and confirm transactions with a tap
+            Extract details from English & Vietnamese receipts and confirm
+            transactions with a tap
           </p>
         </div>
         <Button
@@ -215,8 +245,8 @@ export default function ReceiptsPage() {
           <button
             key={tab.value}
             onClick={() => {
-              setStatusFilter(tab.value);
-              setPage(1);
+              setStatusFilter(tab.value)
+              setPage(1)
             }}
             className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all whitespace-nowrap ${
               statusFilter === tab.value
@@ -273,9 +303,9 @@ export default function ReceiptsPage() {
 
               <Card className="divide-y divide-zinc-100 dark:divide-zinc-800/80 overflow-hidden shadow-sm">
                 {items.map((receipt) => {
-                  const merchantName = receipt.extraction?.merchant;
-                  const totalAmt = receipt.extraction?.totalAmount;
-                  const currencyCode = receipt.extraction?.currency || 'VND';
+                  const merchantName = receipt.extraction?.merchant
+                  const totalAmt = receipt.extraction?.totalAmount
+                  const currencyCode = receipt.extraction?.currency || 'VND'
 
                   return (
                     <div
@@ -304,17 +334,22 @@ export default function ReceiptsPage() {
                           <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] text-zinc-400">
                             {merchantName && (
                               <>
-                                <span className="truncate max-w-[140px] text-zinc-500 dark:text-zinc-400">{receipt.originalFilename}</span>
+                                <span className="truncate max-w-[140px] text-zinc-500 dark:text-zinc-400">
+                                  {receipt.originalFilename}
+                                </span>
                                 <span>•</span>
                               </>
                             )}
                             <span>{formatFileSize(receipt.fileSize)}</span>
                             <span>•</span>
                             <span>
-                              {new Date(receipt.createdAt).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
+                              {new Date(receipt.createdAt).toLocaleTimeString(
+                                [],
+                                {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                },
+                              )}
                             </span>
                             {receipt.errorMessage && (
                               <>
@@ -368,7 +403,7 @@ export default function ReceiptsPage() {
                         </div>
                       </div>
                     </div>
-                  );
+                  )
                 })}
               </Card>
             </div>
@@ -378,7 +413,8 @@ export default function ReceiptsPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-2 px-1 text-xs text-zinc-500">
               <span>
-                Showing {receipts.length} of {totalCount} receipts (Page {page} of {totalPages})
+                Showing {receipts.length} of {totalCount} receipts (Page {page}{' '}
+                of {totalPages})
               </span>
               <div className="flex items-center space-x-2">
                 <Button
@@ -419,13 +455,13 @@ export default function ReceiptsPage() {
         receipt={selectedReceipt}
         isOpen={isDetailModalOpen}
         onClose={() => {
-          setIsDetailModalOpen(false);
-          setSelectedReceipt(null);
+          setIsDetailModalOpen(false)
+          setSelectedReceipt(null)
         }}
         onDelete={handleDeleteReceipt}
         onRetry={handleRetryReceipt}
         onConfirmed={fetchReceipts}
       />
     </div>
-  );
+  )
 }

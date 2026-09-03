@@ -1,6 +1,6 @@
-'use client';
+'use client'
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react'
 import {
   X,
   Upload,
@@ -10,15 +10,18 @@ import {
   Loader2,
   CheckCircle2,
   FileText,
-} from 'lucide-react';
-import { MAX_RECEIPT_FILE_SIZE, ALLOWED_RECEIPT_MIME_TYPES } from '@pocketlens/shared';
-import { Button } from '../ui/Button';
-import { apiClient } from '@/lib/api-client';
+} from 'lucide-react'
+import {
+  MAX_RECEIPT_FILE_SIZE,
+  ALLOWED_RECEIPT_MIME_TYPES,
+} from '@pocketlens/shared'
+import { Button } from '../ui/Button'
+import { apiClient } from '@/lib/api-client'
 
 interface ReceiptUploadModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
 }
 
 export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
@@ -26,98 +29,102 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   const handleFileSelect = (file: File) => {
-    setError(null);
+    setError(null)
 
     // Validate MIME type
     if (!ALLOWED_RECEIPT_MIME_TYPES.includes(file.type as any)) {
-      setError(`Unsupported file type: ${file.type}. Please upload JPEG, PNG, or WebP.`);
-      return;
+      setError(
+        `Unsupported file type: ${file.type}. Please upload JPEG, PNG, or WebP.`,
+      )
+      return
     }
 
     // Validate size
     if (file.size > MAX_RECEIPT_FILE_SIZE) {
-      setError(`File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds 10MB maximum.`);
-      return;
+      setError(
+        `File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds 10MB maximum.`,
+      )
+      return
     }
 
     if (file.size === 0) {
-      setError('Selected file is empty.');
-      return;
+      setError('Selected file is empty.')
+      return
     }
 
-    setSelectedFile(file);
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewUrl(objectUrl);
-  };
+    setSelectedFile(file)
+    const objectUrl = URL.createObjectURL(file)
+    setPreviewUrl(objectUrl)
+  }
 
   const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
+    e.preventDefault()
+    setIsDragging(true)
+  }
 
   const handleDragLeave = () => {
-    setIsDragging(false);
-  };
+    setIsDragging(false)
+  }
 
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
+    e.preventDefault()
+    setIsDragging(false)
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
+      handleFileSelect(e.dataTransfer.files[0])
     }
-  };
+  }
 
   const handleClear = () => {
-    setSelectedFile(null);
+    setSelectedFile(null)
     if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(null);
+      URL.revokeObjectURL(previewUrl)
+      setPreviewUrl(null)
     }
-    setError(null);
-  };
+    setError(null)
+  }
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile) return
 
-    setIsUploading(true);
-    setError(null);
+    setIsUploading(true)
+    setError(null)
 
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
+      const formData = new FormData()
+      formData.append('file', selectedFile)
 
       await apiClient('/receipts', {
         method: 'POST',
         body: formData,
-      });
+      })
 
-      handleClear();
-      onSuccess();
-      onClose();
+      handleClear()
+      onSuccess()
+      onClose()
     } catch (err: any) {
-      setError(err.message || 'Failed to upload receipt');
+      setError(err.message || 'Failed to upload receipt')
     } finally {
-      setIsUploading(false);
+      setIsUploading(false)
     }
-  };
+  }
 
   const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-fadeIn">
@@ -125,12 +132,12 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
         {/* Modal Header */}
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
-              Upload Receipt
-            </h3>
+            Upload Receipt
+          </h3>
           <button
             onClick={() => {
-              handleClear();
-              onClose();
+              handleClear()
+              onClose()
             }}
             className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
           >
@@ -150,7 +157,9 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
           type="file"
           ref={fileInputRef}
           accept="image/jpeg,image/png,image/webp"
-          onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+          onChange={(e) =>
+            e.target.files?.[0] && handleFileSelect(e.target.files[0])
+          }
           className="hidden"
         />
         <input
@@ -158,7 +167,9 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
           ref={cameraInputRef}
           accept="image/jpeg,image/png,image/webp"
           capture="environment"
-          onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+          onChange={(e) =>
+            e.target.files?.[0] && handleFileSelect(e.target.files[0])
+          }
           className="hidden"
         />
 
@@ -281,5 +292,5 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
         )}
       </div>
     </div>
-  );
-};
+  )
+}

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod'
 
 export const registerSchema = z.object({
   email: z
@@ -16,32 +16,26 @@ export const registerSchema = z.object({
     .trim()
     .min(1, 'Display name is required')
     .max(100, 'Display name must not exceed 100 characters'),
-});
+})
 
-export type RegisterInput = z.infer<typeof registerSchema>;
+export type RegisterInput = z.infer<typeof registerSchema>
 
 export const loginSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .email('Invalid email format'),
-  password: z
-    .string()
-    .min(1, 'Password is required'),
-});
+  email: z.string().trim().toLowerCase().email('Invalid email format'),
+  password: z.string().min(1, 'Password is required'),
+})
 
-export type LoginInput = z.infer<typeof loginSchema>;
+export type LoginInput = z.infer<typeof loginSchema>
 
 export interface UserResponse {
-  id: string;
-  email: string;
-  displayName: string;
-  createdAt: string;
-  updatedAt: string;
+  id: string
+  email: string
+  displayName: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface AuthResponse {
-  user: UserResponse;
-  message?: string;
+  user: UserResponse
+  message?: string
 }

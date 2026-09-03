@@ -1,22 +1,22 @@
 export interface OCRResult {
-  rawText: string;
-  confidence: number;
-  detectedLanguage?: string;
-  durationMs: number;
-  provider: string;
+  rawText: string
+  confidence: number
+  detectedLanguage?: string
+  durationMs: number
+  provider: string
 }
 
 export interface OCRProvider {
-  extractText(imageBuffer: Buffer, mimeType: string): Promise<OCRResult>;
+  extractText(imageBuffer: Buffer, mimeType: string): Promise<OCRResult>
 }
 
 export class MockOCRProvider implements OCRProvider {
-  private mockText: string;
-  private confidence: number;
+  private mockText: string
+  private confidence: number
 
   constructor(mockText = '', confidence = 90) {
-    this.mockText = mockText;
-    this.confidence = confidence;
+    this.mockText = mockText
+    this.confidence = confidence
   }
 
   async extractText(imageBuffer: Buffer, mimeType: string): Promise<OCRResult> {
@@ -26,6 +26,6 @@ export class MockOCRProvider implements OCRProvider {
       detectedLanguage: 'eng+vie',
       durationMs: 10,
       provider: 'mock-ocr',
-    };
+    }
   }
 }
