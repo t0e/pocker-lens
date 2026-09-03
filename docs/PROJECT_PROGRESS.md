@@ -34,7 +34,7 @@ Current focus is code quality, consistency, maintainability, documentation, proj
 
 ## Active Work
 
-None.
+- **Code Quality & Maintainability (ESLint Cleanup)**: Decomposed monolithic core domain algorithms (`resolveReceiptTotal`, `parse` rule engine, `processReceiptJob` worker pipeline, `suggestCategory` tiered matcher, and `generateSpendingInsights` rule evaluators) into modular, independently testable pipeline stages.
 
 ## Future
 

@@ -1097,12 +1097,10 @@ export async function getCommitmentsSummary(
   }
 }
 
-export async function generateSpendingInsights(
-  userId: string,
+function buildAnalyticsPeriod(
+  now: Date,
   monthStr?: string,
-  currency = 'VND',
-): Promise<SpendingInsightsResponse> {
-  const now = new Date()
+): { period: AnalyticsPeriod; daysTotal: number; daysElapsed: number } {
   const bounds = getAnalyticsPeriodBounds(
     'current_month',
     monthStr,
@@ -1110,7 +1108,6 @@ export async function generateSpendingInsights(
     undefined,
     now,
   )
-
   const startYear = bounds.current.start.getUTCFullYear()
   const startMonth = bounds.current.start.getUTCMonth()
   const daysTotal = new Date(
@@ -1122,29 +1119,27 @@ export async function generateSpendingInsights(
     ? Math.min(now.getUTCDate(), daysTotal)
     : daysTotal
 
-  const period: AnalyticsPeriod = {
-    label: bounds.current.label,
-    startDate: bounds.current.start.toISOString(),
-    endDate: bounds.current.end.toISOString(),
-    isCurrentPeriod,
+  return {
+    period: {
+      label: bounds.current.label,
+      startDate: bounds.current.start.toISOString(),
+      endDate: bounds.current.end.toISOString(),
+      isCurrentPeriod,
+      daysTotal,
+      daysElapsed,
+    },
     daysTotal,
     daysElapsed,
   }
+}
 
+function evaluateCategoryMomInsights(
+  categories: CategorySpendingItem[],
+  currency: string,
+  significanceMinAmount: number,
+): SpendingInsight[] {
   const insights: SpendingInsight[] = []
-  const significanceMinAmount = currency === 'VND' ? 100000 : 10
-
-  // 1. Check Category Increases & Decreases
-  const catBreakdown = await getCategoryBreakdown(
-    userId,
-    'current_month',
-    monthStr,
-    undefined,
-    undefined,
-    currency,
-  )
-
-  for (const cat of catBreakdown.categories) {
+  for (const cat of categories) {
     if (
       cat.momChangePercentage !== null &&
       Math.abs(cat.momChangeAmount) >= significanceMinAmount
@@ -1183,10 +1178,17 @@ export async function generateSpendingInsights(
       })
     }
   }
+  return insights
+}
 
-  // 2. Check Budget Pace & Limits
-  const budgetPerf = await getBudgetPerformance(userId, monthStr, currency)
-  for (const b of budgetPerf.items) {
+function evaluateBudgetInsights(
+  budgetItems: BudgetPerformanceItem[],
+  currency: string,
+  daysTotal: number,
+  daysElapsed: number,
+): SpendingInsight[] {
+  const insights: SpendingInsight[] = []
+  for (const b of budgetItems) {
     if (b.status === 'OVER_BUDGET') {
       insights.push({
         id: `budget_over_${b.budgetId}`,
@@ -1226,8 +1228,95 @@ export async function generateSpendingInsights(
       })
     }
   }
+  return insights
+}
 
-  // 3. Check Largest Individual Expense
+function evaluateSavingsRateInsight(
+  curSummary: CurrencyFinancialSummary | undefined,
+  currency: string,
+): SpendingInsight | null {
+  if (
+    curSummary &&
+    curSummary.savingsRate !== null &&
+    curSummary.income > 0 &&
+    curSummary.savingsRate >= 30
+  ) {
+    return {
+      id: `savings_rate_${currency}`,
+      type: 'SAVINGS_RATE',
+      severity: 'SUCCESS',
+      title: 'Strong savings rate',
+      description: `Your savings rate is ${curSummary.savingsRate}% this period (net ${curSummary.net.toLocaleString()} ${currency}).`,
+      currency,
+      metricValue: curSummary.savingsRate,
+    }
+  }
+  return null
+}
+
+function evaluateSubscriptionCommitmentsInsight(
+  commitments: CommitmentsSummaryResponse,
+  totalExpenses: number,
+  currency: string,
+): SpendingInsight | null {
+  if (
+    commitments.estimatedMonthlyCost > 0 &&
+    totalExpenses > 0 &&
+    (commitments.estimatedMonthlyCost / totalExpenses) * 100 >= 15
+  ) {
+    const subShare = Math.round(
+      (commitments.estimatedMonthlyCost / totalExpenses) * 100,
+    )
+    return {
+      id: `sub_share_${currency}`,
+      type: 'SUBSCRIPTION_SHARE',
+      severity: 'INFO',
+      title: 'Subscription commitments',
+      description: `Active subscriptions account for ${subShare}% of your monthly spending (${commitments.estimatedMonthlyCost.toLocaleString()} ${currency}/month).`,
+      currency,
+      metricValue: subShare,
+      actionUrl: '/budgets',
+    }
+  }
+  return null
+}
+
+export async function generateSpendingInsights(
+  userId: string,
+  monthStr?: string,
+  currency = 'VND',
+): Promise<SpendingInsightsResponse> {
+  const now = new Date()
+  const { period, daysTotal, daysElapsed } = buildAnalyticsPeriod(now, monthStr)
+  const significanceMinAmount = currency === 'VND' ? 100000 : 10
+  const insights: SpendingInsight[] = []
+
+  const catBreakdown = await getCategoryBreakdown(
+    userId,
+    'current_month',
+    monthStr,
+    undefined,
+    undefined,
+    currency,
+  )
+  insights.push(
+    ...evaluateCategoryMomInsights(
+      catBreakdown.categories,
+      currency,
+      significanceMinAmount,
+    ),
+  )
+
+  const budgetPerf = await getBudgetPerformance(userId, monthStr, currency)
+  insights.push(
+    ...evaluateBudgetInsights(
+      budgetPerf.items,
+      currency,
+      daysTotal,
+      daysElapsed,
+    ),
+  )
+
   const biggestExp = await getBiggestExpenses(
     userId,
     'current_month',
@@ -1253,7 +1342,6 @@ export async function generateSpendingInsights(
     }
   }
 
-  // 4. Check Savings Rate Milestone
   const summary = await getFinancialSummary(
     userId,
     'current_month',
@@ -1262,42 +1350,19 @@ export async function generateSpendingInsights(
     undefined,
     currency,
   )
-  const curSummary = summary.summaries.find((s) => s.currency === currency)
-  if (curSummary && curSummary.savingsRate !== null && curSummary.income > 0) {
-    if (curSummary.savingsRate >= 30) {
-      insights.push({
-        id: `savings_rate_${currency}`,
-        type: 'SAVINGS_RATE',
-        severity: 'SUCCESS',
-        title: 'Strong savings rate',
-        description: `Your savings rate is ${curSummary.savingsRate}% this period (net ${curSummary.net.toLocaleString()} ${currency}).`,
-        currency,
-        metricValue: curSummary.savingsRate,
-      })
-    }
-  }
+  const savingsInsight = evaluateSavingsRateInsight(
+    summary.summaries.find((s) => s.currency === currency),
+    currency,
+  )
+  if (savingsInsight) insights.push(savingsInsight)
 
-  // 5. Subscription Share
   const commitments = await getCommitmentsSummary(userId, currency)
-  if (
-    commitments.estimatedMonthlyCost > 0 &&
-    catBreakdown.totalExpenses > 0 &&
-    (commitments.estimatedMonthlyCost / catBreakdown.totalExpenses) * 100 >= 15
-  ) {
-    const subShare = Math.round(
-      (commitments.estimatedMonthlyCost / catBreakdown.totalExpenses) * 100,
-    )
-    insights.push({
-      id: `sub_share_${currency}`,
-      type: 'SUBSCRIPTION_SHARE',
-      severity: 'INFO',
-      title: 'Subscription commitments',
-      description: `Active subscriptions account for ${subShare}% of your monthly spending (${commitments.estimatedMonthlyCost.toLocaleString()} ${currency}/month).`,
-      currency,
-      metricValue: subShare,
-      actionUrl: '/budgets',
-    })
-  }
+  const subInsight = evaluateSubscriptionCommitmentsInsight(
+    commitments,
+    catBreakdown.totalExpenses,
+    currency,
+  )
+  if (subInsight) insights.push(subInsight)
 
   return { period, insights }
 }

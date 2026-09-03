@@ -543,196 +543,244 @@ export function extractLineItems(
   return items
 }
 
-/**
- * Enhanced semantic candidate extraction, multi-line neighborhood search, arithmetic validation, and conflict resolution.
- */
-export function resolveReceiptTotal(
-  lines: string[],
-  items: ExtractedReceiptItem[],
-  isVND: boolean,
-): {
-  totalAmount: number | null
-  confidence: FieldConfidence
-  hasConflict: boolean
-  uncertaintyWarning: string | null
-  reasons: string[]
+interface SemanticScanContext {
   candidates: ScoredTotalCandidate[]
-} {
-  const candidates: ScoredTotalCandidate[] = []
+  subtotalAmount: number | null
+  taxAmount: number | null
+  discountAmount: number | null
+  cashGivenAmount: number | null
+  changeAmount: number | null
+}
 
-  let subtotalAmount: number | null = null
-  let taxAmount: number | null = null
-  let discountAmount: number | null = null
-  let cashGivenAmount: number | null = null
-  let changeAmount: number | null = null
+function evaluateSemanticRole(
+  line: string,
+  prevLine: string,
+  nextLine: string,
+): { role: SemanticTotalRole; scoreBonus: number; reason: string | null } {
+  if (GRAND_TOTAL_REGEX.test(line)) {
+    return {
+      role: 'grand_total',
+      scoreBonus: 40,
+      reason: 'Grand Total keyword match (+40)',
+    }
+  }
+  if (PURCHASE_VALUE_REGEX.test(line)) {
+    return {
+      role: 'purchase_value',
+      scoreBonus: 30,
+      reason: 'Purchase value keyword match (+30)',
+    }
+  }
+  if (PAYMENT_KEYWORDS_REGEX.test(line)) {
+    return {
+      role: 'payment_amount',
+      scoreBonus: 25,
+      reason: 'Payment method keyword match (+25)',
+    }
+  }
+  if (GRAND_TOTAL_REGEX.test(prevLine) || GRAND_TOTAL_REGEX.test(nextLine)) {
+    return {
+      role: 'grand_total',
+      scoreBonus: 35,
+      reason: 'Adjacent line Grand Total label match (+35)',
+    }
+  }
+  if (
+    PURCHASE_VALUE_REGEX.test(prevLine) ||
+    PURCHASE_VALUE_REGEX.test(nextLine)
+  ) {
+    return {
+      role: 'purchase_value',
+      scoreBonus: 28,
+      reason: 'Adjacent line Purchase Value label match (+28)',
+    }
+  }
+  if (
+    PAYMENT_KEYWORDS_REGEX.test(prevLine) ||
+    PAYMENT_KEYWORDS_REGEX.test(nextLine)
+  ) {
+    return {
+      role: 'payment_amount',
+      scoreBonus: 25,
+      reason: 'Adjacent line Payment label match (+25)',
+    }
+  }
+  return { role: 'fallback', scoreBonus: 0, reason: null }
+}
 
-  // 1. Scan lines for semantic amounts and multi-line total associations
+function applyMonetaryFormattingBonuses(
+  rawStr: string,
+  parsedAmount: number,
+  formatted: boolean,
+  isVND: boolean,
+  score: number,
+  reasons: string[],
+): number {
+  if (formatted) {
+    const bonus = isVND ? 30 : 15
+    reasons.push(`Formatted monetary pattern '${rawStr}' (+${bonus})`)
+    return score + bonus
+  }
+  if (isVND) {
+    if (parsedAmount < 1000) {
+      reasons.push('Unformatted tiny integer < 1000 VND (-60)')
+      return score - 60
+    }
+    if (/^\d{5,}$/.test(rawStr)) {
+      reasons.push('Unformatted plain integer / barcode pattern (-40)')
+      return score - 40
+    }
+  }
+  return score
+}
+
+function processSubordinateRoles(
+  line: string,
+  rawStr: string,
+  parsedAmount: number,
+  lineIndex: number,
+  isLastOnLine: boolean,
+  context: SemanticScanContext,
+): boolean {
+  if (CHANGE_REGEX.test(line) && isLastOnLine) {
+    context.changeAmount = parsedAmount
+    context.candidates.push({
+      amount: parsedAmount,
+      rawString: rawStr,
+      sourceLine: line,
+      lineIndex,
+      role: 'change',
+      score: -50,
+      reasons: ['Change returned amount (-50)'],
+    })
+    return true
+  }
+  if (
+    CASH_GIVEN_REGEX.test(line) &&
+    !GRAND_TOTAL_REGEX.test(line) &&
+    isLastOnLine
+  ) {
+    context.cashGivenAmount = parsedAmount
+    context.candidates.push({
+      amount: parsedAmount,
+      rawString: rawStr,
+      sourceLine: line,
+      lineIndex,
+      role: 'cash_given',
+      score: -50,
+      reasons: ['Cash tendered amount (-50)'],
+    })
+    return true
+  }
+  if (TOTAL_ITEMS_COUNT_REGEX.test(line)) {
+    context.candidates.push({
+      amount: parsedAmount,
+      rawString: rawStr,
+      sourceLine: line,
+      lineIndex,
+      role: 'item_count',
+      score: -60,
+      reasons: ['Total item quantity / count label (-60)'],
+    })
+    return true
+  }
+  if (
+    SUBTOTAL_REGEX.test(line) &&
+    !GRAND_TOTAL_REGEX.test(line) &&
+    isLastOnLine
+  ) {
+    context.subtotalAmount = parsedAmount
+    context.candidates.push({
+      amount: parsedAmount,
+      rawString: rawStr,
+      sourceLine: line,
+      lineIndex,
+      role: 'subtotal',
+      score: 15,
+      reasons: ['Subtotal line'],
+    })
+    return true
+  }
+  if (
+    DISCOUNT_REGEX.test(line) &&
+    !GRAND_TOTAL_REGEX.test(line) &&
+    isLastOnLine
+  ) {
+    context.discountAmount = parsedAmount
+    context.candidates.push({
+      amount: parsedAmount,
+      rawString: rawStr,
+      sourceLine: line,
+      lineIndex,
+      role: 'discount',
+      score: -30,
+      reasons: ['Discount line (-30)'],
+    })
+    return true
+  }
+  if (TAX_REGEX.test(line) && !GRAND_TOTAL_REGEX.test(line) && isLastOnLine) {
+    context.taxAmount = parsedAmount
+    context.candidates.push({
+      amount: parsedAmount,
+      rawString: rawStr,
+      sourceLine: line,
+      lineIndex,
+      role: 'tax',
+      score: -30,
+      reasons: ['Tax line (-30)'],
+    })
+    return true
+  }
+  return false
+}
+
+function scanSemanticAmounts(
+  lines: string[],
+  isVND: boolean,
+): SemanticScanContext {
+  const context: SemanticScanContext = {
+    candidates: [],
+    subtotalAmount: null,
+    taxAmount: null,
+    discountAmount: null,
+    cashGivenAmount: null,
+    changeAmount: null,
+  }
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
-    const prevLine = i > 0 ? lines[i - 1] : ''
-    const nextLine = i < lines.length - 1 ? lines[i + 1] : ''
-    const positionRatio = i / Math.max(lines.length - 1, 1)
-
-    if (ITEM_BREAKDOWN_REGEX.test(line)) {
-      continue
-    }
+    if (ITEM_BREAKDOWN_REGEX.test(line)) continue
 
     const amounts = line.match(/\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?\b/g)
     if (!amounts || amounts.length === 0) continue
 
-    // Check all numbers found on the line as candidate amounts
+    const prevLine = i > 0 ? lines[i - 1] : ''
+    const nextLine = i < lines.length - 1 ? lines[i + 1] : ''
+    const positionRatio = i / Math.max(lines.length - 1, 1)
+
     for (let aIdx = 0; aIdx < amounts.length; aIdx++) {
       const rawStr = amounts[aIdx]
       const parsedAmount = parseReceiptAmount(rawStr, isVND)
       if (parsedAmount === null || parsedAmount <= 0) continue
 
       const isLastOnLine = aIdx === amounts.length - 1
-      const formatted = isFormattedMonetary(rawStr)
-
-      // Handle explicit negative/subordinate semantic roles
-      if (CHANGE_REGEX.test(line) && isLastOnLine) {
-        changeAmount = parsedAmount
-        candidates.push({
-          amount: parsedAmount,
-          rawString: rawStr,
-          sourceLine: line,
-          lineIndex: i,
-          role: 'change',
-          score: -50,
-          reasons: ['Change returned amount (-50)'],
-        })
-        continue
-      }
-
       if (
-        CASH_GIVEN_REGEX.test(line) &&
-        !GRAND_TOTAL_REGEX.test(line) &&
-        isLastOnLine
+        processSubordinateRoles(
+          line,
+          rawStr,
+          parsedAmount,
+          i,
+          isLastOnLine,
+          context,
+        )
       ) {
-        cashGivenAmount = parsedAmount
-        candidates.push({
-          amount: parsedAmount,
-          rawString: rawStr,
-          sourceLine: line,
-          lineIndex: i,
-          role: 'cash_given',
-          score: -50,
-          reasons: ['Cash tendered amount (-50)'],
-        })
         continue
       }
 
-      if (TOTAL_ITEMS_COUNT_REGEX.test(line)) {
-        candidates.push({
-          amount: parsedAmount,
-          rawString: rawStr,
-          sourceLine: line,
-          lineIndex: i,
-          role: 'item_count',
-          score: -60,
-          reasons: ['Total item quantity / count label (-60)'],
-        })
-        continue
-      }
+      const roleResult = evaluateSemanticRole(line, prevLine, nextLine)
+      let score = 10 + roleResult.scoreBonus
+      const reasons: string[] = roleResult.reason ? [roleResult.reason] : []
 
-      if (
-        SUBTOTAL_REGEX.test(line) &&
-        !GRAND_TOTAL_REGEX.test(line) &&
-        isLastOnLine
-      ) {
-        subtotalAmount = parsedAmount
-        candidates.push({
-          amount: parsedAmount,
-          rawString: rawStr,
-          sourceLine: line,
-          lineIndex: i,
-          role: 'subtotal',
-          score: 15,
-          reasons: ['Subtotal line'],
-        })
-        continue
-      }
-
-      if (
-        DISCOUNT_REGEX.test(line) &&
-        !GRAND_TOTAL_REGEX.test(line) &&
-        isLastOnLine
-      ) {
-        discountAmount = parsedAmount
-        candidates.push({
-          amount: parsedAmount,
-          rawString: rawStr,
-          sourceLine: line,
-          lineIndex: i,
-          role: 'discount',
-          score: -30,
-          reasons: ['Discount line (-30)'],
-        })
-        continue
-      }
-
-      if (
-        TAX_REGEX.test(line) &&
-        !GRAND_TOTAL_REGEX.test(line) &&
-        isLastOnLine
-      ) {
-        taxAmount = parsedAmount
-        candidates.push({
-          amount: parsedAmount,
-          rawString: rawStr,
-          sourceLine: line,
-          lineIndex: i,
-          role: 'tax',
-          score: -30,
-          reasons: ['Tax line (-30)'],
-        })
-        continue
-      }
-
-      // Check Grand Total, Purchase Value, or Payment labels (same line or neighboring lines)
-      let role: SemanticTotalRole = 'fallback'
-      let score = 10
-      const reasons: string[] = []
-
-      // Same-line label matches
-      if (GRAND_TOTAL_REGEX.test(line)) {
-        role = 'grand_total'
-        score += 40
-        reasons.push('Grand Total keyword match (+40)')
-      } else if (PURCHASE_VALUE_REGEX.test(line)) {
-        role = 'purchase_value'
-        score += 30
-        reasons.push('Purchase value keyword match (+30)')
-      } else if (PAYMENT_KEYWORDS_REGEX.test(line)) {
-        role = 'payment_amount'
-        score += 25
-        reasons.push('Payment method keyword match (+25)')
-      }
-      // Multi-line neighborhood label association (e.g. Label on prev/next line, value on current line)
-      else if (
-        GRAND_TOTAL_REGEX.test(prevLine) ||
-        GRAND_TOTAL_REGEX.test(nextLine)
-      ) {
-        role = 'grand_total'
-        score += 35
-        reasons.push(`Adjacent line Grand Total label match (+35)`)
-      } else if (
-        PURCHASE_VALUE_REGEX.test(prevLine) ||
-        PURCHASE_VALUE_REGEX.test(nextLine)
-      ) {
-        role = 'purchase_value'
-        score += 28
-        reasons.push(`Adjacent line Purchase Value label match (+28)`)
-      } else if (
-        PAYMENT_KEYWORDS_REGEX.test(prevLine) ||
-        PAYMENT_KEYWORDS_REGEX.test(nextLine)
-      ) {
-        role = 'payment_amount'
-        score += 25
-        reasons.push(`Adjacent line Payment label match (+25)`)
-      }
-
-      // Position scoring
       if (positionRatio > 0.5) {
         score += 10
         reasons.push('Bottom half position (+10)')
@@ -742,47 +790,51 @@ export function resolveReceiptTotal(
         reasons.push('Bottom quartile position (+10)')
       }
 
-      // Monetary formatting bonus / noise penalty
-      if (formatted) {
-        score += isVND ? 30 : 15
-        reasons.push(
-          `Formatted monetary pattern '${rawStr}' (+${isVND ? 30 : 15})`,
-        )
-      } else if (isVND) {
-        // Severe penalty for tiny unformatted integers in VND (e.g. 1, 4, 23)
-        if (parsedAmount < 1000) {
-          score -= 60
-          reasons.push(`Unformatted tiny integer < 1000 VND (-60)`)
-        }
-        // Penalty for isolated barcode/product code strings (plain 5+ digits)
-        if (/^\d{5,}$/.test(rawStr)) {
-          score -= 40
-          reasons.push(`Unformatted plain integer / barcode pattern (-40)`)
-        }
-      }
+      score = applyMonetaryFormattingBonuses(
+        rawStr,
+        parsedAmount,
+        isFormattedMonetary(rawStr),
+        isVND,
+        score,
+        reasons,
+      )
 
-      // Prefer the last number on a line over intermediate quantities
       if (isLastOnLine && amounts.length > 1) {
         score += 10
         reasons.push('Last number on line (+10)')
       }
 
-      candidates.push({
+      context.candidates.push({
         amount: parsedAmount,
         rawString: rawStr,
         sourceLine: line,
         lineIndex: i,
-        role,
+        role: roleResult.role,
         score,
         reasons,
       })
     }
   }
 
-  // 2. Arithmetic Cross-Validation
-  let hasArithmeticProof = false
+  return context
+}
 
-  // A. Check Subtotal + Tax - Discount (ONLY if tax or discount explicitly exists)
+function applyArithmeticCrossValidation(
+  candidates: ScoredTotalCandidate[],
+  scanContext: SemanticScanContext,
+  items: ExtractedReceiptItem[],
+  linesLength: number,
+  isVND: boolean,
+): { hasArithmeticProof: boolean; lineItemSum: number } {
+  let hasArithmeticProof = false
+  const {
+    subtotalAmount,
+    taxAmount,
+    discountAmount,
+    cashGivenAmount,
+    changeAmount,
+  } = scanContext
+
   if (
     subtotalAmount !== null &&
     (taxAmount !== null || discountAmount !== null)
@@ -805,7 +857,6 @@ export function resolveReceiptTotal(
     }
   }
 
-  // B. Check Cash Given - Change
   if (cashGivenAmount !== null && changeAmount !== null) {
     const netPaid = cashGivenAmount - changeAmount
     if (netPaid > 0) {
@@ -825,7 +876,6 @@ export function resolveReceiptTotal(
     }
   }
 
-  // C. Line-Item Sum Arithmetic Validation
   let lineItemSum = 0
   if (items.length >= 2) {
     lineItemSum = items.reduce((sum, item) => sum + (item.totalPrice || 0), 0)
@@ -834,59 +884,38 @@ export function resolveReceiptTotal(
       : Math.round(lineItemSum * 100) / 100
   }
 
-  if (lineItemSum > 0) {
-    const hasSeparateTax = taxAmount !== null && taxAmount > 0
-    const hasSeparateDiscount = discountAmount !== null && discountAmount > 0
+  if (lineItemSum > 0 && !taxAmount && !discountAmount) {
+    candidates.push({
+      amount: lineItemSum,
+      rawString: lineItemSum.toString(),
+      sourceLine: `Arithmetic sum of ${items.length} line items`,
+      lineIndex: linesLength,
+      role: 'line_item_sum',
+      score: 50,
+      reasons: [`Arithmetic sum of line items (${lineItemSum}) (+50)`],
+    })
 
-    if (!hasSeparateTax && !hasSeparateDiscount) {
-      candidates.push({
-        amount: lineItemSum,
-        rawString: lineItemSum.toString(),
-        sourceLine: `Arithmetic sum of ${items.length} line items`,
-        lineIndex: lines.length,
-        role: 'line_item_sum',
-        score: 50,
-        reasons: [`Arithmetic sum of line items (${lineItemSum}) (+50)`],
-      })
-
-      for (const c of candidates) {
-        if (
-          Math.abs(c.amount - lineItemSum) < 0.01 &&
-          c.role !== 'line_item_sum'
-        ) {
-          c.score += 50
-          hasArithmeticProof = true
-          c.reasons.push(
-            `Exact match with line-item arithmetic sum ${lineItemSum} (+50)`,
-          )
-        }
+    for (const c of candidates) {
+      if (
+        Math.abs(c.amount - lineItemSum) < 0.01 &&
+        c.role !== 'line_item_sum'
+      ) {
+        c.score += 50
+        hasArithmeticProof = true
+        c.reasons.push(
+          `Exact match with line-item arithmetic sum ${lineItemSum} (+50)`,
+        )
       }
     }
   }
 
-  // Filter valid positive candidates (strictly exclude negative roles and item count)
-  const validCandidates = candidates.filter(
-    (c) =>
-      c.role !== 'cash_given' &&
-      c.role !== 'change' &&
-      c.role !== 'discount' &&
-      c.role !== 'tax' &&
-      c.role !== 'item_count' &&
-      c.score > 0,
-  )
+  return { hasArithmeticProof, lineItemSum }
+}
 
-  if (validCandidates.length === 0) {
-    return {
-      totalAmount: null,
-      confidence: 'none',
-      hasConflict: false,
-      uncertaintyWarning: 'No valid total candidates found',
-      reasons: ['No valid total candidates found'],
-      candidates,
-    }
-  }
-
-  // 3. Candidate Clustering and Agreement Boosting
+function boostCandidateAgreementAndDisambiguation(
+  validCandidates: ScoredTotalCandidate[],
+  lineItemSum: number,
+): void {
   for (const c of validCandidates) {
     const exactMatches = validCandidates.filter(
       (other) => other !== c && Math.abs(other.amount - c.amount) < 0.01,
@@ -897,7 +926,6 @@ export function resolveReceiptTotal(
     }
   }
 
-  // 4. OCR Confusable Numbers & Disambiguation
   for (const c of validCandidates) {
     for (const other of validCandidates) {
       if (c !== other && areNumericallyConfusable(c.amount, other.amount)) {
@@ -922,50 +950,31 @@ export function resolveReceiptTotal(
         ) {
           c.score += 35
           c.reasons.push(
-            `Payment / arithmetic authority disambiguated over printed OCR confusion (+35)`,
+            'Payment / arithmetic authority disambiguated over printed OCR confusion (+35)',
           )
         }
       }
     }
   }
+}
 
-  // Sort valid candidates by score descending
-  validCandidates.sort((a, b) => b.score - a.score)
-  const bestCandidate = validCandidates[0]
-
-  // If even the best candidate is very weak (< 20), do not fabricate
-  if (bestCandidate.score < 20) {
-    return {
-      totalAmount: null,
-      confidence: 'low',
-      hasConflict: false,
-      uncertaintyWarning: 'Amount detected with uncertainty — please verify.',
-      reasons: ['Candidate score below minimum confidence threshold'],
-      candidates,
-    }
-  }
-
-  // 5. Detect Conflicting Candidates & Numeric Confusion
-  const competingCandidates = validCandidates.filter(
+function evaluateTotalConfidence(
+  bestCandidate: ScoredTotalCandidate,
+  validCandidates: ScoredTotalCandidate[],
+  hasArithmeticProof: boolean,
+  lineItemSum: number,
+): {
+  confidence: FieldConfidence
+  hasConflict: boolean
+  uncertaintyWarning: string | null
+} {
+  const competing = validCandidates.filter(
     (c) => Math.abs(c.amount - bestCandidate.amount) >= 0.01 && c.score > 25,
   )
-
-  let hasConflict = false
-  let hasConfusableConflict = false
-  let uncertaintyWarning: string | null = null
-
-  if (competingCandidates.length > 0) {
-    hasConflict = true
-    for (const comp of competingCandidates) {
-      if (areNumericallyConfusable(comp.amount, bestCandidate.amount)) {
-        hasConfusableConflict = true
-        break
-      }
-    }
-  }
-
-  // 6. Confidence Assignment
-  let confidence: FieldConfidence = 'low'
+  const hasConflict = competing.length > 0
+  const hasConfusableConflict = competing.some((comp) =>
+    areNumericallyConfusable(comp.amount, bestCandidate.amount),
+  )
 
   const exactAgreements = validCandidates.filter(
     (c) => Math.abs(c.amount - bestCandidate.amount) < 0.01,
@@ -973,6 +982,7 @@ export function resolveReceiptTotal(
   const matchesLineItemSum =
     lineItemSum > 0 && Math.abs(bestCandidate.amount - lineItemSum) < 0.01
 
+  let confidence: FieldConfidence = 'low'
   if (bestCandidate.score >= 70 || hasArithmeticProof) {
     confidence = 'high'
   } else if (exactAgreements >= 2 && !hasConfusableConflict) {
@@ -981,10 +991,9 @@ export function resolveReceiptTotal(
     confidence = 'high'
   } else if (bestCandidate.score >= 35) {
     confidence = 'medium'
-  } else {
-    confidence = 'low'
   }
 
+  let uncertaintyWarning: string | null = null
   if (hasConfusableConflict) {
     uncertaintyWarning = 'Amount detected with uncertainty — please verify.'
     if (!matchesLineItemSum && !hasArithmeticProof && exactAgreements < 3) {
@@ -994,13 +1003,84 @@ export function resolveReceiptTotal(
     uncertaintyWarning = 'Amount detected with uncertainty — please verify.'
   }
 
+  return { confidence, hasConflict, uncertaintyWarning }
+}
+
+/**
+ * Enhanced semantic candidate extraction, multi-line neighborhood search, arithmetic validation, and conflict resolution.
+ */
+export function resolveReceiptTotal(
+  lines: string[],
+  items: ExtractedReceiptItem[],
+  isVND: boolean,
+): {
+  totalAmount: number | null
+  confidence: FieldConfidence
+  hasConflict: boolean
+  uncertaintyWarning: string | null
+  reasons: string[]
+  candidates: ScoredTotalCandidate[]
+} {
+  const scanContext = scanSemanticAmounts(lines, isVND)
+  const { hasArithmeticProof, lineItemSum } = applyArithmeticCrossValidation(
+    scanContext.candidates,
+    scanContext,
+    items,
+    lines.length,
+    isVND,
+  )
+
+  const validCandidates = scanContext.candidates.filter(
+    (c) =>
+      c.role !== 'cash_given' &&
+      c.role !== 'change' &&
+      c.role !== 'discount' &&
+      c.role !== 'tax' &&
+      c.role !== 'item_count' &&
+      c.score > 0,
+  )
+
+  if (validCandidates.length === 0) {
+    return {
+      totalAmount: null,
+      confidence: 'none',
+      hasConflict: false,
+      uncertaintyWarning: 'No valid total candidates found',
+      reasons: ['No valid total candidates found'],
+      candidates: scanContext.candidates,
+    }
+  }
+
+  boostCandidateAgreementAndDisambiguation(validCandidates, lineItemSum)
+  validCandidates.sort((a, b) => b.score - a.score)
+  const bestCandidate = validCandidates[0]
+
+  if (bestCandidate.score < 20) {
+    return {
+      totalAmount: null,
+      confidence: 'low',
+      hasConflict: false,
+      uncertaintyWarning: 'Amount detected with uncertainty — please verify.',
+      reasons: ['Candidate score below minimum confidence threshold'],
+      candidates: scanContext.candidates,
+    }
+  }
+
+  const { confidence, hasConflict, uncertaintyWarning } =
+    evaluateTotalConfidence(
+      bestCandidate,
+      validCandidates,
+      hasArithmeticProof,
+      lineItemSum,
+    )
+
   return {
     totalAmount: bestCandidate.amount,
     confidence,
     hasConflict,
     uncertaintyWarning,
     reasons: bestCandidate.reasons,
-    candidates,
+    candidates: scanContext.candidates,
   }
 }
 

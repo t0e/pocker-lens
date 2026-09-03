@@ -19,6 +19,93 @@ export function removeVietnameseAccents(str: string): string {
 }
 
 export class RuleBasedParser implements TransactionInputParser {
+  private resolveMatchedAccounts(
+    rawText: string,
+    lowerNormalized: string,
+    type: TransactionType,
+    accounts: UserAccountContext[],
+    warnings: string[],
+  ): {
+    accountId: string | null
+    accountName: string | null
+    transferAccountId: string | null
+    transferAccountName: string | null
+    accountConfidence: number
+  } {
+    if (type === 'transfer') {
+      const transferMatch = this.matchTransferAccounts(
+        rawText,
+        lowerNormalized,
+        accounts,
+      )
+      if (!transferMatch.sourceAccountId || !transferMatch.destAccountId) {
+        warnings.push(
+          'Please verify both source and destination accounts for the transfer.',
+        )
+      } else if (
+        transferMatch.sourceAccountCurrency !==
+        transferMatch.destAccountCurrency
+      ) {
+        warnings.push(
+          'Source and destination accounts must use the same currency in Phase 3.',
+        )
+      }
+      return {
+        accountId: transferMatch.sourceAccountId,
+        accountName: transferMatch.sourceAccountName,
+        transferAccountId: transferMatch.destAccountId,
+        transferAccountName: transferMatch.destAccountName,
+        accountConfidence: transferMatch.confidence,
+      }
+    }
+
+    const accountMatch = this.matchSingleAccount(
+      rawText,
+      lowerNormalized,
+      accounts,
+    )
+    if (!accountMatch.accountId) {
+      warnings.push('No matching account found. Please select an account.')
+    }
+    return {
+      accountId: accountMatch.accountId,
+      accountName: accountMatch.accountName,
+      transferAccountId: null,
+      transferAccountName: null,
+      accountConfidence: accountMatch.confidence,
+    }
+  }
+
+  private resolveFinalCurrency(
+    extractedCurrency: string | null,
+    accountId: string | null,
+    context: ParserUserContext,
+  ): string {
+    if (extractedCurrency) return extractedCurrency
+    if (accountId) {
+      const acc = context.accounts.find((a) => a.id === accountId)
+      if (acc) return acc.currency
+    }
+    return context.preferredCurrency || 'VND'
+  }
+
+  private calculateOverallConfidence(
+    amountConf: number,
+    typeConf: number,
+    accConf: number,
+    catConf: number,
+    dateConf: number,
+    isTransfer: boolean,
+  ): number {
+    const raw =
+      (amountConf * 0.35 +
+        typeConf * 0.2 +
+        accConf * 0.25 +
+        (isTransfer ? 1.0 : catConf) * 0.2) *
+      dateConf
+    return parseFloat(raw.toFixed(2))
+  }
+
   parse(inputText: string, context: ParserUserContext): ParseTransactionResult {
     const rawText = inputText.trim()
     const warnings: string[] = []
@@ -32,123 +119,56 @@ export class RuleBasedParser implements TransactionInputParser {
       }
     }
 
-    let workingText = rawText
     const lowerNormalized = removeVietnameseAccents(rawText)
-
-    // 1. Parse Date
     const { date, dateConfidence, cleanedFromDate } = this.extractDate(
-      workingText,
+      rawText,
       lowerNormalized,
     )
-    workingText = cleanedFromDate
-
-    // 2. Parse Amount & Currency
     const { amount, currency, amountConfidence, cleanedFromAmount } =
-      this.extractAmountAndCurrency(workingText, context)
-    workingText = cleanedFromAmount
-
-    // 3. Determine Transaction Type (Transfer vs Income vs Expense)
+      this.extractAmountAndCurrency(cleanedFromDate, context)
     const { type, typeConfidence } = this.detectTransactionType(
       rawText,
       lowerNormalized,
     )
 
-    // 4. Match Accounts (Source & Transfer Destination)
-    let accountId: string | null = null
-    let accountName: string | null = null
-    let transferAccountId: string | null = null
-    let transferAccountName: string | null = null
-    let accountConfidence = 0
+    const accountMatch = this.resolveMatchedAccounts(
+      rawText,
+      lowerNormalized,
+      type,
+      context.accounts,
+      warnings,
+    )
 
-    if (type === 'transfer') {
-      const transferMatch = this.matchTransferAccounts(
-        rawText,
-        lowerNormalized,
-        context.accounts,
-      )
-      accountId = transferMatch.sourceAccountId
-      accountName = transferMatch.sourceAccountName
-      transferAccountId = transferMatch.destAccountId
-      transferAccountName = transferMatch.destAccountName
-      accountConfidence = transferMatch.confidence
+    const catMatch =
+      type !== 'transfer'
+        ? this.matchCategory(rawText, lowerNormalized, type, context.categories)
+        : {
+            categoryId: null,
+            categoryName: null,
+            categoryIcon: null,
+            confidence: 0,
+          }
 
-      if (!accountId || !transferAccountId) {
-        warnings.push(
-          'Please verify both source and destination accounts for the transfer.',
-        )
-      } else if (
-        transferMatch.sourceAccountCurrency !==
-        transferMatch.destAccountCurrency
-      ) {
-        warnings.push(
-          'Source and destination accounts must use the same currency in Phase 3.',
-        )
-      }
-    } else {
-      const accountMatch = this.matchSingleAccount(
-        rawText,
-        lowerNormalized,
-        context.accounts,
-      )
-      accountId = accountMatch.accountId
-      accountName = accountMatch.accountName
-      accountConfidence = accountMatch.confidence
-
-      if (!accountId) {
-        warnings.push('No matching account found. Please select an account.')
-      }
-    }
-
-    // 5. Match Category (For Income/Expense)
-    let categoryId: string | null = null
-    let categoryName: string | null = null
-    let categoryIcon: string | null = null
-    let categoryConfidence = 0
-
-    if (type !== 'transfer') {
-      const catMatch = this.matchCategory(
-        rawText,
-        lowerNormalized,
-        type,
-        context.categories,
-      )
-      categoryId = catMatch.categoryId
-      categoryName = catMatch.categoryName
-      categoryIcon = catMatch.categoryIcon
-      categoryConfidence = catMatch.confidence
-    }
-
-    // 6. Extract Description & Merchant
     const { description, merchant } = this.extractDescriptionAndMerchant(
       rawText,
-      workingText,
-      categoryName,
+      cleanedFromAmount,
+      catMatch.categoryName,
       type,
     )
 
-    // 7. Resolve Final Currency
-    let finalCurrency = currency
-    if (!finalCurrency && accountId) {
-      const acc = context.accounts.find((a) => a.id === accountId)
-      if (acc) finalCurrency = acc.currency
-    }
-    if (!finalCurrency) {
-      finalCurrency = context.preferredCurrency || 'VND'
-    }
-
-    // Overall Confidence
-    const overallConfidence = parseFloat(
-      (
-        (amountConfidence * 0.35 +
-          typeConfidence * 0.2 +
-          accountConfidence * 0.25 +
-          (type === 'transfer' ? 1.0 : categoryConfidence) * 0.2) *
-        dateConfidence
-      ).toFixed(2),
+    const finalCurrency = this.resolveFinalCurrency(
+      currency,
+      accountMatch.accountId,
+      context,
     )
-
-    const requiresConfirmation =
-      overallConfidence < 0.85 || !amount || !accountId
+    const overallConfidence = this.calculateOverallConfidence(
+      amountConfidence,
+      typeConfidence,
+      accountMatch.accountConfidence,
+      catMatch.confidence,
+      dateConfidence,
+      type === 'transfer',
+    )
 
     return {
       rawText,
@@ -156,27 +176,28 @@ export class RuleBasedParser implements TransactionInputParser {
         type,
         amount,
         currency: finalCurrency,
-        accountId,
-        accountName,
-        transferAccountId,
-        transferAccountName,
-        categoryId,
-        categoryName,
-        categoryIcon,
+        accountId: accountMatch.accountId,
+        accountName: accountMatch.accountName,
+        transferAccountId: accountMatch.transferAccountId,
+        transferAccountName: accountMatch.transferAccountName,
+        categoryId: catMatch.categoryId,
+        categoryName: catMatch.categoryName,
+        categoryIcon: catMatch.categoryIcon,
         description,
         merchant,
         transactionDate: date.toISOString(),
         confidence: {
           amount: amountConfidence,
           type: typeConfidence,
-          account: accountConfidence,
-          category: categoryConfidence,
+          account: accountMatch.accountConfidence,
+          category: catMatch.confidence,
           date: dateConfidence,
           overall: overallConfidence,
         },
       },
       warnings,
-      requiresConfirmation,
+      requiresConfirmation:
+        overallConfidence < 0.85 || !amount || !accountMatch.accountId,
     }
   }
 

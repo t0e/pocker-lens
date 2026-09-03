@@ -50,6 +50,162 @@ export function setOCRProvider(provider: OCRProvider) {
   ocrProvider = provider
 }
 
+async function loadAndValidateReceiptImage(
+  storageKey: string,
+  receiptId: string,
+): Promise<Buffer> {
+  const exists = await storage.exists(storageKey)
+  if (!exists) {
+    throw new Error(
+      `Receipt image file not found on disk at storage key: ${storageKey}`,
+    )
+  }
+
+  const fileBuffer = await storage.getFile(storageKey)
+  if (!fileBuffer || fileBuffer.length === 0) {
+    throw new Error('Stored receipt image file is empty or corrupted')
+  }
+
+  logger.info(
+    {
+      receiptId,
+      sizeKB: Math.round(fileBuffer.length / 1024),
+      mem: getMemoryStats(),
+    },
+    formatMemUsage('after.file-read'),
+  )
+
+  const magicCheck = validateImageMagicBytes(fileBuffer)
+  if (!magicCheck.valid) {
+    throw new Error('Stored receipt file failed signature verification')
+  }
+
+  return fileBuffer
+}
+
+function assembleFieldConfidencesMetadata(
+  fieldConfidences: unknown,
+  qualityInfo: EnhancedOCRResult['quality'],
+  debugInfo: EnhancedOCRResult['debug'],
+  bestCandidate: string | undefined,
+): Prisma.InputJsonValue {
+  const base =
+    typeof fieldConfidences === 'object' && fieldConfidences !== null
+      ? fieldConfidences
+      : {}
+  return {
+    ...base,
+    ...(qualityInfo
+      ? {
+          imageQuality: {
+            rating: qualityInfo.rating,
+            brightness: Math.round(qualityInfo.brightness),
+            contrast: Math.round(qualityInfo.contrast),
+            sharpness: Math.round(qualityInfo.sharpness),
+            resolution: `${qualityInfo.width}x${qualityInfo.height}`,
+            issues: qualityInfo.details,
+          },
+        }
+      : {}),
+    ...(debugInfo
+      ? {
+          ocrPipeline: {
+            documentDetected: debugInfo.documentDetected,
+            documentConfidence:
+              Math.round(debugInfo.documentConfidence * 100) / 100,
+            documentAreaPercent: Math.round(
+              debugInfo.documentAreaFraction * 100,
+            ),
+            perspectiveCorrected: debugInfo.perspectiveCorrected,
+            originalDimensions: debugInfo.originalDimensions,
+            croppedDimensions: debugInfo.croppedDimensions,
+            candidates: debugInfo.candidateLabels,
+            bestCandidate: bestCandidate || 'unknown',
+          },
+        }
+      : {}),
+  } as Prisma.InputJsonValue
+}
+
+async function persistReceiptExtractionResults(
+  receiptId: string,
+  oldExtractionId: string | undefined,
+  extracted: ReturnType<typeof extractReceiptData>,
+  fieldConfidencesJson: Prisma.InputJsonValue,
+  defaultAccountId: string | null,
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    if (oldExtractionId) {
+      await tx.receiptItem.deleteMany({
+        where: { extractionId: oldExtractionId },
+      })
+      await tx.receiptExtraction.delete({
+        where: { id: oldExtractionId },
+      })
+    }
+
+    await tx.receiptExtraction.create({
+      data: {
+        receiptId,
+        merchant: extracted.merchant,
+        transactionDate: extracted.transactionDate,
+        totalAmount:
+          extracted.totalAmount !== null ? extracted.totalAmount : undefined,
+        currency: extracted.currency,
+        categoryId: extracted.suggestedCategoryId || null,
+        accountId: defaultAccountId,
+        rawText: extracted.rawText,
+        detectedLanguage: extracted.detectedLanguage,
+        confidence: extracted.confidence,
+        fieldConfidences: fieldConfidencesJson,
+        status: 'PENDING_REVIEW',
+        items: {
+          create: extracted.items.map((item) => ({
+            description: item.description,
+            quantity: item.quantity !== null ? item.quantity : undefined,
+            unitPrice: item.unitPrice !== null ? item.unitPrice : undefined,
+            totalPrice: item.totalPrice !== null ? item.totalPrice : undefined,
+          })),
+        },
+      },
+    })
+
+    await tx.receipt.update({
+      where: { id: receiptId },
+      data: {
+        status: 'READY',
+        processingCompletedAt: new Date(),
+      },
+    })
+  })
+}
+
+async function handleReceiptProcessingError(
+  receiptId: string,
+  startTime: number,
+  err: unknown,
+): Promise<never> {
+  const durationMs = Date.now() - startTime
+  const message = err instanceof Error ? err.message : String(err)
+  logger.error(
+    { err: message, receiptId, durationMs, mem: getMemoryStats() },
+    'receipt.failed',
+  )
+
+  await prisma.receipt.update({
+    where: { id: receiptId },
+    data: {
+      status: 'FAILED',
+      errorCode: 'PROCESSING_FAILED',
+      errorMessage:
+        'Receipt OCR and extraction failed. Please verify the file and retry.',
+      processingCompletedAt: new Date(),
+    },
+  })
+
+  throw err
+}
+
 export async function processReceiptJob(
   job: Job<ReceiptJobData, ReceiptJobResult>,
 ): Promise<ReceiptJobResult> {
@@ -61,7 +217,6 @@ export async function processReceiptJob(
     formatMemUsage('job.start'),
   )
 
-  // 1. Fetch receipt and user details from database
   const receipt = await prisma.receipt.findUnique({
     where: { id: receiptId },
     include: {
@@ -71,9 +226,7 @@ export async function processReceiptJob(
           accounts: { where: { isArchived: false } },
         },
       },
-      extraction: {
-        include: { items: true },
-      },
+      extraction: { include: { items: true } },
     },
   })
 
@@ -82,16 +235,14 @@ export async function processReceiptJob(
     return { receiptId, success: false, processedAt: new Date().toISOString() }
   }
 
-  // Idempotency check: if already READY and has extraction, skip
   if (receipt.status === 'READY' && receipt.extraction) {
     logger.info(
       { receiptId },
-      'Receipt already processed with extraction and marked READY. Idempotent skip.',
+      'Receipt already processed and READY. Idempotent skip.',
     )
     return { receiptId, success: true, processedAt: new Date().toISOString() }
   }
 
-  // 2. Mark PROCESSING
   await prisma.receipt.update({
     where: { id: receiptId },
     data: {
@@ -103,33 +254,11 @@ export async function processReceiptJob(
   })
 
   try {
-    // 3. Read and validate stored file
-    const exists = await storage.exists(receipt.storageKey)
-    if (!exists) {
-      throw new Error(
-        `Receipt image file not found on disk at storage key: ${receipt.storageKey}`,
-      )
-    }
-
-    const fileBuffer = await storage.getFile(receipt.storageKey)
-    if (!fileBuffer || fileBuffer.length === 0) {
-      throw new Error('Stored receipt image file is empty or corrupted')
-    }
-    logger.info(
-      {
-        receiptId,
-        sizeKB: Math.round(fileBuffer.length / 1024),
-        mem: getMemoryStats(),
-      },
-      formatMemUsage('after.file-read'),
+    const fileBuffer = await loadAndValidateReceiptImage(
+      receipt.storageKey,
+      receiptId,
     )
 
-    const magicCheck = validateImageMagicBytes(fileBuffer)
-    if (!magicCheck.valid) {
-      throw new Error('Stored receipt file failed signature verification')
-    }
-
-    // 4. Perform multi-pass OCR text extraction with preprocessing
     logger.info({ receiptId }, formatMemUsage('before.ocr'))
     const ocrResult = await ocrProvider.extractText(
       fileBuffer,
@@ -140,12 +269,7 @@ export async function processReceiptJob(
       formatMemUsage('after.ocr'),
     )
 
-    // Extract quality and debug info if available (EnhancedOCRResult)
     const enhancedResult = ocrResult as EnhancedOCRResult
-    const qualityInfo = enhancedResult.quality || null
-    const debugInfo = enhancedResult.debug || null
-
-    // 5. Perform deterministic structured extraction (English + Vietnamese)
     const userCategories = receipt.user.categories.map((c) => ({
       id: c.id,
       name: c.name,
@@ -157,96 +281,21 @@ export async function processReceiptJob(
       userCategories,
       defaultCurrency: defaultAccount?.currency || 'VND',
     })
-    logger.info(
-      { receiptId, mem: getMemoryStats() },
-      formatMemUsage('after.extraction'),
+
+    const fieldConfidencesWithQuality = assembleFieldConfidencesMetadata(
+      extracted.fieldConfidences,
+      enhancedResult.quality,
+      enhancedResult.debug,
+      enhancedResult.bestCandidate,
     )
 
-    // 6. Persist extraction and line items in database atomically
-    await prisma.$transaction(async (tx) => {
-      // Delete old extraction items if re-processing
-      if (receipt.extraction) {
-        await tx.receiptItem.deleteMany({
-          where: { extractionId: receipt.extraction.id },
-        })
-        await tx.receiptExtraction.delete({
-          where: { id: receipt.extraction.id },
-        })
-      }
-
-      // Merge image quality + debug info into fieldConfidences JSON (dev inspection)
-      const fieldConfidencesWithQuality = {
-        ...extracted.fieldConfidences,
-        ...(qualityInfo
-          ? {
-              imageQuality: {
-                rating: qualityInfo.rating,
-                brightness: Math.round(qualityInfo.brightness),
-                contrast: Math.round(qualityInfo.contrast),
-                sharpness: Math.round(qualityInfo.sharpness),
-                resolution: `${qualityInfo.width}x${qualityInfo.height}`,
-                issues: qualityInfo.details,
-              },
-            }
-          : {}),
-        ...(debugInfo
-          ? {
-              ocrPipeline: {
-                documentDetected: debugInfo.documentDetected,
-                documentConfidence:
-                  Math.round(debugInfo.documentConfidence * 100) / 100,
-                documentAreaPercent: Math.round(
-                  debugInfo.documentAreaFraction * 100,
-                ),
-                perspectiveCorrected: debugInfo.perspectiveCorrected,
-                originalDimensions: debugInfo.originalDimensions,
-                croppedDimensions: debugInfo.croppedDimensions,
-                candidates: debugInfo.candidateLabels,
-                bestCandidate: enhancedResult.bestCandidate || 'unknown',
-              },
-            }
-          : {}),
-      }
-
-      const extractionRecord = await tx.receiptExtraction.create({
-        data: {
-          receiptId: receipt.id,
-          merchant: extracted.merchant,
-          transactionDate: extracted.transactionDate,
-          totalAmount:
-            extracted.totalAmount !== null ? extracted.totalAmount : undefined,
-          currency: extracted.currency,
-          categoryId: extracted.suggestedCategoryId || null,
-          accountId: defaultAccount?.id || null,
-          rawText: extracted.rawText,
-          detectedLanguage: extracted.detectedLanguage,
-          confidence: extracted.confidence,
-          fieldConfidences:
-            fieldConfidencesWithQuality as Prisma.InputJsonValue,
-          status: 'PENDING_REVIEW',
-          items: {
-            create: extracted.items.map((item) => ({
-              description: item.description,
-              quantity: item.quantity !== null ? item.quantity : undefined,
-              unitPrice: item.unitPrice !== null ? item.unitPrice : undefined,
-              totalPrice:
-                item.totalPrice !== null ? item.totalPrice : undefined,
-            })),
-          },
-        },
-      })
-
-      // 7. Mark receipt READY for user review
-      await tx.receipt.update({
-        where: { id: receiptId },
-        data: {
-          status: 'READY',
-          processingCompletedAt: new Date(),
-        },
-      })
-
-      return extractionRecord
-    })
+    await persistReceiptExtractionResults(
+      receipt.id,
+      receipt.extraction?.id,
+      extracted,
+      fieldConfidencesWithQuality,
+      defaultAccount?.id || null,
+    )
 
     const durationMs = Date.now() - startTime
     logger.info(
@@ -259,41 +308,14 @@ export async function processReceiptJob(
         itemsCount: extracted.items.length,
         ocrConfidence: ocrResult.confidence,
         extractionConfidence: extracted.confidence,
-        qualityRating: qualityInfo?.rating || 'unknown',
-        documentDetected: debugInfo?.documentDetected ?? false,
-        perspectiveCorrected: debugInfo?.perspectiveCorrected ?? false,
-        candidateCount: enhancedResult.candidateCount || 1,
-        bestCandidate: enhancedResult.bestCandidate || 'unknown',
         durationMs,
         mem: getMemoryStats(),
       },
       formatMemUsage('job.end'),
     )
 
-    return {
-      receiptId,
-      success: true,
-      processedAt: new Date().toISOString(),
-    }
+    return { receiptId, success: true, processedAt: new Date().toISOString() }
   } catch (err) {
-    const durationMs = Date.now() - startTime
-    const message = err instanceof Error ? err.message : String(err)
-    logger.error(
-      { err: message, receiptId, durationMs, mem: getMemoryStats() },
-      'receipt.failed',
-    )
-
-    await prisma.receipt.update({
-      where: { id: receiptId },
-      data: {
-        status: 'FAILED',
-        errorCode: 'PROCESSING_FAILED',
-        errorMessage:
-          'Receipt OCR and extraction failed. Please verify the file and retry.',
-        processingCompletedAt: new Date(),
-      },
-    })
-
-    throw err
+    return await handleReceiptProcessingError(receiptId, startTime, err)
   }
 }
